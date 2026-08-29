@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenant 管理パネル</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body class="admin-tenant-page">
+    <aside class="admin-sidebar admin-sidebar-dark">
+        <nav class="admin-nav">
+            <a class="admin-nav-back" href="/admin.html" title="Tenant 一覧へ戻る">
+                <i class="bi bi-arrow-left"></i> 一覧へ戻る
+            </a>
+            <button type="button" class="admin-nav-item active" data-panel="panel-status">
+                <i class="bi bi-speedometer2"></i> ステータス
+            </button>
+            <button type="button" class="admin-nav-item" data-panel="panel-worlds">
+                <i class="bi bi-globe2"></i> ワールド
+            </button>
+            <a class="admin-nav-item admin-nav-link" id="tenant-world-edit-nav" href="#">
+                <i class="bi bi-pencil-square"></i> ワールド編集
+            </a>
+        </nav>
+    </aside>
+
+    <main class="admin-main">
+        <header>
+            <div class="header-left">
+                <span class="header-username" id="header-username">admin</span>
+                <div class="header-titles">
+                    <p class="header-tenant-id" id="header-tenant-id">-</p>
+                    <h1 id="header-tenant-name">Tenant 管理パネル</h1>
+                </div>
+            </div>
+            <div class="header-actions">
+                <span id="admin-ops-status" class="admin-ops-status" aria-live="polite"></span>
+                <button type="button" class="btn btn-secondary btn-sm" id="admin-reload-settings-btn" title="設定を再読み込み">
+                    <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="admin-restart-btn" title="サーバー完全再起動">
+                    <i class="bi bi-power"></i> 完全再起動
+                </button>
+                <button type="button" class="btn btn-secondary" id="admin-theme-toggle" title="ダークモード切替">
+                    <i class="bi bi-moon-fill" id="admin-theme-icon"></i>
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" id="tenant-archive-btn" title="この Tenant をアーカイブ">
+                    アーカイブ
+                </button>
+                <a class="btn btn-secondary" id="tenant-metaverse-link" href="#" target="_blank" rel="noopener">
+                    メタバースを開く
+                </a>
+                <span class="last-update">最終更新: <span id="last-update">-</span></span>
+            </div>
+        </header>
+
+        <div class="admin-panels">
+            <div id="panel-status" class="admin-panel active">
+                <section class="stats-section">
+                    <h2>サーバー統計</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">接続プレイヤー数</div>
+                            <div class="stat-value" id="tenant-players">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">アクティブルーム数</div>
+                            <div class="stat-value" id="tenant-rooms">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">ワールド数</div>
+                            <div class="stat-value" id="tenant-world-count">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Tenant URL</div>
+                            <div class="stat-value stat-value-sm" id="tenant-url">-</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div id="panel-worlds" class="admin-panel">
+                <section class="stats-section">
+                    <h2>ワールド一覧</h2>
+                    <p class="hint">worlds.json から読み込み（読み取り専用）</p>
+                    <table class="worlds-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>表示名</th>
+                                <th>モデル数</th>
+                            </tr>
+                        </thead>
+                        <tbody id="worlds-table-body"></tbody>
+                    </table>
+                    <p id="worlds-status" class="status-text" role="status"></p>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/admin-url-sanitize.js"></script>
+    <script type="module" src="/js/admin-tenant.js"></script>
+</body>
+</html>

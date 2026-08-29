@@ -1,0 +1,731 @@
+<!-- extracted world-edit panel + modals from metaverse-simple admin.html -->
+            <div id="panel-world-edit" class="admin-panel admin-panel-world-edit">
+                <div class="layout setting-layout">
+                    <main class="viewer">
+                        <canvas id="canvas"></canvas>
+                    </main>
+                    <div class="we-left-area">
+                        <nav class="we-category-nav" aria-label="左パネルカテゴリ">
+                            <button type="button" class="we-category-btn active" data-we-category="world">ワールド</button>
+                            <button type="button" class="we-category-btn" data-we-category="model">モデル</button>
+                            <button type="button" class="we-category-btn" data-we-category="avatar">アバター</button>
+                            <button type="button" class="we-category-btn" data-we-category="pdf">PDF</button>
+                            <button type="button" class="we-category-btn" data-we-category="flights">発着情報</button>
+                            <button type="button" class="we-category-btn" data-we-category="fds-smoke">FDS煙</button>
+                            <button type="button" class="we-category-btn" data-we-category="file">ファイル</button>
+                        </nav>
+                        <div class="we-left-content">
+                            <div id="we-cat-world" class="we-category-pane active">
+                                <section class="section">
+                                    <h2 class="section-title">ワールド</h2>
+                                    <div class="world-list" id="world-list"></div>
+                                    <div class="field-row" id="world-name-row" style="display:none">
+                                        <label class="prop-label">名前</label>
+                                        <input type="text" id="world-name" class="prop-input" placeholder="表示名">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="btn-add-world">ワールドを追加</button>
+                                        <button type="button" id="btn-delete-world" disabled>削除</button>
+                                    </div>
+                                    <section class="section world-rod-section" id="world-rod-section" style="display:none;margin-top:12px;">
+                                        <h2 class="section-title">品質ロッド</h2>
+                                        <p class="hint">全ワールドはロッド1を持ちます。追加でロッド2以降を定義すると、入室時に品質を選べます（距離LODとは別）。</p>
+                                        <div id="world-rod-list" class="world-rod-list"></div>
+                                        <div class="btn-row" style="margin-top:8px;">
+                                            <button type="button" id="btn-world-rod-add" class="btn btn-sm btn-outline-secondary">ロッドを追加</button>
+                                        </div>
+                                    </section>
+                                </section>
+                            </div>
+                            <div id="we-cat-model" class="we-category-pane">
+                                <section class="section">
+                                    <h2 class="section-title">モデル一覧</h2>
+                                    <div class="model-list" id="model-list"></div>
+                                    <div class="field-row" id="add-obj-mtl-row" style="display:none">
+                                        <label class="prop-label" for="add-obj-mtl">MTL（OBJ時）</label>
+                                        <select id="add-obj-mtl" class="prop-input full" aria-label="OBJ用MTLファイル"></select>
+                                    </div>
+                                    <button type="button" id="btn-add-model">モデルを追加</button>
+                                </section>
+                            </div>
+                            <div id="we-cat-avatar" class="we-category-pane">
+                                <section class="section">
+                                    <h2 class="section-title">アバター（GLB）</h2>
+                                    <p class="status-text" id="we-avatar-current-label">現在: <span id="we-avatar-current-filename">—</span></p>
+                                    <div class="field-row">
+                                        <label class="prop-label" for="we-avatar-file">ファイル</label>
+                                        <input type="file" id="we-avatar-file" class="prop-input full" accept=".glb,model/gltf-binary" />
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="btn-we-avatar-upload" class="btn-primary">アップロードして適用</button>
+                                    </div>
+                                    <p id="we-avatar-status" class="status-text" role="status"></p>
+                                </section>
+                                <section class="section">
+                                    <h2 class="section-title">IBL（HDR）</h2>
+                                    <p class="status-text" id="we-hdr-current-label">現在: <span id="we-hdr-current-filename">—</span></p>
+                                    <p class="hint" style="margin:4px 0 8px;">Radiance <code>.hdr</code> を <code>/env/default.hdr</code> として保存し、環境マップとして読み込みます。</p>
+                                    <div class="field-row">
+                                        <label class="prop-label" for="we-hdr-file">ファイル</label>
+                                        <input type="file" id="we-hdr-file" class="prop-input full" accept=".hdr" />
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="btn-we-hdr-upload" class="btn-primary">アップロードして適用</button>
+                                    </div>
+                                    <p id="we-hdr-status" class="status-text" role="status"></p>
+                                </section>
+                            </div>
+                            <div id="we-cat-pdf" class="we-category-pane">
+                                <section class="section">
+                                    <h2 class="section-title">PDF一覧</h2>
+                                    <div class="model-list" id="pdf-list"></div>
+                                    <button type="button" id="btn-add-pdf">PDFを追加</button>
+                                    <div class="pdf-preview-wrap">
+                                        <h3 class="section-subtitle">PDFプレビュー</h3>
+                                        <canvas id="we-pdf-canvas"></canvas>
+                                        <div class="pdf-preview-controls">
+                                            <button type="button" id="we-pdf-prev">前のページ</button>
+                                            <span class="pdf-preview-page-info">
+                                                <span id="we-pdf-page-num">-</span> / <span id="we-pdf-page-count">-</span> ページ
+                                            </span>
+                                            <button type="button" id="we-pdf-next">次のページ</button>
+                                        </div>
+                                        <div id="we-pdf-preview-status" class="status-text"></div>
+                                    </div>
+                                </section>
+                            </div>
+                            <div id="we-cat-flights" class="we-category-pane">
+                                <section class="section">
+                                    <h2 class="section-title">発着情報</h2>
+                                    <p class="hint">松山空港（MYJ）の発着は公式運行状況ページを主データ源に表示します。レイアウト変更時のバックアップ用に <code>ADDON_MATSUYAMA_FLIGHTS_ODPT_CONSUMER_KEY</code> を設定できます。アドオン有効化後にサーバーを再起動してください。</p>
+                                    <button type="button" id="btn-add-flight-board-all">発着パネル（全便）を追加</button>
+                                    <button type="button" id="btn-add-flight-board-domestic">発着パネル（国内線のみ）を追加</button>
+                                    <button type="button" id="btn-add-flight-board-international">発着パネル（国際線のみ）を追加</button>
+                                </section>
+                            </div>
+                            <div id="we-cat-fds-smoke" class="we-category-pane">
+                                <section class="section" id="fds-smoke-upload-section">
+                                    <h2 class="section-title">FDS煙シミュレーション</h2>
+                                    <p class="hint"><code>export-fds-smoke.py</code> で出力したフォルダを ZIP 化してアップロードします（<code>manifest.json</code> + <code>.bin</code>）。</p>
+                                    <div class="field-row">
+                                        <label class="prop-label" for="fds-smoke-sim-id">シミュレーション ID</label>
+                                        <input type="text" id="fds-smoke-sim-id" class="prop-input full" placeholder="lite" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+                                    </div>
+                                    <div class="field-row">
+                                        <label class="prop-label" for="fds-smoke-zip-file">ZIP ファイル</label>
+                                        <input type="file" id="fds-smoke-zip-file" class="prop-input full" accept=".zip,application/zip">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="fds-smoke-upload-btn" class="btn-primary">アップロード</button>
+                                    </div>
+                                    <p id="fds-smoke-upload-status" class="status-text" role="status"></p>
+                                </section>
+                                <section class="section">
+                                    <h2 class="section-title">登録済みシミュレーション</h2>
+                                    <div id="fds-smoke-sim-list" class="model-list fds-smoke-sim-list" aria-live="polite"></div>
+                                    <p id="fds-smoke-list-status" class="status-text" role="status"></p>
+                                </section>
+                                <section class="section" id="fds-smoke-assign-section">
+                                    <h2 class="section-title">ワールドへ紐付け</h2>
+                                    <p class="hint">左の「ワールド」で選択中のワールドに <code>fdsSmokes</code> エントリを追加し、サーバーに保存します。未保存のワールド編集がある場合は先に「保存」を押してください。</p>
+                                    <p class="status-text">選択中ワールド: <span id="fds-smoke-selected-world">—</span></p>
+                                    <div class="prop-row">
+                                        <label class="prop-label" for="fds-smoke-pos-x">位置 X</label>
+                                        <input type="number" id="fds-smoke-pos-x" class="prop-input num" step="0.1" value="0"><span class="prop-unit">m</span>
+                                    </div>
+                                    <div class="prop-row">
+                                        <label class="prop-label" for="fds-smoke-pos-y">位置 Y</label>
+                                        <input type="number" id="fds-smoke-pos-y" class="prop-input num" step="0.1" value="0"><span class="prop-unit">m</span>
+                                    </div>
+                                    <div class="prop-row">
+                                        <label class="prop-label" for="fds-smoke-pos-z">位置 Z</label>
+                                        <input type="number" id="fds-smoke-pos-z" class="prop-input num" step="0.1" value="0"><span class="prop-unit">m</span>
+                                    </div>
+                                    <div class="prop-row">
+                                        <label class="prop-label" for="fds-smoke-scale">スケール</label>
+                                        <input type="number" id="fds-smoke-scale" class="prop-input num" step="0.1" min="0.01" value="1">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="fds-smoke-assign-btn" class="btn-secondary" disabled>選択シミュレーションを紐付け</button>
+                                    </div>
+                                    <p id="fds-smoke-assign-status" class="status-text" role="status"></p>
+                                </section>
+                            </div>
+                            <div id="we-cat-file" class="we-category-pane">
+                                <section class="section">
+                                    <h2 class="section-title">ファイル</h2>
+                                    <button type="button" id="btn-storage-files-open" class="btn-secondary">ファイルを管理</button>
+                                </section>
+                                <section class="section">
+                                    <h2 class="section-title">モデルをアップロード</h2>
+                                    <button type="button" id="btn-model-upload-open" class="btn-secondary">アップロード画面を開く</button>
+                                    <span id="upload-status" class="status-text"></span>
+                                </section>
+                                <section class="section">
+                                    <button type="button" id="btn-save" class="btn-primary">保存</button>
+                                    <span id="save-status" class="status-text"></span>
+                                </section>
+                                <section class="section">
+                                    <div class="world-json-btn-row">
+                                        <button type="button" id="btn-export-worlds" class="btn-secondary">ワールド設定をJSONでエクスポート</button>
+                                        <button type="button" id="btn-edit-worlds-json" class="btn-secondary">JSONで編集</button>
+                                    </div>
+                                    <span id="export-status" class="status-text"></span>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="we-right-area">
+                        <nav class="we-right-category-nav" aria-label="右パネルカテゴリ">
+                            <button type="button" class="we-right-category-btn active" data-we-right-category="model">モデル</button>
+                            <button type="button" class="we-right-category-btn" data-we-right-category="light">ライト</button>
+                            <button type="button" class="we-right-category-btn" data-we-right-category="settings">設定</button>
+                        </nav>
+                        <div class="we-right-content">
+                            <div id="we-cat-right-model" class="we-right-pane active">
+                                <section class="section panel-section" id="panel-world-objects">
+                                    <h2 class="section-title">オブジェクト一覧</h2>
+                                    <div class="object-list-slider" id="world-object-list"></div>
+                                </section>
+                                <section class="section panel-section" id="panel-object">
+                            <h2 class="section-title">オブジェクト</h2>
+                            <p class="hint" id="object-hint">オブジェクトを選択してください</p>
+                            <div id="object-props" style="display:none">
+                                <details class="block" open>
+                                    <summary class="block-header">トランスフォーム</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-path">Path</label>
+                                            <input type="text" id="obj-path" class="prop-input full" readonly>
+                                        </div>
+                                        <div class="prop-row" id="obj-mtl-row" style="display:none">
+                                            <label class="prop-label" for="obj-mtl-path">MTL</label>
+                                            <select id="obj-mtl-path" class="prop-input full" aria-label="OBJ用MTL"></select>
+                                        </div>
+                                        <div class="prop-group-label">位置</div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-pos-x">位置 X</label>
+                                            <input type="number" id="obj-pos-x" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-pos-y">位置 Y</label>
+                                            <input type="number" id="obj-pos-y" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-pos-z">位置 Z</label>
+                                            <input type="number" id="obj-pos-z" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                        </div>
+                                        <div class="prop-group-label">回転</div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-rot-x">回転 X</label>
+                                            <input type="number" id="obj-rot-x" class="prop-input num" step="0.1"><span class="prop-unit">°</span>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-rot-y">回転 Y</label>
+                                            <input type="number" id="obj-rot-y" class="prop-input num" step="0.1"><span class="prop-unit">°</span>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-rot-z">回転 Z</label>
+                                            <input type="number" id="obj-rot-z" class="prop-input num" step="0.1"><span class="prop-unit">°</span>
+                                        </div>
+                                        <div class="prop-group-label">スケール</div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-scale-x">スケール X</label>
+                                            <input type="number" id="obj-scale-x" class="prop-input num" step="0.01">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-scale-y">スケール Y</label>
+                                            <input type="number" id="obj-scale-y" class="prop-input num" step="0.01">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-scale-z">スケール Z</label>
+                                            <input type="number" id="obj-scale-z" class="prop-input num" step="0.01">
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="block" id="object-props-animation">
+                                    <summary class="block-header">モジュール設定</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-animate" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-animate">回転アニメーション</label>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-anim-x">Rot/Frame X</label>
+                                            <input type="number" id="obj-anim-x" class="prop-input num" step="0.01">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-anim-y">Rot/Frame Y</label>
+                                            <input type="number" id="obj-anim-y" class="prop-input num" step="0.01">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-anim-z">Rot/Frame Z</label>
+                                            <input type="number" id="obj-anim-z" class="prop-input num" step="0.01">
+                                        </div>
+                                        <details class="block" id="object-props-glb-anim" style="display:none;margin-top:10px;">
+                                            <summary class="block-header">GLB スキン／ノードアニメーション</summary>
+                                            <div class="block-content">
+                                                <p class="hint" id="obj-glb-anim-hint" style="margin:4px 0 8px;">GLB に含まれるクリップ名です（ファイルによっては一覧されない場合があります）。</p>
+                                                <div id="obj-glb-anim-list" class="obj-glb-anim-list"></div>
+                                                <div class="prop-group-label" style="margin-top:10px;">メタバース内インタラクト（[E] / プロンプト）</div>
+                                                <div class="prop-row checkbox-row">
+                                                    <input type="checkbox" id="obj-glb-interact-enable" class="prop-checkbox">
+                                                    <label class="prop-label" for="obj-glb-interact-enable">接近時にインタラクトで再生</label>
+                                                </div>
+                                                <div id="obj-glb-interact-fields" style="display:none;">
+                                                    <div class="prop-row">
+                                                        <label class="prop-label" for="obj-glb-interact-clip">再生クリップ</label>
+                                                        <select id="obj-glb-interact-clip" class="prop-input full" aria-label="インタラクトで再生するクリップ"></select>
+                                                    </div>
+                                                    <div class="prop-row">
+                                                        <label class="prop-label" for="obj-glb-interact-radius">接近距離</label>
+                                                        <input type="number" id="obj-glb-interact-radius" class="prop-input num" step="0.1" min="0.1" value="3">
+                                                        <span class="prop-unit">m</span>
+                                                    </div>
+                                                    <div class="prop-row">
+                                                        <label class="prop-label" for="obj-glb-interact-label">プロンプト文言</label>
+                                                        <input type="text" id="obj-glb-interact-label" class="prop-input" placeholder="例: [E] 再生">
+                                                    </div>
+                                                    <div class="prop-row">
+                                                        <label class="prop-label" for="obj-glb-interact-access">利用権限</label>
+                                                        <select id="obj-glb-interact-access" class="prop-input">
+                                                            <option value="public">一般公開</option>
+                                                            <option value="student+">生徒以上</option>
+                                                            <option value="teacher+">教師以上</option>
+                                                            <option value="admin">管理者限定</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </details>
+                                        <details class="block" id="object-props-prefab-rod" style="display:none;margin-top:10px;">
+                                            <summary class="block-header">品質ロッド（プレファブ）</summary>
+                                            <div class="block-content">
+                                                <p class="hint">ロッド1は既定モデル（prefabManifest）。ロッド2以降は別プレファブを割り当てできます。タブで編集画面の表示を切り替えます。</p>
+                                                <div id="obj-rod-tabs" class="obj-rod-tabs" role="tablist" aria-label="編集プレビューロッド"></div>
+                                                <div class="prop-row" id="obj-rod-manifest-row">
+                                                    <label class="prop-label" for="obj-rod-manifest">プレファブ</label>
+                                                    <select id="obj-rod-manifest" class="prop-input full" aria-label="ロッド別プレファブ"></select>
+                                                </div>
+                                                <p class="hint" id="obj-rod-fallback-hint" hidden>未設定のためロッド1と同じモデルを使用します。</p>
+                                            </div>
+                                        </details>
+                                        <details class="block" id="object-props-prefab-lod" style="display:none;margin-top:10px;">
+                                            <summary class="block-header">Prefab LOD（距離）</summary>
+                                            <div class="block-content">
+                                                <p class="hint">距離境界は右ペイン「Prefab LOD（距離）」で LOD ID ごとに設定します。</p>
+                                                <div class="prop-row">
+                                                    <label class="prop-label" for="obj-lod-id">LOD ID</label>
+                                                    <select id="obj-lod-id" class="prop-input full" aria-label="Prefab LOD ID">
+                                                        <option value="">（未設定・距離 LOD なし）</option>
+                                                    </select>
+                                                </div>
+                                                <div class="prop-row">
+                                                    <label class="prop-label" for="obj-lod-rank-default">既定ランク（パーツ未指定時）</label>
+                                                    <input type="number" id="obj-lod-rank-default" class="prop-input num" min="1" step="1" value="1" aria-label="既定 LOD ランク">
+                                                </div>
+                                                <p class="prop-group-label">パーツ別ランク（任意）</p>
+                                                <table class="obj-lod-part-table" id="obj-lod-part-table">
+                                                    <thead><tr><th>パーツ</th><th>ランク</th></tr></thead>
+                                                    <tbody id="obj-lod-part-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                        </details>
+                                        <div class="prop-group-label">乗り物</div>
+                                        <p class="hint" style="margin:4px 0 8px;">3D モデルを配置したあと、種類を選んでパラメータを設定してください（メタバース内の操縦用）。</p>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vehicle-type">種類</label>
+                                            <select id="obj-vehicle-type" class="prop-input">
+                                                <option value="">なし</option>
+                                                <option value="airplane">飛行機</option>
+                                            </select>
+                                        </div>
+                                        <div id="obj-aircraft-fields" class="block-content" style="display:none;margin-top:8px;padding-left:4px;border-left:2px solid rgba(128,128,128,0.35);">
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-ac-id">機体 ID（ワールド内で一意）</label>
+                                                <input type="text" id="obj-ac-id" class="prop-input" placeholder="例: hangar-plane-1">
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-ac-library-id">ライブラリ機体 ID</label>
+                                                <select id="obj-ac-library-id" class="prop-input full">
+                                                    <option value="">（未リンク）</option>
+                                                </select>
+                                            </div>
+                                            <p class="hint" style="margin:0 0 8px 4px;font-size:11px;">管理の「飛行機」タブで登録した機体を選ぶと、操縦・カメラ・エンジンブレード等はライブラリの定義が使われます（ここではリンクのみ）。</p>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-ac-radius">接近・操縦距離</label>
+                                                <input type="number" id="obj-ac-radius" class="prop-input num" step="0.1" min="0.1" value="4">
+                                                <span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-ac-label">プロンプト文言</label>
+                                                <input type="text" id="obj-ac-label" class="prop-input" placeholder="操縦する">
+                                            </div>
+                                            <p class="hint" style="margin-top:6px;">ライブラリ未リンクの古いデータに含まれるカメラ／操縦の上書きは、保存時も JSON に残ります。編集は飛行機タブの機体ライブラリで行ってください。前進方向はモデルの <strong>-Z</strong> 軸です。</p>
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="block" id="object-props-taiko">
+                                    <summary class="block-header">太鼓</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-taiko" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-taiko">太鼓にする</label>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-taiko-radius">接近検知範囲</label>
+                                            <input type="number" id="obj-taiko-radius" class="prop-input num" step="0.1" min="0" value="3">
+                                            <span class="prop-unit">m</span>
+                                        </div>
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-taiko-multiplayer" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-taiko-multiplayer">マルチプレイ対応</label>
+                                        </div>
+                                        <div id="obj-taiko-multiplayer-rows" style="display:none">
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-taiko-group-id">マルチプレイグループID</label>
+                                                <input type="text" id="obj-taiko-group-id" class="prop-input" placeholder="例: room-a">
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="obj-taiko-chart-id">譜面（曲）</label>
+                                                <select id="obj-taiko-chart-id" class="prop-input"></select>
+                                            </div>
+                                            <p class="hint" style="margin-top:6px">同一ワールド・同一グループIDの太鼓は1〜3台。同グループで同じ譜面が使われます。</p>
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="block" id="object-props-teleporter">
+                                    <summary class="block-header">テレポーター</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-teleporter" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-teleporter">テレポーターにする</label>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-tp-id">ID</label>
+                                            <input type="text" id="obj-tp-id" class="prop-input" placeholder="s1">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-tp-dest">行先ワールド</label>
+                                            <select id="obj-tp-dest" class="prop-input"></select>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-tp-radius">Radius</label>
+                                            <input type="number" id="obj-tp-radius" class="prop-input num" step="0.1" min="0">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-tp-label">Label</label>
+                                            <input type="text" id="obj-tp-label" class="prop-input">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-tp-access">利用権限</label>
+                                            <select id="obj-tp-access" class="prop-input">
+                                                <option value="public">一般公開（デフォルト）</option>
+                                                <option value="student+">生徒以上（生徒・教師・admin）</option>
+                                                <option value="teacher+">教師以上（教師・admin）</option>
+                                                <option value="admin">管理者限定（admin）</option>
+                                            </select>
+                                        </div>
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-tp-auto-teleport" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-tp-auto-teleport">テレポート可能半径に入り次第、自動でテレポートする</label>
+                                        </div>
+                                        <div class="prop-row checkbox-row">
+                                            <input type="checkbox" id="obj-tp-auto-contact-teleport" class="prop-checkbox">
+                                            <label class="prop-label" for="obj-tp-auto-contact-teleport">（PDFテレポーター専用）接触した瞬間に自動でテレポートする</label>
+                                        </div>
+                                    </div>
+                                </details>
+                                <div class="btn-row">
+                                    <button type="button" id="btn-delete-object">オブジェクトを削除</button>
+                                </div>
+                            </div>
+                                </section>
+                            </div>
+                            <div id="we-cat-right-light" class="we-right-pane">
+                                <section class="section panel-section" id="panel-light">
+                            <h2 class="section-title">ライト</h2>
+                            <p class="hint" id="light-hint">ライトを選択するか追加してください</p>
+                            <div id="light-props" style="display:none">
+                                <details class="block" open>
+                                    <summary class="block-header">トランスフォーム</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row">
+                                            <label class="prop-label">種類</label>
+                                            <input type="text" id="light-type" class="prop-input full" readonly>
+                                        </div>
+                                        <div class="prop-group-label">位置</div>
+                                        <div id="light-position-row">
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="light-pos-x">位置 X</label>
+                                                <input type="number" id="light-pos-x" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="light-pos-y">位置 Y</label>
+                                                <input type="number" id="light-pos-y" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="light-pos-z">位置 Z</label>
+                                                <input type="number" id="light-pos-z" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="block" open>
+                                    <summary class="block-header">ライト設定</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="light-intensity">Intensity</label>
+                                            <input type="number" id="light-intensity" class="prop-input num" step="0.1" min="0">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="light-color">Color</label>
+                                            <input type="text" id="light-color" class="prop-input" placeholder="ffffff">
+                                        </div>
+                                        <div class="prop-row" id="light-distance-row">
+                                            <label class="prop-label" for="light-distance">Distance</label>
+                                            <input type="number" id="light-distance" class="prop-input num" step="1" min="0">
+                                        </div>
+                                    </div>
+                                </details>
+                                <div class="btn-row">
+                                    <button type="button" id="btn-delete-light">ライトを削除</button>
+                                </div>
+                            </div>
+                            <div class="btn-row">
+                                <button type="button" id="btn-add-light">ライトを追加</button>
+                            </div>
+                                </section>
+                            </div>
+                            <div id="we-cat-right-settings" class="we-right-pane">
+                                <section class="section panel-section" id="panel-spawn">
+                                    <details class="block">
+                                        <summary class="block-header">スポーン位置</summary>
+                                        <div class="block-content">
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="spawn-x">位置 X</label>
+                                                <input type="number" id="spawn-x" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="spawn-y">位置 Y</label>
+                                                <input type="number" id="spawn-y" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="spawn-z">位置 Z</label>
+                                                <input type="number" id="spawn-z" class="prop-input num" step="0.1"><span class="prop-unit">m</span>
+                                            </div>
+                                        </div>
+                                    </details>
+                                    <details class="block">
+                                        <summary class="block-header">床</summary>
+                                        <div class="block-content">
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="floor-enabled">床を表示</label>
+                                                <input type="checkbox" id="floor-enabled" class="prop-input" checked>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="floor-width">床の幅（X）</label>
+                                                <input type="number" id="floor-width" class="prop-input num" step="10" min="10"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="floor-depth">床の奥行き（Z）</label>
+                                                <input type="number" id="floor-depth" class="prop-input num" step="10" min="10"><span class="prop-unit">m</span>
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="google-maps-copyright-enabled">Google コピーライト表示</label>
+                                                <input type="checkbox" id="google-maps-copyright-enabled" class="prop-input">
+                                            </div>
+                                            <p class="hint">Google Maps Platform（3D タイル等）由来のモデルを含むワールドで、プレイ画面右下に © Google を表示します。</p>
+                                        </div>
+                                    </details>
+                                    <details class="block">
+                                        <summary class="block-header">サーバ物理補助（足元Y）</summary>
+                                        <div class="block-content">
+                                            <p class="hint">プレイヤー位置のYはスポーンと同じく<strong>足元</strong>基準。床抜け時にサーバがこの範囲へクランプします（多層マップではvoid用の下限のみ想定）。</p>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="physics-assist-enabled">有効</label>
+                                                <input type="checkbox" id="physics-assist-enabled" class="prop-input">
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="physics-assist-min-y">足元Y 下限</label>
+                                                <input type="number" id="physics-assist-min-y" class="prop-input num" step="0.1" placeholder="未設定で無制限">
+                                            </div>
+                                            <div class="prop-row">
+                                                <label class="prop-label" for="physics-assist-max-y">足元Y 上限</label>
+                                                <input type="number" id="physics-assist-max-y" class="prop-input num" step="0.1" placeholder="任意">
+                                            </div>
+                                            <p class="hint" id="physics-assist-spawn-hint" hidden>スポーンYと下限が大きく離れています。意図を確認してください。</p>
+                                        </div>
+                                    </details>
+                                    <details class="block" id="world-lod-details">
+                                        <summary class="block-header">Prefab LOD（距離）</summary>
+                                        <div class="block-content">
+                                            <p class="hint">prefabManifest 付きモデルのみ。境界はプレイヤー描画距離（m）に対する倍率（例: 1.0 = 100%）。スライダーは最大 500% まで。</p>
+                                            <div class="btn-row" style="margin-bottom:8px;">
+                                                <button type="button" id="btn-world-lod-add-id" class="btn btn-sm btn-outline-secondary">LOD ID を追加</button>
+                                            </div>
+                                            <div id="world-lod-entries"></div>
+                                        </div>
+                                    </details>
+                                    <p class="hint" style="margin-top:10px;">飛行機の操縦パラメータ・コックピット／追従カメラは<strong>飛行機</strong>タブの機体ライブラリで機体 ID ごとに設定します。ワールド編集のオブジェクトではライブラリ ID のリンクのみ行ってください。</p>
+                                </section>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="world-edit-loading-overlay" class="world-edit-loading-overlay" aria-hidden="true">
+                        <div class="world-edit-loading-panel" role="status">
+                            <div class="world-edit-loading-spinner" aria-hidden="true"></div>
+                            <p class="world-edit-loading-message">読み込んでいます…</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="world-json-modal" class="modal world-json-modal" aria-hidden="true">
+                <div class="modal-content world-json-modal-content">
+                    <h3>worlds.json を編集</h3>
+                    <p class="hint world-json-modal-hint">表示内容は「JSONでエクスポート」と同じく、現在の編集状態を反映します。保存でサーバーの worlds.json に書き込みます。</p>
+                    <div class="world-json-find-bar" role="search" aria-label="検索と置換">
+                        <div class="world-json-find-stack">
+                            <div class="world-json-find-line">
+                                <label class="world-json-find-line-label" for="world-json-find-input">検索</label>
+                                <div class="world-json-find-line-controls">
+                                    <input type="text" id="world-json-find-input" class="world-json-find-field" placeholder="検索文字列" autocomplete="off">
+                                    <button type="button" id="world-json-find-next" class="world-json-find-btn">次へ</button>
+                                </div>
+                            </div>
+                            <div class="world-json-find-line">
+                                <label class="world-json-find-line-label" for="world-json-replace-input">置換</label>
+                                <div class="world-json-find-line-controls">
+                                    <input type="text" id="world-json-replace-input" class="world-json-find-field" placeholder="置換後" autocomplete="off">
+                                    <button type="button" id="world-json-replace-one" class="world-json-find-btn">置換</button>
+                                    <button type="button" id="world-json-replace-all" class="world-json-find-btn world-json-find-btn-quiet">すべて置換</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="world-json-find-footer">
+                            <label class="world-json-find-toggle">
+                                <input type="checkbox" id="world-json-find-case" class="world-json-find-toggle-input">
+                                <span class="world-json-find-toggle-track" aria-hidden="true"></span>
+                                <span class="world-json-find-toggle-text">大文字小文字を区別</span>
+                            </label>
+                            <span id="world-json-find-hit-status" class="world-json-find-hit-status" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <textarea id="world-json-editor-textarea" class="world-json-editor-textarea" spellcheck="false" aria-label="worlds.json"></textarea>
+                    <div class="modal-buttons">
+                        <button type="button" id="world-json-save-btn" class="btn btn-primary">サーバーに保存</button>
+                        <button type="button" id="world-json-cancel-btn" class="btn btn-secondary">閉じる</button>
+                    </div>
+                    <span id="world-json-modal-status" class="status-text"></span>
+                </div>
+            </div>
+
+            <!-- ストレージ内ファイルの一覧・削除（ワールド編集） -->
+            <div id="storage-files-modal" class="modal storage-files-modal" aria-hidden="true">
+                <div class="modal-content storage-files-modal-content">
+                    <h3>ファイルを管理</h3>
+                    <p class="hint storage-files-modal-hint">サーバー上のアセットフォルダを参照します。チェックボックスで複数選択できます。Shift+クリックでその間のファイルをまとめて選択できます（フォルダは削除できません）。</p>
+                    <div class="storage-files-layout">
+                        <nav class="storage-files-stores" aria-label="ストレージの種類">
+                            <button type="button" class="storage-files-store-btn active" data-storage-store="models">モデル</button>
+                            <button type="button" class="storage-files-store-btn" data-storage-store="pdfs">PDF</button>
+                            <button type="button" class="storage-files-store-btn" data-storage-store="images">画像</button>
+                            <button type="button" class="storage-files-store-btn" data-storage-store="env">環境 (HDR)</button>
+                            <button type="button" class="storage-files-store-btn" data-storage-store="chart-bgm">譜面BGM</button>
+                            <button type="button" class="storage-files-store-btn" data-storage-store="simulations">FDS煙</button>
+                        </nav>
+                        <div class="storage-files-main">
+                            <nav id="storage-files-breadcrumb" class="storage-files-breadcrumb" aria-label="現在のパス"></nav>
+                            <div class="storage-files-toolbar">
+                                <button type="button" id="storage-files-delete-btn" class="btn-secondary" disabled>削除</button>
+                            </div>
+                            <div class="storage-files-list-wrap">
+                                <ul id="storage-files-list" class="storage-files-list" aria-label="ファイル一覧"></ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="button" id="storage-files-close-btn" class="btn btn-secondary">閉じる</button>
+                    </div>
+                    <span id="storage-files-modal-status" class="status-text"></span>
+                </div>
+            </div>
+    <div id="model-upload-modal" class="modal">
+        <div class="modal-content model-upload-modal-panel">
+            <h3>ファイルのアップロード</h3>
+            <fieldset class="model-upload-kind-fieldset">
+                <legend class="model-upload-kind-legend">種類</legend>
+                <div class="model-upload-kind-segmented" role="radiogroup" aria-label="アップロード種類">
+                    <label class="model-upload-kind-segment">
+                        <input type="radio" name="model-upload-kind" value="model" checked>
+                        <span class="model-upload-kind-segment-ui">3Dモデル（GLB など）</span>
+                    </label>
+                    <label class="model-upload-kind-segment">
+                        <input type="radio" name="model-upload-kind" value="pdf">
+                        <span class="model-upload-kind-segment-ui">PDF</span>
+                    </label>
+                    <label class="model-upload-kind-segment">
+                        <input type="radio" name="model-upload-kind" value="hdr">
+                        <span class="model-upload-kind-segment-ui">HDR</span>
+                    </label>
+                    <label class="model-upload-kind-segment">
+                        <input type="radio" name="model-upload-kind" value="prefab">
+                        <span class="model-upload-kind-segment-ui">Prefab（ZIP）</span>
+                    </label>
+                </div>
+            </fieldset>
+            <p id="model-upload-hint-model" class="hint model-upload-hint">GLB はサーバでテクスチャの縦横を指定の上限まで縮小してから保存します（長辺・短辺それぞれが上限、縦横比は維持。複数アップロード時はサーバ側で順番に処理）。下のチェックで縮小を省略できます。</p>
+            <div class="model-upload-texture-max-edge-row prop-row" style="margin-top:10px;">
+                <label class="prop-label" for="model-upload-texture-max-edge">テクスチャ長辺の上限（px）</label>
+                <select id="model-upload-texture-max-edge" class="prop-input" aria-describedby="model-upload-hint-model">
+                    <option value="512">512</option>
+                    <option value="1024">1024</option>
+                    <option value="1536" selected>1536（既定）</option>
+                    <option value="2048">2048</option>
+                    <option value="4096">4096</option>
+                    <option value="8192">8192</option>
+                </select>
+            </div>
+            <div class="model-upload-skip-texture-row prop-row checkbox-row" style="margin-top:10px;">
+                <input type="checkbox" id="model-upload-skip-texture-resize" class="prop-checkbox">
+                <label class="prop-label" for="model-upload-skip-texture-resize">テクスチャをリサイズしない（GLB 内のオリジナル画像のまま保存）</label>
+            </div>
+            <p id="model-upload-hint-pdf" class="hint model-upload-hint" hidden>PDF をサーバーにアップロードします。同名ファイルがある場合は上書きの確認が表示されます。</p>
+            <p id="model-upload-hint-hdr" class="hint model-upload-hint" hidden>Radiance の <code>.hdr</code> のみ。<code>default.hdr</code> として保存され、メタバースは <code>/env/default.hdr</code> から読み込みます。</p>
+            <p id="model-upload-hint-prefab" class="hint model-upload-hint" hidden>ZIP 内の複数 GLB と同梱アセットを展開し、<code>*-prefab-manifest.json</code> とともに <code>models/</code> 配下に保存します。一部のファイル名が既にある場合は一覧で上書き確認できます。</p>
+            <div id="model-upload-3d-only" class="model-upload-3d-only">
+                <div id="model-upload-server-queue" class="model-upload-server-queue" aria-live="polite"></div>
+                <div id="model-upload-overall-progress" class="model-upload-overall-progress" style="display:none;">
+                    <div class="model-upload-progress-track">
+                        <div id="model-upload-overall-fill" class="model-upload-progress-fill"></div>
+                    </div>
+                    <span id="model-upload-overall-label" class="model-upload-overall-label"></span>
+                </div>
+                <div id="model-upload-file-list" class="model-upload-file-list"></div>
+            </div>
+            <input type="file" id="model-upload-input" accept=".glb,.obj,.mtl,.png,.jpg,.jpeg,.webp" multiple style="display:none">
+            <!-- accept は付けない（OS により .zip が選べなくなる事例がある。サーバで .zip を検証） -->
+            <input type="file" id="model-upload-zip-input" style="display:none">
+            <div class="modal-buttons model-upload-modal-actions">
+                <button type="button" id="model-upload-pick" class="btn-secondary">ファイルを選択</button>
+                <button type="button" id="model-upload-close" class="btn-secondary">閉じる</button>
+            </div>
+            <div id="model-upload-modal-footer-status" class="status-text"></div>
+            <input type="file" id="upload-pdf-input" accept=".pdf" hidden aria-hidden="true">
+            <input type="file" id="upload-hdr-input" accept=".hdr" hidden aria-hidden="true">
+        </div>
+    </div>
+
+    <div id="overwrite-select-modal" class="modal">
+        <div class="modal-content overwrite-select-card">
+            <h3>以下のファイルが上書きされますが、よろしいですか？</h3>
+            <div class="overwrite-select-actions">
+                <button type="button" id="overwrite-select-check-all" class="btn btn-secondary">すべて選択</button>
+                <button type="button" id="overwrite-select-uncheck-all" class="btn btn-secondary">すべて解除</button>
+            </div>
+            <div id="overwrite-select-list" class="overwrite-select-list"></div>
+            <div class="modal-buttons">
+                <button type="button" id="overwrite-select-apply" class="btn btn-primary">選択したファイルを上書き</button>
+                <button type="button" id="overwrite-select-cancel" class="btn btn-secondary">キャンセル</button>
+            </div>
+        </div>

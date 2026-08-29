@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tenant Metaverse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <script>
+        try {
+            const scheme = localStorage.getItem('metaverse-control-scheme');
+            if (scheme === 'touch' || scheme === 'keyboard') {
+                document.documentElement.setAttribute('data-control-scheme', scheme);
+            }
+        } catch (_) { /* ignore */ }
+    </script>
+</head>
+<body>
+    <div id="info">
+        <h1 id="tenant-title">Tenant</h1>
+        <p class="subtitle"><a href="/">← プラットフォーム hub</a></p>
+        <nav id="metaverse-portal-nav" class="portal-nav" aria-label="系列サービス" hidden>
+            <span class="portal-nav-label">系列</span>
+            <div id="metaverse-portal-links" class="portal-nav-links"></div>
+        </nav>
+        <div id="info-stats">
+            <p><span data-i18n="info.worldLabel"></span> <span id="world-name">-</span></p>
+            <p><span data-i18n="info.positionLabel"></span> <span id="position-display">0, 0, 0</span></p>
+            <p><span data-i18n="info.playerCountLabel"></span> <span id="player-count">0</span></p>
+        </div>
+        <div id="player-list-container">
+            <div id="ping-display" class="ping-display" title="サーバー応答時間">
+                <i class="bi bi-bar-chart-fill"></i> <span id="ping-value">-</span>
+            </div>
+            <div id="player-list" class="player-list"></div>
+        </div>
+        <p id="socket-status" class="muted" hidden>接続中…</p>
+    </div>
+
+    <div id="teleport-prompt" style="display: none;" role="button" tabindex="0" aria-hidden="true"></div>
+
+    <div id="world-load-overlay" class="world-load-overlay" style="display: none;" aria-hidden="true" role="status">
+        <div class="world-load-panel">
+            <p id="world-load-label" class="world-load-label" data-i18n="worldLoad.loading">読み込み中…</p>
+            <p id="world-load-asset" class="world-load-asset" aria-live="polite"></p>
+            <div class="world-load-bar-wrap">
+                <div class="world-load-bar-track">
+                    <div id="world-load-bar-fill" class="world-load-bar-fill"></div>
+                </div>
+                <span id="world-load-pct" class="world-load-pct">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <script type="module" src="/js/tenant-metaverse-app.js"></script>
+</body>
+</html>

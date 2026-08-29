@@ -1,0 +1,83 @@
+# Environment
+.env
+.env.*
+!.env.example
+*.local
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Vite cache (project root; node_modules/.vite is covered by node_modules/)
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Cursor
+.cursor/plans/
+
+# Certificates / secrets
+certs/
+secrets/
+*.pem
+*.key
+*.crt
+
+# Platform runtime data (local / generated)
+data/*
+!data/platform/
+data/platform/*
+!data/platform/network-config.example.json
+
+# Test / coverage
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+coverage/
+
+# Python (scripts/export-fds-smoke.py 等)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Archived tenants (admin panel delete)
+tenants/_archive/
+
+# Tenant runtime assets (metaverse-simple から seed / 管理画面アップロード)
+tenants/**/models/
+tenants/**/pdfs/
+tenants/**/env/
+tenants/**/db/
+tenants/**/data/simulations/
+tenants/**/images/
+!tenants/_template/images/
+!tenants/_template/images/**
+tenants/**/data/images/
+!tenants/_template/data/images/
+!tenants/_template/data/images/**
+
+# Admin 作成 tenant（fixture: P-01..P-04。P-05 以降はローカル専用）
+tenants/P-0[5-9]/
+tenants/P-[1-9][0-9]/

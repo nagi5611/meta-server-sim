@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>シミュレーション管理パネル</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+    <main class="admin-main admin-landing">
+        <header>
+            <div class="header-left">
+                <span class="header-username" id="header-username">admin</span>
+                <h1>シミュレーション管理パネル</h1>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn btn-primary" id="tenant-add-btn-header" title="新しい Tenant を追加">
+                    <i class="bi bi-plus-lg"></i> Tenant 追加
+                </button>
+                <span id="admin-ops-status" class="admin-ops-status" aria-live="polite"></span>
+                <button type="button" class="btn btn-secondary" id="admin-reload-settings-btn" title="network-config.json 等を再読み込み">
+                    <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
+                </button>
+                <button type="button" class="btn btn-danger" id="admin-restart-btn" title="Node プロセスを再起動">
+                    <i class="bi bi-power"></i> 完全再起動
+                </button>
+                <button type="button" class="btn btn-secondary" id="admin-theme-toggle" title="ダークモード切替">
+                    <i class="bi bi-moon-fill" id="admin-theme-icon"></i>
+                </button>
+                <a class="btn btn-secondary" href="/">プラットフォーム hub</a>
+                <span class="last-update">最終更新: <span id="last-update">-</span></span>
+            </div>
+        </header>
+
+        <div class="admin-panels">
+            <section class="stats-section platform-summary">
+                <h2>プラットフォーム概要</h2>
+                <div class="stats-grid stats-grid-compact">
+                    <div class="stat-card">
+                        <div class="stat-label">接続プレイヤー数</div>
+                        <div class="stat-value" id="total-players">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">アクティブルーム数</div>
+                        <div class="stat-value" id="total-rooms">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Tenant 数</div>
+                        <div class="stat-value" id="tenant-count">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">CPU使用率</div>
+                        <div class="stat-value" id="cpu-usage">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">RAM使用率</div>
+                        <div class="stat-value" id="ram-usage">-</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="stats-section tenant-list-section">
+                <div class="section-header-row">
+                    <h2>Tenant 一覧</h2>
+                    <button type="button" class="btn btn-primary" id="tenant-add-btn">
+                        <i class="bi bi-plus-lg"></i> Tenant 追加
+                    </button>
+                </div>
+                <p class="hint">行をクリックすると、その Tenant の管理パネルに入ります。</p>
+                <table class="tenants-table tenants-table-clickable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>表示名</th>
+                            <th>プレイヤー</th>
+                            <th>ルーム</th>
+                            <th>ワールド数</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tenants-table-body"></tbody>
+                </table>
+            </section>
+
+            <section class="stats-section network-config-section">
+                <div class="section-header-row">
+                    <h2>ネットワーク / 系列リンク</h2>
+                    <button type="button" class="btn btn-primary" id="network-config-save-btn">
+                        <i class="bi bi-save"></i> 保存
+                    </button>
+                </div>
+                <p class="hint">
+                    系列メタバースサーバーの host / port とナビリンクを管理します。設定は
+                    <code>data/platform/network-config.json</code> に保存されます（.env より優先）。
+                    開発時、3003 以外の公開ポート（例: 3004）は <code>npm run dev</code> 起動後に自動で Vite が立ちます。
+                </p>
+                <div id="network-config-warnings" class="network-config-warnings" hidden></div>
+                <p id="network-config-status" class="hint"></p>
+
+                <h3 class="network-config-subtitle">系列サーバー（host → port）</h3>
+                <table class="tenants-table network-config-table">
+                    <thead>
+                        <tr>
+                            <th>表示名</th>
+                            <th>Host / IP</th>
+                            <th>Port</th>
+                            <th>HTTPS</th>
+                            <th>パス</th>
+                            <th>リンク</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="network-servers-body"></tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" id="network-server-add-btn">
+                    <i class="bi bi-plus-lg"></i> サーバー追加
+                </button>
+                <div id="network-servers-port-warnings" class="network-port-warnings" hidden></div>
+
+                <h3 class="network-config-subtitle">ナビリンク（任意・上記と別 URL のとき）</h3>
+                <table class="tenants-table network-config-table">
+                    <thead>
+                        <tr>
+                            <th>表示名</th>
+                            <th>URL</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="network-portal-links-body"></tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" id="network-portal-add-btn">
+                    <i class="bi bi-plus-lg"></i> リンク追加
+                </button>
+
+                <h3 class="network-config-subtitle">Tenant 公開 URL（任意）</h3>
+                <table class="tenants-table network-config-table">
+                    <thead>
+                        <tr>
+                            <th>Tenant ID</th>
+                            <th>公開 URL</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="network-tenant-urls-body"></tbody>
+                </table>
+                <div class="network-config-actions-row">
+                    <button type="button" class="btn btn-secondary btn-sm" id="network-tenant-url-add-btn">
+                        <i class="bi bi-plus-lg"></i> URL 追加
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="network-tenant-url-autofill-btn">
+                        未設定 Tenant を自動入力
+                    </button>
+                </div>
+
+                <div class="network-config-options">
+                    <label class="admin-checkbox">
+                        <input type="checkbox" id="network-use-reverse-proxy">
+                        リバースプロキシモード（USE_REVERSE_PROXY）
+                    </label>
+                    <label class="admin-checkbox">
+                        <input type="checkbox" id="network-trust-proxy">
+                        Trust proxy（TRUST_PROXY）
+                    </label>
+                    <label class="admin-checkbox">
+                        <input type="checkbox" id="network-require-secure-http">
+                        HTTPS 必須（REQUIRE_SECURE_HTTP）
+                    </label>
+                    <label class="admin-form-field network-service-domain-field">
+                        <span>このサーバーのドメイン（PROXY_SERVICE_DOMAIN）</span>
+                        <select id="network-proxy-service-domain">
+                            <option value="">— 未選択 —</option>
+                        </select>
+                    </label>
+                </div>
+                <p id="network-config-error" class="form-error" hidden></p>
+            </section>
+        </div>
+    </main>
+
+    <div id="tenant-add-modal" class="admin-modal" hidden aria-hidden="true">
+        <div class="admin-modal-backdrop" data-modal-close></div>
+        <div class="admin-modal-dialog" role="dialog" aria-labelledby="tenant-add-title" aria-modal="true">
+            <h2 id="tenant-add-title">Tenant 追加</h2>
+            <p class="hint">英数字で始まり、英数字とハイフンのみ使用できます。</p>
+            <form id="tenant-add-form">
+                <label class="admin-form-field">
+                    <span>Tenant ID</span>
+                    <input type="text" id="tenant-add-id" name="id" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" autocomplete="off" placeholder="P-03">
+                </label>
+                <label class="admin-form-field">
+                    <span>表示名（任意）</span>
+                    <input type="text" id="tenant-add-display-name" name="displayName" maxlength="120" autocomplete="off" placeholder="デモ Tenant">
+                </label>
+
+                <div id="tenant-add-network-section" class="tenant-add-network-section" hidden>
+                    <h3 class="tenant-add-network-title">ネットワーク設定（下の一覧へ追加・編集可）</h3>
+                    <p class="hint">
+                        確定後は下の「ネットワーク / 系列リンク」表に反映されます。
+                        <code>network-config.json</code> へ書き込むにはネットワーク欄の<strong>保存</strong>ボタンを押してください。
+                    </p>
+
+                    <label class="admin-form-field">
+                        <span>Tenant 公開 URL</span>
+                        <input type="url" id="tenant-add-access-url" autocomplete="off" placeholder="https://localhost:3003/P-03/">
+                    </label>
+
+                    <fieldset class="tenant-add-fieldset">
+                        <legend>ナビリンク</legend>
+                        <label class="admin-form-field">
+                            <span>表示名</span>
+                            <input type="text" id="tenant-add-portal-label" autocomplete="off">
+                        </label>
+                        <label class="admin-form-field">
+                            <span>URL</span>
+                            <input type="url" id="tenant-add-portal-url" autocomplete="off">
+                        </label>
+                    </fieldset>
+
+                    <fieldset class="tenant-add-fieldset">
+                        <legend>系列サーバー（切り替え）</legend>
+                        <label class="admin-form-field">
+                            <span>表示名</span>
+                            <input type="text" id="tenant-add-server-label" autocomplete="off">
+                        </label>
+                        <div class="tenant-add-server-grid">
+                            <label class="admin-form-field">
+                                <span>Host</span>
+                                <input type="text" id="tenant-add-server-host" autocomplete="off" placeholder="localhost">
+                            </label>
+                            <label class="admin-form-field">
+                                <span>Port</span>
+                                <input type="number" id="tenant-add-server-port" min="1" max="65535" autocomplete="off">
+                            </label>
+                            <label class="admin-checkbox tenant-add-server-secure">
+                                <input type="checkbox" id="tenant-add-server-secure">
+                                HTTPS
+                            </label>
+                        </div>
+                        <label class="admin-form-field">
+                            <span>パス</span>
+                            <input type="text" id="tenant-add-server-path" autocomplete="off" placeholder="/P-03/">
+                        </label>
+                        <p id="tenant-add-port-conflict" class="form-error tenant-add-port-hint" hidden></p>
+                    </fieldset>
+                </div>
+
+                <p id="tenant-add-error" class="form-error" hidden></p>
+                <div class="admin-modal-actions">
+                    <button type="button" class="btn btn-secondary" data-modal-close>キャンセル</button>
+                    <button type="submit" class="btn btn-primary" id="tenant-add-submit">確定して追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/admin-url-sanitize.js"></script>
+    <script type="module" src="/js/admin-sim.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "portalLinks": [
+    { "label": "みんなでメタ", "url": "http://localhost:3001/" },
+    { "label": "シミュレーション", "url": "http://localhost:3003/" },
+    { "label": "333", "url": "http://localhost:3004/P-03/" }
+  ],
+  "servers": [
+    { "label": "みんなでメタ", "host": "localhost", "port": 3001, "secure": false },
+    {
+      "label": "シミュレーション (Node)",
+      "host": "localhost",
+      "port": 3002,
+      "secure": false,
+      "bindService": true
+    },
+    {
+      "label": "シミュレーション (公開/Vite)",
+      "host": "localhost",
+      "port": 3003,
+      "secure": false
+    },
+    {
+      "label": "333",
+      "host": "localhost",
+      "port": 3004,
+      "secure": false,
+      "path": "/P-03/"
+    }
+  ],
+  "tenantAccessUrls": [
+    { "tenantId": "P-01", "url": "http://localhost:3003/P-01/" },
+    { "tenantId": "P-02", "url": "http://localhost:3003/P-02/" },
+    { "tenantId": "P-03", "url": "http://localhost:3004/P-03/" }
+  ],
+  "proxyServiceDomain": "localhost",
+  "useReverseProxy": false,
+  "trustProxy": false,
+  "requireSecureHttp": false
+}

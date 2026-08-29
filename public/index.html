@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Metaverse Simulation Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="hub-page">
+    <div class="hub-backdrop" aria-hidden="true"></div>
+    <main class="hub-panel" id="hub-panel">
+        <header class="hub-header">
+            <div class="hub-brand">
+                <span class="hub-brand-icon" aria-hidden="true"><i class="bi bi-boxes"></i></span>
+                <div>
+                    <h1>メタバース シミュレーション</h1>
+                    <p class="hub-subtitle">コンテナ型プラットフォーム</p>
+                </div>
+            </div>
+        </header>
+
+        <nav id="metaverse-portal-nav" class="portal-nav" aria-label="系列サービス" hidden>
+            <span class="portal-nav-label">系列</span>
+            <div id="metaverse-portal-links" class="portal-nav-links"></div>
+        </nav>
+
+        <section class="hub-section" aria-labelledby="hub-tenant-heading">
+            <div class="hub-section-head">
+                <h2 id="hub-tenant-heading">Tenant 一覧</h2>
+                <p id="hub-status" class="hub-meta">読み込み中…</p>
+            </div>
+            <ul id="tenant-list" class="hub-tenant-list" aria-live="polite"></ul>
+        </section>
+
+        <footer class="hub-footer">
+            <a class="hub-footer-link" href="/admin.html">
+                <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                管理パネル
+            </a>
+        </footer>
+    </main>
+    <script type="module" src="/js/hub.js"></script>
+</body>
+</html>

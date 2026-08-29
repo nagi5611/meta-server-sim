@@ -1,0 +1,8 @@
+// public/css/admin-tenant-world-edit.css — Tenant ワールド編集（metaverse-simple レイアウト上の微調整）
+.admin-sidebar .admin-nav-item.admin-nav-link {
+    text-decoration: none;
+}
+
+.admin-sidebar .admin-nav-item[aria-current="page"] {
+    cursor: default;
+}
