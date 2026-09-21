@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="/css/admin.css">
 </head>
 <body>
+    <aside class="admin-sidebar" aria-label="管理メニュー">
+        <nav class="admin-nav" id="admin-side-nav">
+            <button type="button" class="admin-nav-item active" data-admin-panel="overview">
+                <i class="bi bi-speedometer2"></i> 概要
+            </button>
+            <button type="button" class="admin-nav-item" data-admin-panel="settings">
+                <i class="bi bi-gear"></i> 設定
+            </button>
+        </nav>
+    </aside>
+
     <main class="admin-main admin-landing">
         <header>
             <div class="header-left">
@@ -15,25 +26,30 @@
                 <h1>シミュレーション管理パネル</h1>
             </div>
             <div class="header-actions">
-                <button type="button" class="btn btn-primary" id="tenant-add-btn-header" title="新しい Tenant を追加">
-                    <i class="bi bi-plus-lg"></i> Tenant 追加
-                </button>
                 <span id="admin-ops-status" class="admin-ops-status" aria-live="polite"></span>
-                <button type="button" class="btn btn-secondary" id="admin-reload-settings-btn" title="network-config.json 等を再読み込み">
-                    <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
-                </button>
-                <button type="button" class="btn btn-danger" id="admin-restart-btn" title="Node プロセスを再起動">
-                    <i class="bi bi-power"></i> 完全再起動
-                </button>
-                <button type="button" class="btn btn-secondary" id="admin-theme-toggle" title="ダークモード切替">
+                <details class="admin-ops-menu">
+                    <summary class="btn btn-secondary admin-ops-menu-trigger" title="サーバー操作">
+                        <i class="bi bi-three-dots-vertical"></i> 操作
+                    </summary>
+                    <div class="admin-ops-menu-panel">
+                        <button type="button" class="admin-ops-menu-item" id="admin-reload-settings-btn">
+                            <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
+                        </button>
+                        <button type="button" class="admin-ops-menu-item admin-ops-menu-item-danger" id="admin-restart-btn">
+                            <i class="bi bi-power"></i> 完全再起動
+                        </button>
+                    </div>
+                </details>
+                <button type="button" class="btn btn-secondary btn-icon" id="admin-theme-toggle" title="ダークモード切替">
                     <i class="bi bi-moon-fill" id="admin-theme-icon"></i>
                 </button>
-                <a class="btn btn-secondary" href="/">プラットフォーム hub</a>
-                <span class="last-update">最終更新: <span id="last-update">-</span></span>
+                <a class="btn btn-secondary" href="/">hub</a>
+                <span class="last-update">更新: <span id="last-update">-</span></span>
             </div>
         </header>
 
         <div class="admin-panels">
+            <div class="admin-panel active" data-admin-panel-id="overview">
             <section class="stats-section platform-summary">
                 <h2>プラットフォーム概要</h2>
                 <div class="stats-grid stats-grid-compact">
@@ -57,7 +73,20 @@
                         <div class="stat-label">RAM使用率</div>
                         <div class="stat-value" id="ram-usage">-</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-label">HTTP 送信（直近60秒）</div>
+                        <div class="stat-value" id="traffic-window">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">HTTP 送信レート</div>
+                        <div class="stat-value" id="traffic-rate">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">HTTP 送信（累計）</div>
+                        <div class="stat-value stat-value-sm" id="traffic-total">-</div>
+                    </div>
                 </div>
+                <p class="hint" id="traffic-by-category-hint">煙データ（メイン／バルク）と R2 アセットの送信量です。サーバー再起動で累計はリセットされます。</p>
             </section>
 
             <section class="stats-section tenant-list-section">
@@ -82,7 +111,50 @@
                     <tbody id="tenants-table-body"></tbody>
                 </table>
             </section>
+            </div>
 
+            <div class="admin-panel" data-admin-panel-id="settings">
+            <nav class="admin-settings-subnav" id="admin-settings-subnav" aria-label="設定カテゴリ">
+                <button type="button" class="admin-settings-subnav-item active" data-settings-tab="env">
+                    <i class="bi bi-sliders"></i> 環境変数
+                </button>
+                <button type="button" class="admin-settings-subnav-item" data-settings-tab="network">
+                    <i class="bi bi-diagram-3"></i> ネットワーク
+                </button>
+                <button type="button" class="admin-settings-subnav-item" data-settings-tab="code">
+                    <i class="bi bi-code-slash"></i> JSON
+                </button>
+            </nav>
+
+            <div class="admin-settings-tab active" data-settings-tab-id="env">
+            <section class="stats-section env-config-section">
+                <div class="section-header-row">
+                    <h2>環境変数</h2>
+                    <button type="button" class="btn btn-primary" id="env-config-save-btn">
+                        <i class="bi bi-save"></i> 保存
+                    </button>
+                </div>
+                <p class="hint hint-compact">
+                    <code>.env</code> 優先 · 未ロック分は <code>env-config.json</code> に保存
+                </p>
+                <div id="env-config-banner" class="env-config-banner" hidden></div>
+                <div class="r2-connection-panel" id="r2-connection-panel">
+                    <div class="r2-connection-panel-main">
+                        <span id="r2-connection-badge" class="r2-connection-badge r2-connection-badge--unknown">確認中…</span>
+                        <span id="r2-connection-detail" class="r2-connection-detail"></span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="r2-connection-test-btn" disabled>
+                        <i class="bi bi-cloud-check"></i> R2 接続テスト
+                    </button>
+                </div>
+                <p id="r2-connection-error" class="form-error" hidden></p>
+                <p id="env-config-status" class="hint hint-compact"></p>
+                <div id="env-config-groups" class="env-config-groups"></div>
+                <p id="env-config-error" class="form-error" hidden></p>
+            </section>
+            </div>
+
+            <div class="admin-settings-tab" data-settings-tab-id="network">
             <section class="stats-section network-config-section">
                 <div class="section-header-row">
                     <h2>ネットワーク / 系列リンク</h2>
@@ -90,10 +162,8 @@
                         <i class="bi bi-save"></i> 保存
                     </button>
                 </div>
-                <p class="hint">
-                    系列メタバースサーバーの host / port とナビリンクを管理します。設定は
-                    <code>data/platform/network-config.json</code> に保存されます（.env より優先）。
-                    開発時、3003 以外の公開ポート（例: 3004）は <code>npm run dev</code> 起動後に自動で Vite が立ちます。
+                <p class="hint hint-compact">
+                    <code>network-config.json</code> に保存。リバースプロキシ等は<strong>環境変数</strong>で設定。
                 </p>
                 <div id="network-config-warnings" class="network-config-warnings" hidden></div>
                 <p id="network-config-status" class="hint"></p>
@@ -153,28 +223,36 @@
                     </button>
                 </div>
 
-                <div class="network-config-options">
-                    <label class="admin-checkbox">
-                        <input type="checkbox" id="network-use-reverse-proxy">
-                        リバースプロキシモード（USE_REVERSE_PROXY）
-                    </label>
-                    <label class="admin-checkbox">
-                        <input type="checkbox" id="network-trust-proxy">
-                        Trust proxy（TRUST_PROXY）
-                    </label>
-                    <label class="admin-checkbox">
-                        <input type="checkbox" id="network-require-secure-http">
-                        HTTPS 必須（REQUIRE_SECURE_HTTP）
-                    </label>
-                    <label class="admin-form-field network-service-domain-field">
-                        <span>このサーバーのドメイン（PROXY_SERVICE_DOMAIN）</span>
-                        <select id="network-proxy-service-domain">
-                            <option value="">— 未選択 —</option>
-                        </select>
-                    </label>
-                </div>
                 <p id="network-config-error" class="form-error" hidden></p>
             </section>
+            </div>
+
+            <div class="admin-settings-tab" data-settings-tab-id="code">
+            <section class="stats-section code-config-section">
+                <div class="section-header-row">
+                    <h2>設定 JSON</h2>
+                    <div class="code-config-toolbar">
+                        <select id="code-config-target" class="code-config-select" aria-label="編集対象">
+                            <option value="env">env-config.json</option>
+                            <option value="network">network-config.json</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" id="code-config-reload-btn">
+                            <i class="bi bi-arrow-clockwise"></i> 読み込み
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" id="code-config-save-btn">
+                            <i class="bi bi-save"></i> 保存
+                        </button>
+                    </div>
+                </div>
+                <p class="hint hint-compact">
+                    生の JSON を直接編集します。<code>env-config.json</code> はロック済みキーは含めません。
+                </p>
+                <textarea id="code-config-editor" class="code-config-editor" spellcheck="false" aria-label="設定 JSON"></textarea>
+                <p id="code-config-status" class="hint hint-compact"></p>
+                <p id="code-config-error" class="form-error" hidden></p>
+            </section>
+            </div>
+            </div>
         </div>
     </main>
 
@@ -196,8 +274,8 @@
                 <div id="tenant-add-network-section" class="tenant-add-network-section" hidden>
                     <h3 class="tenant-add-network-title">ネットワーク設定（下の一覧へ追加・編集可）</h3>
                     <p class="hint">
-                        確定後は下の「ネットワーク / 系列リンク」表に反映されます。
-                        <code>network-config.json</code> へ書き込むにはネットワーク欄の<strong>保存</strong>ボタンを押してください。
+                        確定後は<strong>設定 → ネットワーク</strong>の表に反映されます。
+                        <code>network-config.json</code> へ書き込むにはネットワークの<strong>保存</strong>を押してください。
                     </p>
 
                     <label class="admin-form-field">
@@ -251,6 +329,44 @@
                     <button type="submit" class="btn btn-primary" id="tenant-add-submit">確定して追加</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="admin-restart-modal" class="admin-modal" hidden aria-hidden="true">
+        <div class="admin-modal-backdrop" data-modal-close></div>
+        <div class="admin-modal-dialog" role="dialog" aria-labelledby="admin-restart-title" aria-modal="true">
+            <h2 id="admin-restart-title">サーバー再起動</h2>
+            <p class="hint">強制再起動は即時に切断されます。計画再起動は指定時間まで全プレイヤーにアラートを表示します。</p>
+            <fieldset class="admin-restart-mode-fieldset">
+                <label class="admin-form-field admin-form-field-inline">
+                    <input type="radio" name="restart-mode" value="force" checked>
+                    <span>強制再起動（即時）</span>
+                </label>
+                <label class="admin-form-field admin-form-field-inline">
+                    <input type="radio" name="restart-mode" value="planned">
+                    <span>計画再起動</span>
+                </label>
+            </fieldset>
+            <div id="admin-restart-planned-fields" hidden>
+                <div class="admin-restart-delay-row">
+                    <label class="admin-form-field">
+                        <span>分</span>
+                        <input type="number" id="admin-restart-delay-minutes" min="0" max="1440" value="5" inputmode="numeric">
+                    </label>
+                    <label class="admin-form-field">
+                        <span>秒</span>
+                        <input type="number" id="admin-restart-delay-seconds" min="0" max="59" value="0" inputmode="numeric">
+                    </label>
+                </div>
+                <label class="admin-form-field">
+                    <span>プレイヤー向けアラートメッセージ</span>
+                    <textarea id="admin-restart-alert-message" rows="4" maxlength="500" placeholder="メンテナンスのため、まもなくサーバーを再起動します。"></textarea>
+                </label>
+            </div>
+            <div class="admin-modal-actions">
+                <button type="button" class="btn btn-secondary" data-modal-close>キャンセル</button>
+                <button type="button" class="btn btn-danger" id="admin-restart-submit-btn">再起動を実行</button>
+            </div>
         </div>
     </div>
 

@@ -23,6 +23,7 @@ import {
 } from './lib/platform-network-config.js';
 
 import { loadTenantRegistry, listTenants } from './lib/tenant-registry.js';
+import { reconcileAllTenantsAssetsToR2 } from './lib/tenant-r2-sync.js';
 
 import { tenantResolver } from './lib/tenant-context.js';
 
@@ -35,6 +36,8 @@ import { isValidTenantId } from './lib/tenant-id.js';
 import { registerPlatformAdmin } from './lib/platform-admin.js';
 
 import { initPlatformRuntime } from './lib/platform-runtime.js';
+import { ensureTenantMediasoupWorkers } from './lib/tenant-socket-features.js';
+import { startFdsSmokeBulkServer, stopFdsSmokeBulkServer } from './lib/fds-smoke-bulk-process.js';
 
 
 
@@ -98,7 +101,7 @@ const httpServer = http.createServer(app);
 
 
 
-app.use(express.json({ limit: '64kb' }));
+app.use(express.json({ limit: '10mb' }));
 
 
 
@@ -282,6 +285,8 @@ function shutdownHttpServer(signal) {
 
     console.log(`[metaverse-simulation] ${signal} received, closing HTTP server...`);
 
+    stopFdsSmokeBulkServer();
+
     try {
         if (typeof httpServer.closeAllConnections === 'function') {
             httpServer.closeAllConnections();
@@ -316,7 +321,32 @@ process.once('SIGINT', () => shutdownHttpServer('SIGINT'));
 
 
 
-httpServer.listen(PORT, HOST, () => {
+async function bootHttpServer() {
+    try {
+        await startFdsSmokeBulkServer({ host: HOST, mainPort: PORT });
+    } catch (err) {
+        console.error('[fds-smoke-bulk] startup failed:', err);
+    }
+
+    httpServer.listen(PORT, HOST, () => {
+
+    void ensureTenantMediasoupWorkers().catch((err) => {
+        console.error('[metaverse-simulation] mediasoup worker init failed:', err);
+    });
+
+    void reconcileAllTenantsAssetsToR2(tenants)
+        .then((report) => {
+            if (report.skipped) return;
+            for (const t of report.tenants) {
+                if (t.skipped) continue;
+                console.log(
+                    `[tenant-r2-sync] ${t.tenantId}: uploaded=${t.uploaded}, skipped=${t.skippedCount}, errors=${t.errors}`
+                );
+            }
+        })
+        .catch((err) => {
+            console.error('[tenant-r2-sync] startup reconcile failed:', err);
+        });
 
     console.log(`[metaverse-simulation] platform http://localhost:${PORT}`);
 
@@ -358,5 +388,8 @@ httpServer.listen(PORT, HOST, () => {
 
     }
 
-});
+    });
+}
+
+void bootHttpServer();
 

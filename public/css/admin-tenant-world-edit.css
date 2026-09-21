@@ -6,3 +6,38 @@
 .admin-sidebar .admin-nav-item[aria-current="page"] {
     cursor: default;
 }
+
+/* FDS煙ライブラリ — シム行のボタン配置 */
+.admin-panel-world-edit .fds-smoke-sim-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.admin-panel-world-edit .fds-smoke-sim-item strong {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.admin-panel-world-edit .fds-smoke-sim-meta {
+    flex: 1 1 100%;
+    font-size: 0.85em;
+    opacity: 0.85;
+}
+
+.admin-panel-world-edit .fds-smoke-sim-item .fds-smoke-add-to-world-btn,
+.admin-panel-world-edit .fds-smoke-sim-item .fds-smoke-delete-btn {
+    flex: 0 0 auto;
+}
+
+/* FDS煙・再生ボタン — 右パネル details（GLB アニメと同様の余白） */
+.admin-panel-world-edit #object-props-fds-smoke,
+.admin-panel-world-edit #object-props-fds-smoke-btn {
+    margin-top: 10px;
+}
+
+.admin-panel-world-edit #object-props-fds-smoke .prop-row,
+.admin-panel-world-edit #object-props-fds-smoke-btn .prop-row {
+    margin-bottom: 8px;
+}

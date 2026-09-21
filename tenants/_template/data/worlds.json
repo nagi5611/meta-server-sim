@@ -1,16 +1,9 @@
 {
-
   "lobby": {
-
     "id": "lobby",
-
     "name": "Lobby",
-
     "models": [],
-
-    "fdsSmokes": []
-
+    "fdsSmokes": [],
+    "fdsSmokeButtons": []
   }
-
 }
-

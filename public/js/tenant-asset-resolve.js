@@ -1,8 +1,11 @@
 // public/js/tenant-asset-resolve.js — テナントベースパス付き asset-resolve ラッパー
 import * as core from '@metaverse-simple/asset-resolve-original';
 import { toTenantUrl } from './tenant-runtime-shim.js';
+import { loadClientConfigOnce } from './tenant-client-config.js';
 
-export const loadClientConfigOnce = core.loadClientConfigOnce;
+core.setLoadClientConfigOnceFn(loadClientConfigOnce);
+
+export { loadClientConfigOnce };
 export const getAssetModelsConfig = core.getAssetModelsConfig;
 export const prefetchSignedAssetHrefs = core.prefetchSignedAssetHrefs;
 

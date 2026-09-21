@@ -99,25 +99,50 @@ export function getAdminCsrfTokenSync() {
  * @param {RequestInit} [init]
  * @returns {Promise<Response>}
  */
+async function performAdminFetch(urlStr, init, headers) {
+    const resolvedUrl = resolveAdminRequestUrl(urlStr);
+    return nativeFetch(resolvedUrl, {
+        ...init,
+        credentials: init.credentials ?? 'include',
+        headers,
+    });
+}
+
 export async function adminFetch(url, init = {}) {
     const urlStr = rewriteTenantWorldEditApiUrl(toUrlString(url));
     const method = String(init.method || 'GET').toUpperCase();
     const headers = new Headers(init.headers || {});
 
-    if (needsAdminFetch(urlStr) && MUTATING.has(method)) {
+    const needsCsrf = needsAdminFetch(urlStr) && MUTATING.has(method);
+    if (needsCsrf) {
         await ensureCsrfToken();
         if (cachedToken) {
             headers.set(ADMIN_CSRF_HEADER, cachedToken);
         }
     }
 
-    const resolvedUrl = resolveAdminRequestUrl(urlStr);
+    let res = await performAdminFetch(urlStr, init, headers);
 
-    return nativeFetch(resolvedUrl, {
-        ...init,
-        credentials: init.credentials ?? 'include',
-        headers,
-    });
+    if (needsCsrf && res.status === 403) {
+        try {
+            const data = await res.clone().json();
+            if (data?.error === 'csrf_invalid') {
+                cachedToken = null;
+                cachedExpiresAt = 0;
+                initPromise = null;
+                await ensureCsrfToken();
+                const retryHeaders = new Headers(init.headers || {});
+                if (cachedToken) {
+                    retryHeaders.set(ADMIN_CSRF_HEADER, cachedToken);
+                }
+                res = await performAdminFetch(urlStr, init, retryHeaders);
+            }
+        } catch {
+            /* non-JSON 403 */
+        }
+    }
+
+    return res;
 }
 
 /**

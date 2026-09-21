@@ -5,6 +5,19 @@ import { wirePlatformOpsButtons } from './admin-platform-ops.js';
 
 const UPDATE_INTERVAL = 2000;
 
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function formatTrafficBytes(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(sizes.length - 1, Math.floor(Math.log(n) / Math.log(k)));
+    return `${Math.round((n / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
+}
+
 /** tenant ID パターン（サーバーと同等） */
 const TENANT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 
@@ -61,6 +74,26 @@ async function loadStats() {
             'ram-usage',
             data.ramUsagePercent != null ? `${Number(data.ramUsagePercent).toFixed(1)}%` : '-'
         );
+
+        const traffic = data.traffic;
+        if (traffic) {
+            set('traffic-window', traffic.bytesSentLastWindowHuman || '-');
+            set('traffic-rate', traffic.bytesPerSecondHuman || '-');
+            set('traffic-total', traffic.bytesSentTotalHuman || '-');
+            const hintEl = document.getElementById('traffic-by-category-hint');
+            if (hintEl && traffic.byCategory) {
+                const parts = [
+                    ['fds_smoke_main', '煙メイン'],
+                    ['fds_smoke_bulk', '煙バルク'],
+                    ['tenant_r2', 'R2'],
+                ]
+                    .filter(([key]) => traffic.byCategory[key] > 0)
+                    .map(([key, label]) => `${label}: ${formatTrafficBytes(traffic.byCategory[key])}`);
+                hintEl.textContent = parts.length
+                    ? `カテゴリ別累計 — ${parts.join(' / ')}（直近60秒の合計は上段）`
+                    : '煙データ（メイン／バルク）と R2 アセットの送信量です。まだトラフィックは記録されていません。';
+            }
+        }
 
         updateLastUpdateTime();
     } catch (e) {
@@ -706,12 +739,599 @@ function applyTenantNetworkToDraft(id, entries) {
  *   portalLinks: { label: string, url: string }[],
  *   servers: { label: string, host: string, port: number, secure?: boolean, path?: string }[],
  *   tenantAccessUrls: { tenantId: string, url: string }[],
- *   proxyServiceDomain: string,
- *   useReverseProxy: boolean,
- *   trustProxy: boolean,
- *   requireSecureHttp: boolean,
  * } | null} */
 let networkConfigDraft = null;
+
+/** @type {{ groups: { id: string, label: string, items: object[] }[] } | null} */
+let envConfigView = null;
+
+/** @type {Record<string, string>} */
+const envConfigEdits = {};
+
+const ENV_SOURCE_LABELS = {
+    env: '.env',
+    file: 'panel',
+    default: 'def',
+    unset: '—',
+};
+
+const ADMIN_PANEL_IDS = ['overview', 'settings'];
+const SETTINGS_TAB_IDS = ['env', 'network', 'code'];
+const LEGACY_PANEL_TO_SETTINGS_TAB = {
+    env: 'env',
+    network: 'network',
+    code: 'code',
+};
+
+/**
+ * 設定パネル内のサブタブを切り替える
+ * @param {string} tabId
+ */
+function activateSettingsTab(tabId) {
+    if (!SETTINGS_TAB_IDS.includes(tabId)) tabId = 'env';
+    const subnav = document.getElementById('admin-settings-subnav');
+    if (!subnav) return;
+
+    for (const btn of subnav.querySelectorAll('[data-settings-tab]')) {
+        btn.classList.toggle('active', btn.getAttribute('data-settings-tab') === tabId);
+    }
+    for (const tab of document.querySelectorAll('[data-settings-tab-id]')) {
+        tab.classList.toggle('active', tab.getAttribute('data-settings-tab-id') === tabId);
+    }
+    if (tabId === 'code') {
+        void loadCodeEditor();
+    }
+}
+
+/**
+ * サイドメニューでタブ切替
+ */
+function initAdminSideNav() {
+    const nav = document.getElementById('admin-side-nav');
+    if (!nav) return;
+
+    const buttons = nav.querySelectorAll('[data-admin-panel]');
+    const panels = document.querySelectorAll('[data-admin-panel-id]');
+
+    const activate = (panelId, settingsTab) => {
+        if (!ADMIN_PANEL_IDS.includes(panelId)) panelId = 'overview';
+        for (const btn of buttons) {
+            btn.classList.toggle('active', btn.getAttribute('data-admin-panel') === panelId);
+        }
+        for (const panel of panels) {
+            panel.classList.toggle('active', panel.getAttribute('data-admin-panel-id') === panelId);
+        }
+        if (panelId === 'settings') {
+            activateSettingsTab(settingsTab || 'env');
+        }
+        try {
+            const hash = panelId === 'settings'
+                ? `settings/${settingsTab || 'env'}`
+                : panelId;
+            history.replaceState(null, '', `#${hash}`);
+        } catch {
+            /* ignore */
+        }
+    };
+
+    nav.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-admin-panel]');
+        if (!btn) return;
+        activate(btn.getAttribute('data-admin-panel') || 'overview');
+    });
+
+    const subnav = document.getElementById('admin-settings-subnav');
+    subnav?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-settings-tab]');
+        if (!btn) return;
+        activate('settings', btn.getAttribute('data-settings-tab') || 'env');
+    });
+
+    const hash = location.hash.replace(/^#/, '');
+    if (ADMIN_PANEL_IDS.includes(hash)) {
+        activate(hash);
+        return;
+    }
+    if (SETTINGS_TAB_IDS.includes(hash)) {
+        activate('settings', hash);
+        return;
+    }
+    if (hash.startsWith('settings/')) {
+        const tab = hash.slice('settings/'.length);
+        activate('settings', SETTINGS_TAB_IDS.includes(tab) ? tab : 'env');
+        return;
+    }
+    if (LEGACY_PANEL_TO_SETTINGS_TAB[hash]) {
+        activate('settings', LEGACY_PANEL_TO_SETTINGS_TAB[hash]);
+        return;
+    }
+    activate('overview');
+}
+
+function initEnvConfigPanel() {
+    const saveBtn = document.getElementById('env-config-save-btn');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', () => {
+        void saveEnvConfig();
+    });
+    initR2ConnectionPanel();
+    void loadEnvConfig();
+}
+
+function initR2ConnectionPanel() {
+    const testBtn = document.getElementById('r2-connection-test-btn');
+    testBtn?.addEventListener('click', () => {
+        void runR2ConnectionTestUi();
+    });
+}
+
+/**
+ * @param {Record<string, unknown>} status
+ */
+function renderR2ConnectionStatus(status) {
+    const badge = document.getElementById('r2-connection-badge');
+    const detail = document.getElementById('r2-connection-detail');
+    const testBtn = document.getElementById('r2-connection-test-btn');
+    const errorEl = document.getElementById('r2-connection-error');
+    if (!badge) return;
+
+    if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+    }
+
+    let badgeClass = 'r2-connection-badge--unknown';
+    let badgeText = '確認中…';
+
+    if (status.backend !== 'r2') {
+        badgeClass = 'r2-connection-badge--local';
+        badgeText = 'ローカルストレージ';
+    } else if (!status.configured) {
+        badgeClass = 'r2-connection-badge--pending';
+        badgeText = '未設定';
+    } else if (status.connected) {
+        badgeClass = 'r2-connection-badge--connected';
+        badgeText = '接続済み';
+    } else if (status.stale) {
+        badgeClass = 'r2-connection-badge--pending';
+        badgeText = '要再確認';
+    } else if (status.lastError) {
+        badgeClass = 'r2-connection-badge--failed';
+        badgeText = '接続失敗';
+    } else {
+        badgeClass = 'r2-connection-badge--pending';
+        badgeText = '未確認';
+    }
+
+    badge.className = `r2-connection-badge ${badgeClass}`;
+    badge.textContent = badgeText;
+
+    if (detail) {
+        const parts = [];
+        if (status.backend === 'r2' && status.bucket) {
+            parts.push(`bucket: ${status.bucket}`);
+        }
+        if (status.connected && status.testedAt) {
+            parts.push(`確認: ${new Date(status.testedAt).toLocaleString('ja-JP')}`);
+        } else if (status.message) {
+            parts.push(String(status.message));
+        }
+        if (status.lastError && !status.connected) {
+            parts.push(String(status.lastError));
+        }
+        detail.textContent = parts.join(' · ');
+    }
+
+    if (testBtn) {
+        testBtn.disabled = status.backend !== 'r2' || !status.configured;
+        testBtn.title =
+            status.backend !== 'r2'
+                ? 'STORAGE_BACKEND=r2 のときのみテストできます'
+                : !status.configured
+                  ? 'R2 認証情報を設定してください'
+                  : 'テストファイルをアップロード・ダウンロード・削除します';
+    }
+}
+
+async function loadR2ConnectionStatus() {
+    try {
+        const res = await adminFetch('/admin/r2-storage-status', { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const status = await res.json();
+        renderR2ConnectionStatus(status);
+        return status;
+    } catch (e) {
+        renderR2ConnectionStatus({ backend: 'local', configured: false, connected: false });
+        console.error('loadR2ConnectionStatus failed:', e);
+        return null;
+    }
+}
+
+async function runR2ConnectionTestUi() {
+    const testBtn = document.getElementById('r2-connection-test-btn');
+    const errorEl = document.getElementById('r2-connection-error');
+    if (testBtn) {
+        testBtn.disabled = true;
+        testBtn.textContent = 'テスト中…';
+    }
+    if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+    }
+
+    try {
+        const res = await adminFetch('/admin/r2-connection-test', {
+            method: 'POST',
+            credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.status) {
+            renderR2ConnectionStatus(data.status);
+        }
+        if (!res.ok) {
+            throw new Error(data.error || data.message || `HTTP ${res.status}`);
+        }
+        showEnvConfigBanner(data.message || 'R2 接続完了');
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : 'R2 接続テストに失敗しました';
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.hidden = false;
+        }
+        await loadR2ConnectionStatus();
+    } finally {
+        if (testBtn) {
+            testBtn.disabled = false;
+            testBtn.innerHTML = '<i class="bi bi-cloud-check"></i> R2 接続テスト';
+        }
+    }
+}
+
+async function loadEnvConfig() {
+    const statusEl = document.getElementById('env-config-status');
+    try {
+        const res = await adminFetch('/admin/env-config', { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        envConfigView = await res.json();
+        for (const key of Object.keys(envConfigEdits)) {
+            delete envConfigEdits[key];
+        }
+        if (statusEl) {
+            const parts = [
+                envConfigView.configExists ? '保存済み設定あり' : 'ファイル未作成（既定値）',
+                `マスクレベル: ${envConfigView.secretLevel}`,
+            ];
+            statusEl.textContent = parts.join(' · ');
+        }
+        renderEnvConfigDraft();
+        await loadR2ConnectionStatus();
+    } catch (e) {
+        if (statusEl) statusEl.textContent = '環境変数の読み込みに失敗しました';
+        console.error('loadEnvConfig failed:', e);
+    }
+}
+
+function renderEnvConfigDraft() {
+    const container = document.getElementById('env-config-groups');
+    if (!container || !envConfigView) return;
+    container.replaceChildren();
+
+    for (const group of envConfigView.groups || []) {
+        const groupLabel = document.createElement('div');
+        groupLabel.className = 'env-config-group-label';
+        groupLabel.textContent = group.label;
+        container.appendChild(groupLabel);
+
+        const list = document.createElement('div');
+        list.className = 'env-config-list';
+
+        for (const item of group.items || []) {
+            const row = document.createElement('div');
+            row.className = 'env-config-row';
+            if (item.locked) row.classList.add('env-config-locked');
+            if (item.masked) row.classList.add('env-config-masked');
+
+            const editValue = envConfigEdits[item.key] !== undefined
+                ? envConfigEdits[item.key]
+                : item.value;
+
+            const keyEl = document.createElement('div');
+            keyEl.className = 'env-config-row-key';
+            keyEl.textContent = item.key;
+            keyEl.title = item.label + (item.description ? ` — ${item.description}` : '');
+
+            const valueEl = document.createElement('div');
+            valueEl.className = 'env-config-row-value';
+
+            if (item.locked) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.disabled = true;
+                input.placeholder = '(.env)';
+                valueEl.appendChild(input);
+            } else if (item.multiline) {
+                const ta = document.createElement('textarea');
+                ta.rows = 1;
+                ta.dataset.envKey = item.key;
+                ta.value = editValue;
+                valueEl.appendChild(ta);
+            } else {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.dataset.envKey = item.key;
+                input.value = editValue;
+                valueEl.appendChild(input);
+            }
+
+            const badges = document.createElement('div');
+            badges.className = 'env-config-badges';
+            badges.innerHTML = [
+                item.locked ? '🔒' : '',
+                item.restartRequired ? '<span class="env-config-restart-badge">R</span>' : '',
+                `<span title="ソース">${escapeHtml(ENV_SOURCE_LABELS[item.source] || item.source)}</span>`,
+            ].filter(Boolean).join(' ');
+
+            row.appendChild(keyEl);
+            row.appendChild(valueEl);
+            row.appendChild(badges);
+            list.appendChild(row);
+        }
+
+        container.appendChild(list);
+    }
+
+    for (const input of container.querySelectorAll('[data-env-key]')) {
+        input.addEventListener('input', handleEnvFieldChange);
+        input.addEventListener('focus', handleEnvFieldFocus);
+    }
+}
+
+function handleEnvFieldFocus(e) {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    const key = target.getAttribute('data-env-key');
+    if (!key) return;
+    if (target.value === '••••••••') {
+        target.value = '';
+        envConfigEdits[key] = '';
+    }
+}
+
+function handleEnvFieldChange(e) {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+    const key = target.getAttribute('data-env-key');
+    if (!key) return;
+    envConfigEdits[key] = target.value;
+}
+
+function showEnvConfigBanner(message, isWarning = false) {
+    const banner = document.getElementById('env-config-banner');
+    if (!banner) return;
+    banner.hidden = false;
+    banner.textContent = message;
+    banner.classList.toggle('env-config-banner-warn', isWarning);
+}
+
+async function saveEnvConfig() {
+    const errorEl = document.getElementById('env-config-error');
+    const saveBtn = document.getElementById('env-config-save-btn');
+    if (!envConfigView) return;
+
+    if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+    }
+    if (saveBtn) saveBtn.disabled = true;
+
+    const values = { ...envConfigEdits };
+    for (const group of envConfigView.groups || []) {
+        for (const item of group.items || []) {
+            if (item.locked || values[item.key] !== undefined) continue;
+            if (item.masked && item.value === '••••••••') continue;
+            values[item.key] = item.value;
+        }
+    }
+
+    try {
+        const res = await adminFetch('/admin/env-config', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const errors = Array.isArray(data.errors) ? data.errors.join('\n') : data.message;
+            throw new Error(errors || `HTTP ${res.status}`);
+        }
+
+        const requiresRestart = Array.isArray(data.requiresRestart) ? data.requiresRestart : [];
+        if (requiresRestart.length > 0) {
+            showEnvConfigBanner(
+                `保存しました。再起動が必要: ${requiresRestart.join(', ')}（「サーバー完全再起動」を実行してください）`,
+                true
+            );
+        } else {
+            showEnvConfigBanner(data.message || '反映しました（再起動不要）');
+        }
+
+        await loadEnvConfig();
+        await loadNetworkConfig();
+        await loadR2ConnectionStatus();
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : '保存に失敗しました';
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.hidden = false;
+        } else {
+            alert(msg);
+        }
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+/**
+ * env-config.json 用の編集可能 JSON を組み立てる
+ * @returns {string}
+ */
+function buildEnvConfigJsonForEditor() {
+    if (!envConfigView) return '{}';
+    const obj = {};
+    for (const group of envConfigView.groups || []) {
+        for (const item of group.items || []) {
+            if (item.locked) continue;
+            const edited = envConfigEdits[item.key];
+            if (edited !== undefined) {
+                if (edited.trim() !== '') obj[item.key] = edited;
+                continue;
+            }
+            if (item.masked) continue;
+            if (item.source === 'file' || item.configured) {
+                const v = item.effectiveValue || item.value;
+                if (v !== undefined && String(v).trim() !== '') obj[item.key] = v;
+            }
+        }
+    }
+    return `${JSON.stringify(obj, null, 2)}\n`;
+}
+
+/**
+ * network-config.json 用 JSON を組み立てる
+ * @returns {string}
+ */
+function buildNetworkConfigJsonForEditor() {
+    if (!networkConfigDraft) return '{\n  "portalLinks": [],\n  "servers": [],\n  "tenantAccessUrls": []\n}\n';
+    const payload = {
+        portalLinks: networkConfigDraft.portalLinks.map((l) => ({
+            label: l.label,
+            url: l.url,
+        })),
+        servers: networkConfigDraft.servers,
+        tenantAccessUrls: networkConfigDraft.tenantAccessUrls,
+    };
+    return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+function initCodeConfigPanel() {
+    const targetSelect = document.getElementById('code-config-target');
+    const reloadBtn = document.getElementById('code-config-reload-btn');
+    const saveBtn = document.getElementById('code-config-save-btn');
+    const editor = document.getElementById('code-config-editor');
+    if (!targetSelect || !editor) return;
+
+    targetSelect.addEventListener('change', () => {
+        void loadCodeEditor();
+    });
+    reloadBtn?.addEventListener('click', () => {
+        void loadCodeEditor(true);
+    });
+    saveBtn?.addEventListener('click', () => {
+        void saveCodeEditor();
+    });
+}
+
+async function loadCodeEditor(forceRefresh = false) {
+    const editor = document.getElementById('code-config-editor');
+    const statusEl = document.getElementById('code-config-status');
+    const targetSelect = document.getElementById('code-config-target');
+    if (!editor || !targetSelect) return;
+
+    const target = targetSelect.value === 'network' ? 'network' : 'env';
+
+    try {
+        if (target === 'env' && (forceRefresh || !envConfigView)) {
+            await loadEnvConfig();
+        }
+        if (target === 'network' && (forceRefresh || !networkConfigDraft)) {
+            await loadNetworkConfig();
+        }
+
+        editor.value = target === 'network'
+            ? buildNetworkConfigJsonForEditor()
+            : buildEnvConfigJsonForEditor();
+
+        if (statusEl) {
+            statusEl.textContent = target === 'network'
+                ? 'network-config.json（構造データのみ）'
+                : 'env-config.json（ロック済みキー除く）';
+        }
+    } catch (e) {
+        if (statusEl) statusEl.textContent = '読み込みに失敗しました';
+        console.error('loadCodeEditor failed:', e);
+    }
+}
+
+async function saveCodeEditor() {
+    const editor = document.getElementById('code-config-editor');
+    const errorEl = document.getElementById('code-config-error');
+    const statusEl = document.getElementById('code-config-status');
+    const targetSelect = document.getElementById('code-config-target');
+    const saveBtn = document.getElementById('code-config-save-btn');
+    if (!editor || !targetSelect) return;
+
+    if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+    }
+    if (saveBtn) saveBtn.disabled = true;
+
+    const target = targetSelect.value === 'network' ? 'network' : 'env';
+
+    try {
+        const parsed = JSON.parse(editor.value);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('JSON はオブジェクトである必要があります');
+        }
+
+        if (target === 'env') {
+            const res = await adminFetch('/admin/env-config', {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ values: parsed }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const errors = Array.isArray(data.errors) ? data.errors.join('\n') : data.message;
+                throw new Error(errors || `HTTP ${res.status}`);
+            }
+            const requiresRestart = Array.isArray(data.requiresRestart) ? data.requiresRestart : [];
+            if (statusEl) {
+                statusEl.textContent = requiresRestart.length > 0
+                    ? `保存済み。再起動が必要: ${requiresRestart.join(', ')}`
+                    : 'env-config.json を保存し反映しました';
+            }
+            await loadEnvConfig();
+        } else {
+            const res = await adminFetch('/admin/network-config', {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(parsed),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const errors = Array.isArray(data.errors) ? data.errors.join('\n') : data.message;
+                throw new Error(errors || `HTTP ${res.status}`);
+            }
+            if (statusEl) statusEl.textContent = data.message || 'network-config.json を保存しました';
+            await loadNetworkConfig();
+            editor.value = buildNetworkConfigJsonForEditor();
+        }
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : '保存に失敗しました';
+        if (errorEl) {
+            errorEl.textContent = msg;
+            errorEl.hidden = false;
+        } else {
+            alert(msg);
+        }
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
 
 function initNetworkConfigPanel() {
     const saveBtn = document.getElementById('network-config-save-btn');
@@ -770,10 +1390,6 @@ async function loadNetworkConfig() {
                   }))
                 : [],
             tenantAccessUrls: Array.isArray(data.tenantAccessUrls) ? data.tenantAccessUrls : [],
-            proxyServiceDomain: data.proxyServiceDomain || '',
-            useReverseProxy: !!data.useReverseProxy,
-            trustProxy: !!data.trustProxy,
-            requireSecureHttp: !!data.requireSecureHttp,
         };
 
         if (statusEl) {
@@ -824,24 +1440,6 @@ async function autofillTenantUrls() {
     } catch (e) {
         alert(e instanceof Error ? e.message : 'Tenant 一覧の取得に失敗しました');
     }
-}
-
-function refreshProxyDomainSelect() {
-    const select = document.getElementById('network-proxy-service-domain');
-    if (!select || !networkConfigDraft) return;
-    const current = networkConfigDraft.proxyServiceDomain || '';
-    select.replaceChildren();
-    const empty = document.createElement('option');
-    empty.value = '';
-    empty.textContent = '— 未選択 —';
-    select.appendChild(empty);
-    for (const s of networkConfigDraft.servers) {
-        const opt = document.createElement('option');
-        opt.value = s.host;
-        opt.textContent = `${s.label} (${s.host})`;
-        select.appendChild(opt);
-    }
-    select.value = current;
 }
 
 function renderNetworkConfigDraft() {
@@ -931,39 +1529,6 @@ function renderNetworkConfigDraft() {
             });
         }
     }
-
-    const useRp = document.getElementById('network-use-reverse-proxy');
-    const trust = document.getElementById('network-trust-proxy');
-    const secure = document.getElementById('network-require-secure-http');
-    if (useRp) useRp.checked = networkConfigDraft.useReverseProxy;
-    if (trust) trust.checked = networkConfigDraft.trustProxy;
-    if (secure) secure.checked = networkConfigDraft.requireSecureHttp;
-
-    if (useRp) {
-        useRp.onchange = () => {
-            if (networkConfigDraft) networkConfigDraft.useReverseProxy = useRp.checked;
-        };
-    }
-    if (trust) {
-        trust.onchange = () => {
-            if (networkConfigDraft) networkConfigDraft.trustProxy = trust.checked;
-        };
-    }
-    if (secure) {
-        secure.onchange = () => {
-            if (networkConfigDraft) networkConfigDraft.requireSecureHttp = secure.checked;
-        };
-    }
-
-    refreshProxyDomainSelect();
-    const domainSelect = document.getElementById('network-proxy-service-domain');
-    if (domainSelect) {
-        domainSelect.onchange = () => {
-            if (networkConfigDraft) {
-                networkConfigDraft.proxyServiceDomain = domainSelect.value;
-            }
-        };
-    }
 }
 
 function handleServerFieldChange(e) {
@@ -981,7 +1546,6 @@ function handleServerFieldChange(e) {
     const previewCell = target.closest('tr')?.querySelector('.link-preview');
     if (previewCell) previewCell.textContent = buildServerUrl(row);
     if (field === 'host' || field === 'port') renderNetworkServersPortWarnings();
-    if (field === 'host') refreshProxyDomainSelect();
 }
 
 function handlePortalFieldChange(e) {
@@ -1058,10 +1622,15 @@ async function bootstrapAdminSim() {
     }
 
     initThemeToggle();
+    initAdminSideNav();
     initTenantAddModal();
+    initEnvConfigPanel();
+    initCodeConfigPanel();
     initNetworkConfigPanel();
     wirePlatformOpsButtons({
         onReloadSuccess: async () => {
+            await loadEnvConfig();
+            await loadR2ConnectionStatus();
             await loadNetworkConfig();
             await loadTenants();
             await loadStats();

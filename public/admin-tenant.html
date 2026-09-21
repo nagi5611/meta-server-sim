@@ -13,12 +13,9 @@
             <a class="admin-nav-back" href="/admin.html" title="Tenant 一覧へ戻る">
                 <i class="bi bi-arrow-left"></i> 一覧へ戻る
             </a>
-            <button type="button" class="admin-nav-item active" data-panel="panel-status">
-                <i class="bi bi-speedometer2"></i> ステータス
-            </button>
-            <button type="button" class="admin-nav-item" data-panel="panel-worlds">
-                <i class="bi bi-globe2"></i> ワールド
-            </button>
+            <span class="admin-nav-item active" aria-current="page">
+                <i class="bi bi-building"></i> 概要
+            </span>
             <a class="admin-nav-item admin-nav-link" id="tenant-world-edit-nav" href="#">
                 <i class="bi bi-pencil-square"></i> ワールド編集
             </a>
@@ -36,13 +33,20 @@
             </div>
             <div class="header-actions">
                 <span id="admin-ops-status" class="admin-ops-status" aria-live="polite"></span>
-                <button type="button" class="btn btn-secondary btn-sm" id="admin-reload-settings-btn" title="設定を再読み込み">
-                    <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
-                </button>
-                <button type="button" class="btn btn-danger btn-sm" id="admin-restart-btn" title="サーバー完全再起動">
-                    <i class="bi bi-power"></i> 完全再起動
-                </button>
-                <button type="button" class="btn btn-secondary" id="admin-theme-toggle" title="ダークモード切替">
+                <details class="admin-ops-menu">
+                    <summary class="btn btn-secondary btn-sm admin-ops-menu-trigger" title="サーバー操作">
+                        <i class="bi bi-three-dots-vertical"></i> 操作
+                    </summary>
+                    <div class="admin-ops-menu-panel">
+                        <button type="button" class="admin-ops-menu-item" id="admin-reload-settings-btn">
+                            <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
+                        </button>
+                        <button type="button" class="admin-ops-menu-item admin-ops-menu-item-danger" id="admin-restart-btn">
+                            <i class="bi bi-power"></i> 完全再起動
+                        </button>
+                    </div>
+                </details>
+                <button type="button" class="btn btn-secondary btn-icon" id="admin-theme-toggle" title="ダークモード切替">
                     <i class="bi bi-moon-fill" id="admin-theme-icon"></i>
                 </button>
                 <button type="button" class="btn btn-danger btn-sm" id="tenant-archive-btn" title="この Tenant をアーカイブ">
@@ -51,15 +55,15 @@
                 <a class="btn btn-secondary" id="tenant-metaverse-link" href="#" target="_blank" rel="noopener">
                     メタバースを開く
                 </a>
-                <span class="last-update">最終更新: <span id="last-update">-</span></span>
+                <span class="last-update">更新: <span id="last-update">-</span></span>
             </div>
         </header>
 
         <div class="admin-panels">
-            <div id="panel-status" class="admin-panel active">
+            <div id="panel-overview" class="admin-panel active">
                 <section class="stats-section">
-                    <h2>サーバー統計</h2>
-                    <div class="stats-grid">
+                    <h2>ステータス</h2>
+                    <div class="stats-grid stats-grid-compact">
                         <div class="stat-card">
                             <div class="stat-label">接続プレイヤー数</div>
                             <div class="stat-value" id="tenant-players">0</div>
@@ -78,11 +82,45 @@
                         </div>
                     </div>
                 </section>
-            </div>
 
-            <div id="panel-worlds" class="admin-panel">
                 <section class="stats-section">
-                    <h2>ワールド一覧</h2>
+                    <h2>通信トラフィック（HTTP 送信）</h2>
+                    <p class="hint">FDS 煙バイナリ（メイン／バルク専用サーバー）と R2 経由アセットの送出量。直近60秒の平均レートです。</p>
+                    <div class="stats-grid stats-grid-compact">
+                        <div class="stat-card">
+                            <div class="stat-label">送信レート</div>
+                            <div class="stat-value" id="tenant-traffic-rate">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">直近60秒</div>
+                            <div class="stat-value" id="tenant-traffic-window">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">累計（起動後）</div>
+                            <div class="stat-value stat-value-sm" id="tenant-traffic-total">-</div>
+                        </div>
+                    </div>
+                    <p class="hint" id="tenant-traffic-categories">-</p>
+                    <table class="worlds-table" id="tenant-traffic-top-table">
+                        <thead>
+                            <tr>
+                                <th>パス（カテゴリ付き）</th>
+                                <th>累計送信</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenant-traffic-top-body">
+                            <tr><td colspan="2">データなし</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section class="stats-section">
+                    <div class="section-header-row">
+                        <h2>ワールド一覧</h2>
+                        <a class="btn btn-primary btn-sm" id="tenant-world-edit-cta" href="#">
+                            <i class="bi bi-pencil-square"></i> ワールド編集
+                        </a>
+                    </div>
                     <p class="hint">worlds.json から読み込み（読み取り専用）</p>
                     <table class="worlds-table">
                         <thead>
@@ -99,6 +137,44 @@
             </div>
         </div>
     </main>
+
+    <div id="admin-restart-modal" class="admin-modal" hidden aria-hidden="true">
+        <div class="admin-modal-backdrop" data-modal-close></div>
+        <div class="admin-modal-dialog" role="dialog" aria-labelledby="admin-restart-title" aria-modal="true">
+            <h2 id="admin-restart-title">サーバー再起動</h2>
+            <p class="hint">強制再起動は即時に切断されます。計画再起動は指定時間まで全プレイヤーにアラートを表示します。</p>
+            <fieldset class="admin-restart-mode-fieldset">
+                <label class="admin-form-field admin-form-field-inline">
+                    <input type="radio" name="restart-mode" value="force" checked>
+                    <span>強制再起動（即時）</span>
+                </label>
+                <label class="admin-form-field admin-form-field-inline">
+                    <input type="radio" name="restart-mode" value="planned">
+                    <span>計画再起動</span>
+                </label>
+            </fieldset>
+            <div id="admin-restart-planned-fields" hidden>
+                <div class="admin-restart-delay-row">
+                    <label class="admin-form-field">
+                        <span>分</span>
+                        <input type="number" id="admin-restart-delay-minutes" min="0" max="1440" value="5" inputmode="numeric">
+                    </label>
+                    <label class="admin-form-field">
+                        <span>秒</span>
+                        <input type="number" id="admin-restart-delay-seconds" min="0" max="59" value="0" inputmode="numeric">
+                    </label>
+                </div>
+                <label class="admin-form-field">
+                    <span>プレイヤー向けアラートメッセージ</span>
+                    <textarea id="admin-restart-alert-message" rows="4" maxlength="500" placeholder="メンテナンスのため、まもなくサーバーを再起動します。"></textarea>
+                </label>
+            </div>
+            <div class="admin-modal-actions">
+                <button type="button" class="btn btn-secondary" data-modal-close>キャンセル</button>
+                <button type="button" class="btn btn-danger" id="admin-restart-submit-btn">再起動を実行</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/js/admin-url-sanitize.js"></script>
     <script type="module" src="/js/admin-tenant.js"></script>

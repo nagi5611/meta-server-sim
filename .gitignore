@@ -26,6 +26,9 @@ Thumbs.db
 Desktop.ini
 ehthumbs.db
 
+# Runtime bridge for metaverse-simple lib imports (captions)
+data/platform/metaverse-simple-bridge/
+
 # IDE
 .idea/
 .vscode/
@@ -78,6 +81,6 @@ tenants/**/data/images/
 !tenants/_template/data/images/
 !tenants/_template/data/images/**
 
-# Admin 作成 tenant（fixture: P-01..P-04。P-05 以降はローカル専用）
+# Admin 作成 tenant（fixture: P-01..P-03。P-04 以降はローカル専用）
 tenants/P-0[5-9]/
 tenants/P-[1-9][0-9]/

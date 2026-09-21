@@ -71,8 +71,11 @@ uniform float random;
 uniform sampler2D depthTexture;
 #endif
 
-// The world-space origin of the volume
+// The world-space origin of the volume (local corner before rotation)
 uniform vec3 volumeOrigin;
+// Local → world rotation for volume voxel grid
+uniform mat3 volumeRotation;
+uniform mat3 volumeRotationInverse;
 #if USE_CUSTOM_VALUE_FUNCTION
 // The world-space size of the volume
 uniform vec3 volumeSize;
@@ -90,25 +93,32 @@ uniform vec3 atlasResolution;
 uniform vec3 volumeResolution;
 // The physical size of a single voxel
 uniform vec3 voxelSize;
+// Per-axis mirror: 1.0 = normal, -1.0 = flip sample along that local axis
+uniform vec3 volumeMirrorSign;
 // The number of timesteps (volumes) stored in the atlas, ignoring unused volumes
 uniform float timeCount;
 
-// Sample and interpolate a value from the volume atlas
-float sampleValue(vec3 position, vec3 volumeUvOffset0, vec3 volumeUvOffset1, float volumeT) {
-    // Transform the position into voxel/UV coordinates inside the volume
-    // Assumes that the origin is centered on the first voxel
-    vec3 volumeVoxel = (position - volumeOrigin) / voxelSize;
+vec3 mirrorLocalPos(vec3 localPos) {
+    vec3 localExtent = (volumeResolution - 1.0) * voxelSize;
+    vec3 p = localPos;
+    if (volumeMirrorSign.x < 0.0) p.x = localExtent.x - p.x;
+    if (volumeMirrorSign.y < 0.0) p.y = localExtent.y - p.y;
+    if (volumeMirrorSign.z < 0.0) p.z = localExtent.z - p.z;
+    return p;
+}
+
+// Sample and interpolate a value from the volume atlas at local volume coordinates
+float sampleValueAtLocal(vec3 localPos, vec3 volumeUvOffset0, vec3 volumeUvOffset1, float volumeT) {
+    vec3 samplePos = mirrorLocalPos(localPos);
+    vec3 volumeVoxel = samplePos / voxelSize;
     vec3 volumeUv = (volumeVoxel + 0.5) / volumeResolution;
 
-    // Calculate UV coordinates inside the individual volumes
     vec3 uv0 = volumeUvOffset0 + volumeUv / atlasResolution;
     vec3 uv1 = volumeUvOffset1 + volumeUv / atlasResolution;
 
-    // Sample the values from the volume atlas
     float value0 = texture(volumeAtlas, uv0).r;
     float value1 = texture(volumeAtlas, uv1).r;
 
-    // Interpolate between volumes
     return mix(value0, value1, volumeT);
 }
 #endif
@@ -153,10 +163,7 @@ void main() {
 #endif
 
 #if USE_CUSTOM_VALUE_FUNCTION == 0
-    // Calculate the volume size and max coordinate
-    vec3 volumeSize = volumeResolution * voxelSize;
-    // Minus one voxel since they are centered
-    vec3 volumeMax = volumeOrigin + (volumeResolution - 1.0) * voxelSize;
+    vec3 localExtent = (volumeResolution - 1.0) * voxelSize;
 
     // Calculate the volume indices and interpolation factor
     int volumeIndex0 = int(time) % int(timeCount);
@@ -180,16 +187,18 @@ void main() {
     vec3 volumeUvOffset0 = vec3(float(volume0X), float(volume0Y), float(volume0Z)) / atlasResolution;
     vec3 volumeUvOffset1 = vec3(float(volume1X), float(volume1Y), float(volume1Z)) / atlasResolution;
 #else
-    // Calculate the volume max coordinate
-    vec3 volumeMax = volumeOrigin + volumeSize;
+    vec3 localExtent = volumeSize;
 #endif
 
-    // Calculate ray-box intersection
-    vec3 boxMin = max(volumeOrigin, clipMin);
-    vec3 boxMax = min(volumeMax, clipMax);
+    // Ray in volume-local space (corner at origin, axes aligned with voxel data)
+    vec3 localRayOrigin = volumeRotationInverse * (rayOrigin - volumeOrigin);
+    vec3 localRayDir = normalize(volumeRotationInverse * rayDirection);
 
-    vec3 t1 = (boxMin - rayOrigin) / rayDirection;
-    vec3 t2 = (boxMax - rayOrigin) / rayDirection;
+    vec3 boxMin = vec3(0.0);
+    vec3 boxMax = localExtent;
+
+    vec3 t1 = (boxMin - localRayOrigin) / localRayDir;
+    vec3 t2 = (boxMax - localRayOrigin) / localRayDir;
 
     vec3 tMin = min(t1, t2);
     vec3 tMax = max(t1, t2);
@@ -197,20 +206,17 @@ void main() {
     float tNear = max(max(tMin.x, tMin.y), tMin.z);
     float tFar = min(min(tMax.x, tMax.y), tMax.z);
 
-    // If the ray starts outside the volume and does not hit the box, discard the fragment
-    bool insideBox = all(greaterThanEqual(rayOrigin, boxMin)) &&
-        all(lessThanEqual(rayOrigin, boxMax));
+    bool insideBox = all(greaterThanEqual(localRayOrigin, boxMin)) &&
+        all(lessThanEqual(localRayOrigin, boxMax));
 
     if (!insideBox && (tNear > tFar || tFar < 0.0)) {
         discard;
     }
 
-    // Calculate the ray entry and exit points on the volume
-    vec3 entryPoint = insideBox ? rayOrigin : rayOrigin + rayDirection * tNear;
-    vec3 exitPoint = rayOrigin + rayDirection * tFar;
+    vec3 localEntry = insideBox ? localRayOrigin : localRayOrigin + localRayDir * tNear;
+    vec3 localExit = localRayOrigin + localRayDir * tFar;
 
-    // Calculate the total volume ray intersection and step length
-    float intersectionLength = length(exitPoint - entryPoint);
+    float intersectionLength = length(localExit - localEntry);
     float stepLength = intersectionLength / float(RAY_STEPS);
 
 #if RENDER_NORMALS == 0
@@ -245,15 +251,18 @@ void main() {
         // Mask steps outside the bounding volume (a mask is used to avoid conditional branching)
         float stepWeight = 1.0 - step(intersectionLength - 1e-6, currentRayLength);
 
-        // Interpolate the current position along the ray
-        vec3 position = mix(entryPoint, exitPoint, currentRayLength / intersectionLength);
+        vec3 localPos = mix(localEntry, localExit, currentRayLength / intersectionLength);
+        vec3 worldPos = volumeOrigin + volumeRotation * localPos;
+
+        stepWeight *= step(clipMin.x, worldPos.x) * step(worldPos.x, clipMax.x)
+            * step(clipMin.y, worldPos.y) * step(worldPos.y, clipMax.y)
+            * step(clipMin.z, worldPos.z) * step(worldPos.z, clipMax.z);
 
         // Sample value at ray position
 #if USE_CUSTOM_VALUE_FUNCTION
-        vec3 local = position - volumeOrigin;
-        float sampledValue = sampleValue(local.x, local.y, local.z, time);
+        float sampledValue = sampleValue(localPos.x, localPos.y, localPos.z, time);
 #else
-        float sampledValue = sampleValue(position, volumeUvOffset0, volumeUvOffset1, volumeT);
+        float sampledValue = sampleValueAtLocal(localPos, volumeUvOffset0, volumeUvOffset1, volumeT);
 #endif
         float scaledValue = sampledValue * valueMultiplier + valueAdded;
 
@@ -261,8 +270,8 @@ void main() {
         stepWeight *= step(minCutoffValue, scaledValue) * step(scaledValue, maxCutoffValue);
 
 #if USE_VOLUMETRIC_DEPTH_TEST
-        // Mask areas behind the depth buffer
-        stepWeight *= step(currentRayLength + tNear, depth);
+        float worldRayDist = dot(worldPos - rayOrigin, rayDirection);
+        stepWeight *= step(worldRayDist, depth);
 #endif
 
 #if RENDER_MEAN_VALUE && RENDER_NORMALS == 0
@@ -274,20 +283,23 @@ void main() {
         // Approximate normal using forward difference
   #if USE_CUSTOM_VALUE_FUNCTION
         vec3 delta = vec3(
-            sampleValue(local.x + normalEpsilon, local.y, local.z, time) - sampledValue,
-            sampleValue(local.x, local.y + normalEpsilon, local.z, time) - sampledValue,
-            sampleValue(local.x, local.y, local.z + normalEpsilon, time) - sampledValue);
+            sampleValue(localPos.x + normalEpsilon, localPos.y, localPos.z, time) - sampledValue,
+            sampleValue(localPos.x, localPos.y + normalEpsilon, localPos.z, time) - sampledValue,
+            sampleValue(localPos.x, localPos.y, localPos.z + normalEpsilon, time) - sampledValue);
   #else
         vec3 delta = vec3(
-            sampleValue(position + vec3(normalEpsilon, 0.0, 0.0), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue,
-            sampleValue(position + vec3(0.0, normalEpsilon, 0.0), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue,
-            sampleValue(position + vec3(0.0, 0.0, normalEpsilon), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue);
+            sampleValueAtLocal(localPos + vec3(normalEpsilon, 0.0, 0.0), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue,
+            sampleValueAtLocal(localPos + vec3(0.0, normalEpsilon, 0.0), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue,
+            sampleValueAtLocal(localPos + vec3(0.0, 0.0, normalEpsilon), volumeUvOffset0, volumeUvOffset1, volumeT) - sampledValue);
+        if (volumeMirrorSign.x < 0.0) delta.x = -delta.x;
+        if (volumeMirrorSign.y < 0.0) delta.y = -delta.y;
+        if (volumeMirrorSign.z < 0.0) delta.z = -delta.z;
   #endif
         delta = mix(vec3(0, 1, 0), delta, step(1e-7, dot(delta, delta)));
   #if INVERT_NORMALS
-        vec3 normal = normalize(-delta);
+        vec3 normal = normalize(-volumeRotation * delta);
   #else
-        vec3 normal = normalize(delta);
+        vec3 normal = normalize(volumeRotation * delta);
   #endif
 
   #if RENDER_NORMALS
@@ -301,7 +313,7 @@ void main() {
         vec3 addedLights = vec3(0.0);
 
         // Transform world position and normal into view space
-        vec3 viewPosition = (viewMatrix * vec4(position, 1.0)).xyz;
+        vec3 viewPosition = (viewMatrix * vec4(worldPos, 1.0)).xyz;
         vec3 viewNormal = normalize((viewMatrix * vec4(normal, 0.0)).xyz);
 
    #if USE_POINT_LIGHTS && NUM_POINT_LIGHTS > 0
@@ -469,6 +481,9 @@ export default class VolumeRenderer extends THREE.Mesh {
         depthTexture:          { value: null },
 
         volumeOrigin:          { value: new THREE.Vector3() },
+        volumeRotation:        { value: new THREE.Matrix3() },
+        volumeRotationInverse: { value: new THREE.Matrix3() },
+        volumeMirrorSign:      { value: new THREE.Vector3(1, 1, 1) },
         volumeSize:            { value: new THREE.Vector3() },
 
         volumeAtlas:           { value: null },
@@ -507,6 +522,9 @@ export default class VolumeRenderer extends THREE.Mesh {
 
         // Render the volume late as it acts as a postprocessing effect
         this.renderOrder = 1000;
+
+        this.uniforms.volumeRotation.value.identity();
+        this.uniforms.volumeRotationInverse.value.identity();
 
         this.updateMaterial();
     }
@@ -550,6 +568,9 @@ export default class VolumeRenderer extends THREE.Mesh {
         // Put together a new uniforms object referencing only the relevant uniforms
         const uniforms = lights ? THREE.UniformsUtils.merge([THREE.UniformsLib['lights'], {}]) : {};
         uniforms.volumeOrigin = this.uniforms.volumeOrigin;
+        uniforms.volumeRotation = this.uniforms.volumeRotation;
+        uniforms.volumeRotationInverse = this.uniforms.volumeRotationInverse;
+        uniforms.volumeMirrorSign = this.uniforms.volumeMirrorSign;
         uniforms.time = this.uniforms.time;
         uniforms.random = this.uniforms.random;
         uniforms.minCutoffValue = this.uniforms.minCutoffValue;

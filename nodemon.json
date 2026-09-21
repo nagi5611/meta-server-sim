@@ -1,5 +1,5 @@
 {
-  "watch": ["server.js", "lib", "data/platform/network-config.json", "data/platform/.restart-signal"],
+  "watch": ["server.js", "lib", "data/platform/network-config.json", "data/platform/env-config.json", "data/platform/.restart-signal"],
   "ext": "js,json",
   "ignore": ["tenants/**", "node_modules/**", "dist/**", "public/**"],
   "signal": "SIGTERM",

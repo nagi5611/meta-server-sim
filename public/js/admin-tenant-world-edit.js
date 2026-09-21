@@ -3,6 +3,7 @@ import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { initTenantSettingEditor } from './tenant-setting-editor.js';
 import { initTenantWorldEditShell } from './tenant-world-edit-shell.js';
 import { installTenantWorldEditXhrShim } from './tenant-world-edit-xhr.js';
+import { installTenantR2FetchShim, installTenantR2UploadShim } from './tenant-r2-upload-shim.js';
 
 /**
  * URL から tenant ID を解決する
@@ -35,6 +36,8 @@ if (!tenantId) {
 
     bootstrapAdminApi()
         .then(() => {
+            installTenantR2FetchShim();
+            installTenantR2UploadShim();
             installTenantWorldEditXhrShim();
             return initTenantSettingEditor(tenantId);
         })

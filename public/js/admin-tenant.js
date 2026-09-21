@@ -21,6 +21,74 @@ function resolveTenantIdFromLocation() {
 
 const tenantId = resolveTenantIdFromLocation();
 
+const TRAFFIC_CATEGORY_LABELS = {
+    fds_smoke_main: '煙メイン',
+    fds_smoke_bulk: '煙バルク',
+    tenant_r2: 'R2',
+};
+
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function formatTrafficBytes(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(sizes.length - 1, Math.floor(Math.log(n) / Math.log(k)));
+    return `${Math.round((n / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
+}
+
+/**
+ * 通信トラフィック UI を更新する
+ * @param {object | undefined} traffic
+ */
+function renderTenantTraffic(traffic) {
+    const set = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+    if (!traffic) {
+        set('tenant-traffic-rate', '-');
+        set('tenant-traffic-window', '-');
+        set('tenant-traffic-total', '-');
+        set('tenant-traffic-categories', 'トラフィックデータがありません');
+        return;
+    }
+
+    set('tenant-traffic-rate', traffic.bytesPerSecondHuman || '-');
+    set('tenant-traffic-window', traffic.bytesSentLastWindowHuman || '-');
+    set('tenant-traffic-total', traffic.bytesSentTotalHuman || '-');
+
+    const catParts = Object.entries(traffic.byCategory || {})
+        .filter(([, bytes]) => bytes > 0)
+        .map(([key, bytes]) => `${TRAFFIC_CATEGORY_LABELS[key] || key}: ${formatTrafficBytes(bytes)}`);
+    set(
+        'tenant-traffic-categories',
+        catParts.length ? `カテゴリ別累計 — ${catParts.join(' / ')}` : 'まだ送信トラフィックは記録されていません',
+    );
+
+    const tbody = document.getElementById('tenant-traffic-top-body');
+    if (!tbody) return;
+    const rows = Array.isArray(traffic.topPaths) ? traffic.topPaths : [];
+    tbody.replaceChildren();
+    if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="2">データなし</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+    for (const row of rows) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><code>${escapeHtml(row.key)}</code></td>
+            <td>${escapeHtml(row.bytesHuman || formatTrafficBytes(row.bytes))}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
 /**
  * 最終更新時刻を表示する
  */
@@ -28,24 +96,6 @@ function updateLastUpdateTime() {
     const el = document.getElementById('last-update');
     if (el) {
         el.textContent = new Date().toLocaleTimeString('ja-JP');
-    }
-}
-
-/**
- * サイドナビのパネル切替
- */
-function initAdminPanels() {
-    const buttons = document.querySelectorAll('.admin-nav-item[data-panel]');
-    for (const btn of buttons) {
-        btn.addEventListener('click', () => {
-            const panelId = btn.getAttribute('data-panel');
-            if (!panelId) return;
-            for (const b of buttons) b.classList.remove('active');
-            btn.classList.add('active');
-            for (const panel of document.querySelectorAll('.admin-panel')) {
-                panel.classList.toggle('active', panel.id === panelId);
-            }
-        });
     }
 }
 
@@ -76,7 +126,22 @@ function applyTenantHeader(data) {
     const linkEl = document.getElementById('tenant-metaverse-link');
     if (idEl) idEl.textContent = data.tenantId;
     if (nameEl) nameEl.textContent = data.displayName || data.tenantId;
-    if (linkEl) linkEl.href = data.url || `/${data.tenantId}/`;
+    if (linkEl) {
+        linkEl.href = data.url || `/${data.tenantId}/`;
+        linkEl.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const targetUrl = linkEl.href;
+            try {
+                const res = await adminFetch('/admin/enter-metaverse', { credentials: 'include' });
+                if (!res.ok) {
+                    /* ignore — ゲストとして入室 */
+                }
+            } catch {
+                /* ignore — ゲストとして入室 */
+            }
+            window.open(targetUrl, '_blank', 'noopener');
+        });
+    }
     document.title = `${data.displayName || data.tenantId} — 管理パネル`;
 }
 
@@ -95,8 +160,13 @@ async function loadTenantStats() {
             applyTenantHeader(data);
 
         const worldEditNav = document.getElementById('tenant-world-edit-nav');
+        const worldEditCta = document.getElementById('tenant-world-edit-cta');
+        const worldEditUrl = `/admin/tenant/${encodeURIComponent(data.tenantId)}/world-edit`;
         if (worldEditNav) {
-            worldEditNav.href = `/admin/tenant/${encodeURIComponent(data.tenantId)}/world-edit`;
+            worldEditNav.href = worldEditUrl;
+        }
+        if (worldEditCta) {
+            worldEditCta.href = worldEditUrl;
         }
 
         const set = (id, text) => {
@@ -108,6 +178,8 @@ async function loadTenantStats() {
         set('tenant-rooms', String(data.rooms ?? 0));
         set('tenant-world-count', String(data.worldCount ?? 0));
         set('tenant-url', data.url || `/${tenantId}/`);
+
+        renderTenantTraffic(data.traffic);
 
         updateLastUpdateTime();
     } catch (e) {
@@ -261,7 +333,6 @@ if (!tenantId) {
 } else {
     bootstrapAdminApi()
         .then(() => {
-            initAdminPanels();
             initThemeToggle();
             wirePlatformOpsButtons({
                 onReloadSuccess: async () => {

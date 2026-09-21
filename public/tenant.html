@@ -1,60 +1,597 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Tenant Metaverse</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css">
-    <script>
-        try {
-            const scheme = localStorage.getItem('metaverse-control-scheme');
-            if (scheme === 'touch' || scheme === 'keyboard') {
-                document.documentElement.setAttribute('data-control-scheme', scheme);
-            }
-        } catch (_) { /* ignore */ }
-    </script>
-</head>
-<body>
-    <div id="info">
-        <h1 id="tenant-title">Tenant</h1>
-        <p class="subtitle"><a href="/">← プラットフォーム hub</a></p>
-        <nav id="metaverse-portal-nav" class="portal-nav" aria-label="系列サービス" hidden>
-            <span class="portal-nav-label">系列</span>
-            <div id="metaverse-portal-links" class="portal-nav-links"></div>
-        </nav>
-        <div id="info-stats">
-            <p><span data-i18n="info.worldLabel"></span> <span id="world-name">-</span></p>
-            <p><span data-i18n="info.positionLabel"></span> <span id="position-display">0, 0, 0</span></p>
-            <p><span data-i18n="info.playerCountLabel"></span> <span id="player-count">0</span></p>
-        </div>
-        <div id="player-list-container">
-            <div id="ping-display" class="ping-display" title="サーバー応答時間">
-                <i class="bi bi-bar-chart-fill"></i> <span id="ping-value">-</span>
-            </div>
-            <div id="player-list" class="player-list"></div>
-        </div>
-        <p id="socket-status" class="muted" hidden>接続中…</p>
-    </div>
-
-    <div id="teleport-prompt" style="display: none;" role="button" tabindex="0" aria-hidden="true"></div>
-
-    <div id="world-load-overlay" class="world-load-overlay" style="display: none;" aria-hidden="true" role="status">
-        <div class="world-load-panel">
-            <p id="world-load-label" class="world-load-label" data-i18n="worldLoad.loading">読み込み中…</p>
-            <p id="world-load-asset" class="world-load-asset" aria-live="polite"></p>
-            <div class="world-load-bar-wrap">
-                <div class="world-load-bar-track">
-                    <div id="world-load-bar-fill" class="world-load-bar-fill"></div>
-                </div>
-                <span id="world-load-pct" class="world-load-pct">0%</span>
-            </div>
-        </div>
-    </div>
-
-    <canvas id="canvas"></canvas>
-    <script type="module" src="/js/tenant-metaverse-app.js"></script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Tenant Metaverse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .fds-smoke-panel-crosshair {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 22px;
+            height: 22px;
+            margin: -11px 0 0 -11px;
+            pointer-events: none;
+            z-index: 1100;
+        }
+        .fds-smoke-panel-crosshair::before,
+        .fds-smoke-panel-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 1px;
+        }
+        .fds-smoke-panel-crosshair::before {
+            left: 50%;
+            top: 2px;
+            width: 2px;
+            height: 18px;
+            margin-left: -1px;
+        }
+        .fds-smoke-panel-crosshair::after {
+            top: 50%;
+            left: 2px;
+            width: 18px;
+            height: 2px;
+            margin-top: -1px;
+        }
+        .fds-smoke-panel-crosshair--on-button::before,
+        .fds-smoke-panel-crosshair--on-button::after {
+            background: #7dffb8;
+            box-shadow: 0 0 6px rgba(125, 255, 184, 0.75);
+        }
+        .fds-smoke-exposure-hud {
+            position: fixed;
+            left: 12px;
+            bottom: 12px;
+            max-width: min(420px, 92vw);
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.75);
+            color: #f4f4f4;
+            font-size: 12px;
+            line-height: 1.45;
+            border-radius: 8px;
+            z-index: 1200;
+            pointer-events: none;
+        }
+    </style>
+    <script>
+        try {
+            const scheme = localStorage.getItem('metaverse-control-scheme');
+            if (scheme === 'touch' || scheme === 'keyboard') {
+                document.documentElement.setAttribute('data-control-scheme', scheme);
+            }
+        } catch (_) { /* ignore */ }
+    </script>
+</head>
+<body>
+    <div id="info">
+        <h1 id="tenant-title">Tenant</h1>
+        <p class="subtitle"><a href="/">← プラットフォーム hub</a></p>
+        <nav id="metaverse-portal-nav" class="portal-nav" aria-label="系列サービス" hidden>
+            <span class="portal-nav-label">系列</span>
+            <div id="metaverse-portal-links" class="portal-nav-links"></div>
+        </nav>
+        <div id="info-stats">
+            <p><span data-i18n="info.worldLabel"></span> <span id="world-name">-</span></p>
+            <p><span data-i18n="info.positionLabel"></span> <span id="position-display">0, 0, 0</span></p>
+            <p><span data-i18n="info.playerCountLabel"></span> <span id="player-count">0</span></p>
+        </div>
+        <div id="player-list-container">
+            <div id="ping-display" class="ping-display" title="サーバー応答時間">
+                <i class="bi bi-bar-chart-fill"></i> <span id="ping-value">-</span>
+            </div>
+            <div id="player-list" class="player-list"></div>
+        </div>
+        <p id="socket-status" class="muted" hidden>接続中…</p>
+    </div>
+
+    <div id="fds-smoke-panel-crosshair" class="fds-smoke-panel-crosshair" hidden aria-hidden="true"></div>
+
+    <div id="fds-smoke-exposure-hud" class="fds-smoke-exposure-hud" hidden aria-live="polite"></div>
+
+    <div id="teleport-prompt" style="display: none;" role="button" tabindex="0" aria-hidden="true"></div>
+
+    <div id="world-load-overlay" class="world-load-overlay" style="display: none;" aria-hidden="true" role="status">
+        <div class="world-load-panel">
+            <p id="world-load-label" class="world-load-label" data-i18n="worldLoad.loading">読み込み中…</p>
+            <p id="world-load-asset" class="world-load-asset" aria-live="polite"></p>
+            <div class="world-load-bar-wrap">
+                <div class="world-load-bar-track">
+                    <div id="world-load-bar-fill" class="world-load-bar-fill"></div>
+                </div>
+                <span id="world-load-pct" class="world-load-pct">0%</span>
+            </div>
+        </div>
+    </div>
+
+<!-- Chat Container -->
+    <div id="chat-container">
+        <div id="chat-header">
+            <span><i class="bi bi-chat-left-text"></i> <span data-i18n="chat.header">チャット</span></span>
+            <button id="chat-minimize-btn">−</button>
+        </div>
+        <div id="chat-messages">
+            <!-- Messages will be added here dynamically -->
+        </div>
+        <div id="chat-input-container">
+            <input type="text" id="chat-input" data-i18n-placeholder="chat.placeholder" placeholder="メッセージを入力... @でメンション" maxlength="200" autocomplete="off">
+            <button id="chat-send-btn"><i class="bi bi-send-fill"></i></button>
+        </div>
+    </div>
+
+    <!-- Emoji Menu -->
+    <div id="emoji-menu">
+        <!-- Emoji buttons will be added dynamically -->
+    </div>
+
+    <!-- モバイル用メニュートグル (768px以下で表示) -->
+    <button id="mobile-menu-toggle" class="mobile-menu-toggle" type="button" data-i18n-aria-label="menu.mobileToggleAria" aria-label="メニュー" aria-hidden="true">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- プロモード用: PC 左上の設定アイコン -->
+    <button id="pro-mode-settings-btn" class="pro-mode-settings-btn menu-button" type="button" data-i18n-title="menu.settingsTitle" title="設定" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+        </svg>
+    </button>
+
+    <!-- Menu Bar -->
+    <div id="menu-bar">
+        <!-- Admin menu button (管理者のみ有効) -->
+        <button id="admin-menu-btn" class="menu-button admin-menu-button" data-i18n-title="menu.adminTitle" title="あどみんメニュー" style="display: none;">
+            <i class="bi bi-shield-lock"></i>
+        </button>
+        <button id="mic-btn" class="menu-button" data-i18n-title="menu.micMuteTitle" title="マイクミュート">
+            <svg class="icon" id="mic-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z"/>
+            </svg>
+        </button>
+        <button id="speaker-btn" class="menu-button" data-i18n-title="menu.speakerMuteTitle" title="スピーカーミュート">
+            <svg class="icon" id="speaker-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+        </button>
+        <button id="captions-btn" class="menu-button" data-i18n-title="menu.captionsTitle" title="字幕 ON/OFF">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 12h4v2H4v-2zm10 6H4v-2h10v2zm6 0h-4v-2h4v2zm0-4H10v-2h10v2z"/>
+            </svg>
+        </button>
+        <button id="stamp-btn" class="menu-button" data-i18n-title="menu.stampTitle" title="スタンプ">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+        </button>
+        <button id="video-btn" class="menu-button" data-i18n-title="menu.videoTitle" title="ビデオ通話">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+            </svg>
+        </button>
+        <button id="help-btn" class="menu-button" type="button" data-i18n-title="menu.helpTitle" title="操作方法" data-i18n-aria-label="menu.helpAria" aria-label="操作方法">
+            <i class="bi bi-question-circle"></i>
+        </button>
+        <button id="restart-world-btn" class="menu-button" type="button" data-i18n-title="menu.restartTitle" title="リスタート（初期地点へ）" data-i18n-aria-label="menu.restartAria" aria-label="現在のワールドの初期地点へ戻る">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+        <button id="settings-btn" class="menu-button" data-i18n-title="menu.settingsTitle" title="設定">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+            </svg>
+        </button>
+        <button id="logout-btn" class="menu-button danger" data-i18n-title="menu.logoutTitle" title="退出">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Admin quick controls (透明化 / 飛行 / 高速移動) -->
+    <div id="admin-menu" class="admin-menu" style="display: none;">
+        <div class="admin-menu-header">
+            <span class="admin-menu-title" data-i18n="adminMenu.title">あどみんメニュー</span>
+        </div>
+        <div class="admin-menu-body">
+            <label class="admin-menu-item">
+                <input type="checkbox" id="admin-invisible-toggle">
+                <span data-i18n="adminMenu.invisible">透明化（ネームタグごと）</span>
+            </label>
+            <label class="admin-menu-item">
+                <input type="checkbox" id="admin-fly-toggle">
+                <span data-i18n="adminMenu.fly">飛行モード（落下なし）</span>
+            </label>
+            <label class="admin-menu-item">
+                <input type="checkbox" id="admin-speed-toggle">
+                <span data-i18n="adminMenu.speed">高速移動</span>
+            </label>
+            <a href="/admin.html" class="admin-menu-item admin-menu-link" data-i18n="adminMenu.openAdmin">管理画面（admin）を開く</a>
+        </div>
+    </div>
+
+    <!-- 管理者カメラログイン専用 HUD（ビューファインダー＋端配置コントロール） -->
+    <div id="admin-camera-hud" class="admin-camera-hud" style="display: none;" aria-hidden="true">
+        <div class="admin-camera-viewfinder" aria-hidden="true">
+            <div class="admin-camera-viewfinder-frame">
+                <span class="admin-camera-corner admin-camera-corner-tl"></span>
+                <span class="admin-camera-corner admin-camera-corner-tr"></span>
+                <span class="admin-camera-corner admin-camera-corner-bl"></span>
+                <span class="admin-camera-corner admin-camera-corner-br"></span>
+                <span class="admin-camera-center-mark"></span>
+            </div>
+        </div>
+
+        <header class="admin-camera-top-bar">
+            <span class="admin-camera-brand"><i class="bi bi-camera-video"></i> CAMERA</span>
+            <span id="admin-camera-rec-indicator" class="admin-camera-rec-indicator" hidden>REC</span>
+            <span id="admin-camera-zoom-value" class="admin-camera-zoom-readout">1.0×</span>
+            <div class="admin-camera-mode-toggle" role="group" aria-label="撮影モード">
+                <button type="button" id="admin-camera-mode-photo" class="admin-camera-mode-btn active" title="写真モード">写真</button>
+                <button type="button" id="admin-camera-mode-video" class="admin-camera-mode-btn" title="動画モード">動画</button>
+            </div>
+        </header>
+
+        <aside class="admin-camera-left-rail" aria-label="ズーム">
+            <span class="admin-camera-rail-label">ZOOM</span>
+            <input type="range" id="admin-camera-zoom" class="admin-camera-zoom-slider" min="0.5" max="10" step="0.1" value="1" orient="vertical" aria-valuemin="0.5" aria-valuemax="10">
+            <span class="admin-camera-rail-hint">0.5×</span>
+            <span class="admin-camera-rail-hint">10×</span>
+        </aside>
+
+        <aside class="admin-camera-right-rail" aria-label="シャッター">
+            <button type="button" id="admin-camera-shutter" class="admin-camera-shutter-btn" aria-label="撮影">
+                <span class="admin-camera-shutter-inner" aria-hidden="true"></span>
+            </button>
+            <span id="admin-camera-shutter-label" class="admin-camera-shutter-label">撮影 · Enter</span>
+        </aside>
+
+        <footer class="admin-camera-footer-hint">
+            左ドラッグ: 視点 · 右ドラッグ: 傾き · WASD 移動 · Space 上 · Shift 下
+        </footer>
+
+        <div id="admin-camera-flash" class="admin-camera-flash" hidden aria-hidden="true"></div>
+    </div>
+
+    <!-- 操作方法ヘルプ -->
+    <div id="help-modal" aria-hidden="true">
+        <div id="help-modal-content">
+            <div id="help-header">
+                <h3 data-i18n="help.title">操作方法</h3>
+                <button type="button" id="help-close-btn" data-i18n-aria-label="help.closeAria" aria-label="閉じる">×</button>
+            </div>
+            <div id="help-body" class="help-body">
+                <section class="help-section">
+                    <h4 data-i18n="help.pcBasicTitle">基本操作（PC）</h4>
+                    <ul class="help-list">
+                        <li data-i18n="help.pcBasic1">画面（3D）をクリックしてマウスポインターをロックし、マウス移動で視点を変えます。</li>
+                        <li data-i18n-html="help.pcBasic2Html"><kbd>U</kbd> キー、または <kbd>Shift</kbd>＋クリック／<kbd>Ctrl</kbd>＋クリックでポインターロックを解除します。</li>
+                        <li data-i18n-html="help.pcBasic3Html"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> で移動、<kbd>Space</kbd> でジャンプします。</li>
+                        <li data-i18n-html="help.pcBasic4Html"><kbd>Shift</kbd> を押しながら移動するとダッシュします。</li>
+                        <li data-i18n-html="help.pcBasic5Html"><kbd>V</kbd> キーで1人称視点と3人称視点を切り替えます（飛行機搭乗中は機体視点の切替）。</li>
+                    </ul>
+                </section>
+                <section class="help-section">
+                    <h4 data-i18n="help.eKeyTitle">近くのオブジェクト（E キー）</h4>
+                    <p class="help-p" data-i18n="help.eKeyP">プロンプトが表示されているときに E を押すと、次の優先順で動作します（ワールドにより異なります）。</p>
+                    <ol class="help-list ordered">
+                        <li data-i18n="help.eKey1">太鼓ゲームのゾーン</li>
+                        <li data-i18n="help.eKey2">PDF ビューアの開始</li>
+                        <li data-i18n="help.eKey3">テレポート</li>
+                    </ol>
+                </section>
+                <section class="help-section">
+                    <h4 data-i18n="help.mediaTitle">ビデオ・音声・チャット</h4>
+                    <ul class="help-list">
+                        <li data-i18n="help.media1">下のメニューからマイク・スピーカー・ビデオ通話・スタンプを操作できます。</li>
+                        <li data-i18n="help.media2">誰かがビデオ配信中のとき、V キーでその配信を視聴できます（入力欄にフォーカスがあるときは無効）。</li>
+                        <li data-i18n="help.media3">プレイヤー一覧のユーザーを Shift＋クリックするか U でマウスを解放してからクリックすると、個別に視聴できます。</li>
+                        <li data-i18n="help.media4">チャットは画面のチャット欄から送信できます（@ でメンション）。</li>
+                    </ul>
+                </section>
+                <section class="help-section">
+                    <h4 data-i18n="help.pdfTitle">PDF ビューア</h4>
+                    <ul class="help-list">
+                        <li data-i18n="help.pdf1">Esc で閉じます。パン・ズーム・ペン描画はオーバーレイ内の UI に従ってください。</li>
+                    </ul>
+                </section>
+                <section class="help-section">
+                    <h4 data-i18n="help.settingsTitle">設定・退出</h4>
+                    <ul class="help-list">
+                        <li data-i18n="help.settings1">歯車アイコンから一人称／三人称視点や描画・音声設定を変更できます。</li>
+                        <li data-i18n="help.settings2">更新アイコンから、いまいるワールドの初期地点（スポーン）へ戻れます。</li>
+                        <li data-i18n="help.settings3">退出ボタンからロビーへ戻るかログアウトを選べます。</li>
+                    </ul>
+                </section>
+                <section class="help-section help-section-mobile">
+                    <h4 data-i18n="help.mobileTitle">スマートフォン・タブレット</h4>
+                    <ul class="help-list">
+                        <li data-i18n-html="help.mobile1Html">左下のジョイスティックで移動、画面右側のドラッグで視点操作、<span class="help-inline-btn">ジャンプ</span> ボタンでジャンプします。</li>
+                        <li data-i18n="help.mobile2">画面右上のメニュー（ハンバーガー）から下段のメニューバーにアクセスできます。</li>
+                    </ul>
+                </section>
+                <section class="help-section">
+                    <h4 data-i18n="help.adminTitle">管理者向け</h4>
+                    <ul class="help-list">
+                        <li data-i18n-html="help.admin1Html">管理者のみ、シールドアイコンから透明化・飛行モード・高速移動などを切り替えられます。飛行中は Space（上昇）と C（下降）が使えます。</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exit Modal (ロビーに戻る / ログアウト) -->
+    <div id="logout-modal">
+        <div id="logout-modal-content">
+            <h3 data-i18n="logout.title">退出</h3>
+            <p data-i18n="logout.body">ロビーに戻るか、ログアウトするか選んでください。</p>
+            <div class="logout-buttons">
+                <button class="logout-btn lobby" id="return-to-lobby-btn" data-i18n="logout.lobby">ロビーに戻る</button>
+                <button class="logout-btn confirm" id="logout-confirm-btn" data-i18n="logout.confirm">ログアウト</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 品質ロッド選択（入室時） -->
+    <div id="rod-selection-modal" aria-hidden="true">
+        <div id="rod-selection-modal-content">
+            <h3>品質を選択</h3>
+            <p class="rod-selection-hint"><span id="rod-selection-world-name"></span> に入室します。端末に合った品質を選んでください。</p>
+            <div id="rod-selection-list" class="rod-selection-list" role="listbox" aria-label="品質ロッド一覧"></div>
+        </div>
+    </div>
+
+    <!-- リスタート（現在のワールドのスポーンへ） -->
+    <div id="restart-modal" aria-hidden="true">
+        <div id="restart-modal-content">
+            <h3 data-i18n="restart.title">リスタート</h3>
+            <p data-i18n-html="restart.bodyHtml">このワールドの<strong>初期地点（スポーン）</strong>に移動します。飛行機を操縦中の場合は降りてから移動します。</p>
+            <div class="logout-buttons">
+                <button type="button" class="logout-btn lobby" id="restart-spawn-confirm-btn" data-i18n="restart.confirm">初期地点へ移動</button>
+                <button type="button" class="logout-btn secondary" id="restart-modal-cancel-btn" data-i18n="restart.cancel">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal">
+        <div id="settings-modal-content">
+            <div id="settings-header">
+                <h3 data-i18n="settings.title">設定</h3>
+                <button id="settings-close-btn" data-i18n="settings.close">×</button>
+            </div>
+            <div id="settings-body">
+                <div id="settings-sidebar">
+                    <div class="settings-category active" data-section="general" data-i18n="settings.cat.general">一般</div>
+                    <div class="settings-category" data-section="audio" data-i18n="settings.cat.audio">音声</div>
+                    <div class="settings-category" data-section="draw" data-i18n="settings.cat.draw">描画</div>
+                </div>
+                <div id="settings-content">
+                    <div class="settings-section active" id="general-section">
+                        <h4 data-i18n="settings.generalHeading">一般</h4>
+                        <div class="setting-item">
+                            <label for="language" data-i18n="settings.languageLabel">言語:</label>
+                            <select id="language">
+                                <option value="ja">日本語</option>
+                                <option value="en">English</option>
+                                <option value="zh">中文（简体）</option>
+                                <option value="ko">한국어</option>
+                                <option value="zh-tw">中文（繁體）</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.languageHint">表示言語を選択してください</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="controlScheme" data-i18n="settings.controlSchemeLabel">操作方法:</label>
+                            <select id="controlScheme">
+                                <option value="touch" data-i18n="settings.controlSchemeTouch">タッチ操作</option>
+                                <option value="keyboard" data-i18n="settings.controlSchemeKeyboard">キーボード操作</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.controlSchemeHint">タッチは仮想スティック、キーボードは WASD とマウスで操作します</div>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="audio-section">
+                        <h4 data-i18n="settings.audioHeading">音声</h4>
+                        <div class="setting-item mic-test-item">
+                            <label data-i18n="settings.micTestLabel">マイクテスト</label>
+                            <p class="mic-test-desc" data-i18n="settings.micTestDesc">マイクに問題がありますか? テストを開始し、何でもいいので話してください。声を再生してお返しします。</p>
+                            <div class="mic-test-row">
+                                <button type="button" id="mic-test-btn" class="mic-test-btn" data-i18n="settings.micTestStart">テストを開始</button>
+                                <div id="settings-mic-analyzer" class="mic-analyzer-segments">
+                                    <!-- 40個のセグメントをJSで生成 -->
+                                </div>
+                            </div>
+                            <p id="mic-test-status" class="mic-test-status"></p>
+                        </div>
+                        <div class="setting-item">
+                            <label for="micDevice" data-i18n="settings.micDeviceLabel">使用するマイク:</label>
+                            <select id="micDevice">
+                                <option value="" data-i18n="settings.defaultDevice">デフォルト</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.micDeviceHint">使用するマイクデバイスを選択してください</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="speakerDevice" data-i18n="settings.speakerDeviceLabel">使用するスピーカー:</label>
+                            <select id="speakerDevice">
+                                <option value="" data-i18n="settings.defaultDevice">デフォルト</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.speakerDeviceHint">使用するスピーカーデバイスを選択してください</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="micVolume"><span data-i18n="settings.micVolumeLabel"></span> <span id="micVolumeValue">99</span>%</label>
+                            <input type="range" id="micVolume" min="0" max="100" value="33">
+                            <div class="setting-description" data-i18n="settings.micVolumeHint">マイクの入力音量倍率（0%で無音、100%で等倍、最大300%）</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="speakerVolume" data-i18n="settings.speakerVolumeLabel">スピーカー音量:</label>
+                            <input type="range" id="speakerVolume" min="0" max="100" value="50">
+                            <span id="speakerVolumeValue">50</span>%
+                            <div class="setting-description" data-i18n="settings.speakerVolumeHint">スピーカーの出力音量を調整します</div>
+                        </div>
+                    </div>
+                    <div class="settings-section" id="draw-section">
+                        <h4 data-i18n="settings.drawHeading">描画</h4>
+                        <div class="setting-item">
+                            <label for="viewDistanceM"><span data-i18n="settings.viewDistanceLabel"></span> <span id="viewDistanceMValue">50</span> <span data-i18n="settings.viewDistanceUnit">m</span></label>
+                            <input type="range" id="viewDistanceM" min="0" max="1000" step="1" value="159">
+                            <div class="setting-description" data-i18n="settings.viewDistanceHint">足元を中心とした球。範囲外のワールド・PDF・他プレイヤーは非表示（スカイドームは常に表示）</div>
+                        </div>
+                        <div class="setting-item setting-row">
+                            <label for="viewModeToggle" data-i18n="settings.viewModeLabel">画面表示</label>
+                            <div class="view-mode-control">
+                                <span id="viewModeLabel" class="view-mode-label">3人称視点</span>
+                                <label class="toggle-switch" data-i18n-title="settings.viewModeToggleTitle" title="1人称と3人称を切り替える">
+                                    <input type="checkbox" id="viewModeToggle">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="setting-description" data-i18n="settings.viewModeHint">1人称はアバターの頭部視点になります。V キーでも切り替えできます</div>
+                        <div class="setting-item setting-row">
+                            <label for="highContrastToggle" data-i18n="settings.visualModeLabel">ハイコントラスト</label>
+                            <label class="toggle-switch" data-i18n-title="settings.visualModeTitle" title="白ベースのまま UI・シーンのコントラストを強めます">
+                                <input type="checkbox" id="highContrastToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-description" data-i18n="settings.visualModeHint">オブジェクトの明暗差を強め、UI を白ベースの高コントラスト表示にします。露出はハイコントラスト時に少し上がります</div>
+                        <div class="setting-item">
+                            <label for="graphicsTier" data-i18n="settings.graphicsTierLabel">描画品質:</label>
+                            <select id="graphicsTier">
+                                <option value="high">高（シャドウ・AA 重視）</option>
+                                <option value="medium">中</option>
+                                <option value="low" selected>低（軽量）</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.graphicsTierHint">WebXR 中は自動で軽量設定になります</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="toneMappingExposure"><span data-i18n="settings.exposureLabel"></span> <span id="toneMappingExposureValue">1.0</span></label>
+                            <input type="range" id="toneMappingExposure" min="0.3" max="2" step="0.05" value="1">
+                            <div class="setting-description" data-i18n="settings.exposureHint">ACES Filmic の露出。HDR と直接光のバランス調整に使います</div>
+                        </div>
+                        <div class="setting-item">
+                            <label for="pixelRatioCap" data-i18n="settings.pixelRatioLabel">ピクセル比:</label>
+                            <select id="pixelRatioCap">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="full" data-i18n="settings.pixelRatioDevice">デバイスどおり</option>
+                            </select>
+                            <div class="setting-description" data-i18n="settings.pixelRatioHint">低いほど軽くなります（WebXR 中は最大 1 に制限）</div>
+                        </div>
+                        <div class="setting-item setting-row">
+                            <label for="showViewRangeSpheres" data-i18n="settings.showViewRangeLabel">描画範囲の表示</label>
+                            <label class="toggle-switch" data-i18n-title="settings.showViewRangeTitle" title="足元中心・描画距離の球（青）と2倍半径（黄）を半透明表示">
+                                <input type="checkbox" id="showViewRangeSpheres">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-description" data-i18n="settings.showViewRangeHint">デバッグ用。青系＝描画距離 R、黄系＝半径 2R</div>
+                        <div class="setting-item setting-row">
+                            <label for="proModeToggle" data-i18n="settings.proModeLabel">プロモード</label>
+                            <label class="toggle-switch" data-i18n-title="settings.proModeTitle" title="UIを最小化して3D画面を広く表示します">
+                                <input type="checkbox" id="proModeToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-description" data-i18n="settings.proModeHint">ON にするとモバイルはメニューボタンのみ表示（操作系は非表示のまま操作可能）、PC は左上の設定アイコンのみが表示されます</div>
+                        <div class="setting-item setting-row">
+                            <label for="developerModeToggle" data-i18n="settings.developerModeLabel">開発者モード</label>
+                            <label class="toggle-switch" data-i18n-title="settings.developerModeTitle" title="ワールド読み込み時にファイル名などの詳細を表示">
+                                <input type="checkbox" id="developerModeToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="setting-description" data-i18n="settings.developerModeHint">ON にするとロード画面にプレハブ名・ファイル名などが表示されます。FDS 煙の頭位置マーカー・濃度 HUD も表示されます</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Call Settings Modal -->
+    <div id="video-modal">
+        <div id="video-modal-content">
+            <div id="video-modal-header">
+                <h3 data-i18n="video.title">配信設定</h3>
+                <button id="video-modal-close-btn" data-i18n="settings.close">×</button>
+            </div>
+            <div id="video-modal-body">
+                <div id="video-preview-wrap">
+                    <div id="video-preview-label" data-i18n="video.previewLabel">プレビュー</div>
+                    <video id="video-preview" autoplay muted playsinline></video>
+                    <div id="video-preview-placeholder" data-i18n="video.previewLabel">プレビュー</div>
+                </div>
+                <div class="video-mode-toggle" role="tablist">
+                    <label class="video-mode-tab">
+                        <input type="radio" name="video-mode" value="camera" checked>
+                        <span class="video-mode-icon">📷</span>
+                        <span data-i18n="video.cameraTab">カメラ</span>
+                    </label>
+                    <label class="video-mode-tab">
+                        <input type="radio" name="video-mode" value="screen">
+                        <span class="video-mode-icon">🖥</span>
+                        <span data-i18n="video.screenTab">画面共有</span>
+                    </label>
+                </div>
+                <div id="video-camera-options" class="video-options">
+                    <div class="setting-item">
+                        <label for="video-camera-device" data-i18n="video.cameraDevice">カメラ</label>
+                        <select id="video-camera-device">
+                            <option value="" data-i18n="settings.defaultDevice">デフォルト</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="video-camera-resolution" data-i18n="video.resolution">解像度</label>
+                        <select id="video-camera-resolution">
+                            <option value="360p">360p (640×360)</option>
+                            <option value="480p">480p (854×480)</option>
+                            <option value="540p">540p (960×540)</option>
+                            <option value="720p" selected>720p (1280×720)</option>
+                            <option value="1080p">1080p (1920×1080)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item setting-row">
+                        <label for="video-camera-audio" data-i18n="video.includeAudio">音声を含める</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="video-camera-audio" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <div id="video-screen-options" class="video-options" style="display:none;">
+                    <div class="setting-item">
+                        <label for="video-screen-resolution" data-i18n="video.resolution">解像度</label>
+                        <select id="video-screen-resolution">
+                            <option value="360p">360p (640×360)</option>
+                            <option value="480p">480p (854×480)</option>
+                            <option value="540p">540p (960×540)</option>
+                            <option value="720p" selected>720p (1280×720)</option>
+                            <option value="1080p">1080p (1920×1080)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="video-action-buttons">
+                    <button id="video-start-btn" class="video-btn primary" data-i18n="video.start">開始</button>
+                    <button id="video-stop-btn" class="video-btn danger" style="display:none;" data-i18n="video.stop">停止</button>
+                </div>
+                <div id="video-modal-error" class="video-error" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- モバイル用コントロール (768px以下で表示) -->
+    <div id="mobile-controls" class="mobile-controls" aria-hidden="true">
+        <div id="mobile-camera-drag-layer" class="mobile-camera-drag-layer" aria-hidden="true"></div>
+        <div id="joystick-left-zone" class="joystick-zone joystick-left"></div>
+        <button id="mobile-interact-btn" class="mobile-interact-btn" type="button" style="display: none;" aria-hidden="true" data-i18n="mobile.interact">インタラクト</button>
+        <button id="mobile-jump-btn" class="mobile-jump-btn" type="button" data-i18n-aria-label="mobile.jumpAria" aria-label="ジャンプ" data-i18n="mobile.jumpLabel">ジャンプ</button>
+    </div>
+
+    
+    <canvas id="canvas"></canvas>
+
+    <script type="module" src="/js/tenant-metaverse-app.js"></script>
+</body>
+</html>

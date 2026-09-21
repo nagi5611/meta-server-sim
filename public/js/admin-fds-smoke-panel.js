@@ -1,12 +1,9 @@
-// public/js/admin-fds-smoke-panel.js — FDS煙 ZIP アップロード・一覧・ワールド紐付け
+// public/js/admin-fds-smoke-panel.js — FDS煙 ZIP アップロード・ライブラリ（ワールド追加は setting.js）
 
 const SIM_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
 
 /** @type {string | null} */
 let activeTenantId = null;
-
-/** @type {string | null} */
-let selectedSimId = null;
 
 /**
  * ZIP ファイル名から simId を推測する
@@ -26,16 +23,6 @@ function simIdFromZipFilename(filename) {
 function getSelectedWorldIdFromDom() {
     const sel = document.querySelector('#world-list .item.selected');
     return sel?.dataset?.id ?? null;
-}
-
-/**
- * 選択中ワールド表示を更新する
- */
-function refreshSelectedWorldLabel() {
-    const label = document.getElementById('fds-smoke-selected-world');
-    if (!label) return;
-    const worldId = getSelectedWorldIdFromDom();
-    label.textContent = worldId ?? '（未選択）';
 }
 
 /**
@@ -59,23 +46,23 @@ async function fetchSimulations() {
  */
 function renderSimulationList(simulations) {
     const listEl = document.getElementById('fds-smoke-sim-list');
-    const assignBtn = document.getElementById('fds-smoke-assign-btn');
     if (!listEl) return;
 
     listEl.innerHTML = '';
     if (simulations.length === 0) {
         listEl.innerHTML = '<p class="hint">登録済みシミュレーションはありません。</p>';
-        if (assignBtn) assignBtn.disabled = true;
-        selectedSimId = null;
         return;
     }
 
+    const worldSelected = !!getSelectedWorldIdFromDom();
+
     for (const sim of simulations) {
         const row = document.createElement('div');
-        row.className = 'item fds-smoke-sim-item' + (sim.id === selectedSimId ? ' selected' : '');
+        row.className = 'item fds-smoke-sim-item';
         row.dataset.simId = sim.id;
-        row.setAttribute('role', 'button');
-        row.setAttribute('tabindex', '0');
+
+        const title = document.createElement('strong');
+        title.textContent = sim.id;
 
         const meta = document.createElement('span');
         meta.className = 'fds-smoke-sim-meta';
@@ -84,8 +71,12 @@ function renderSimulationList(simulations) {
             : '単一ファイル';
         meta.textContent = `${sim.quantity || '—'} · ${sim.frameCount} frames · ${multipartLabel}`;
 
-        const title = document.createElement('strong');
-        title.textContent = sim.id;
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'btn btn-sm btn-secondary fds-smoke-add-to-world-btn';
+        addBtn.textContent = 'ワールドに追加';
+        addBtn.dataset.simId = sim.id;
+        addBtn.disabled = !worldSelected;
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -93,12 +84,8 @@ function renderSimulationList(simulations) {
         delBtn.textContent = '削除';
         delBtn.dataset.simId = sim.id;
 
-        row.append(title, meta, delBtn);
+        row.append(title, meta, addBtn, delBtn);
         listEl.appendChild(row);
-    }
-
-    if (assignBtn) {
-        assignBtn.disabled = !selectedSimId || !getSelectedWorldIdFromDom();
     }
 }
 
@@ -151,46 +138,51 @@ async function handleUpload() {
     }
 
     const doUpload = async (confirmOverwrite) => {
-        const form = new FormData();
-        form.append('zip', file);
-        form.append('simId', simId);
+        const csrfRes = await fetch('/admin/csrf-token', { credentials: 'include' });
+        if (!csrfRes.ok) throw new Error(await csrfRes.text());
+        const { token } = await csrfRes.json();
+
         const qs = confirmOverwrite ? '?confirm=1' : '';
-        const res = await fetch(
+        const uploadRes = await fetch(
             `/admin/tenants/${encodeURIComponent(activeTenantId)}/upload-fds-smoke-zip${qs}`,
             {
                 method: 'POST',
+                headers: { 'X-Admin-CSRF': token },
                 credentials: 'include',
-                body: form,
+                body: (() => {
+                    const fd = new FormData();
+                    fd.append('zip', file);
+                    fd.append('simId', simId);
+                    return fd;
+                })(),
             },
         );
-        if (res.status === 409) {
-            const data = await res.json().catch(() => ({}));
+        if (uploadRes.status === 409) {
+            const data = await uploadRes.json().catch(() => ({}));
             const msg = data.message || `シミュレーション "${simId}" は既に存在します。上書きしますか？`;
-            if (confirm(msg)) {
+            if (window.confirm(msg)) {
                 return doUpload(true);
             }
             throw new Error('アップロードをキャンセルしました。');
         }
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(text || `HTTP ${res.status}`);
+        if (!uploadRes.ok) {
+            throw new Error(await uploadRes.text());
         }
-        return res.json();
+        return uploadRes.json();
     };
 
     if (statusEl) {
-        statusEl.textContent = 'アップロード中…';
+        statusEl.textContent = 'アップロード中…（大容量は数分かかります）';
         statusEl.className = '';
     }
 
     try {
         const result = await doUpload(false);
         if (statusEl) {
-            statusEl.textContent = `アップロード完了: ${result.simId}`;
+            statusEl.textContent = `アップロード完了: ${result.simId ?? simId}`;
             statusEl.className = '';
         }
-        simIdInput.value = result.simId ?? simId;
-        selectedSimId = result.simId ?? simId;
+        if (result.simId) simIdInput.value = result.simId;
         fileInput.value = '';
         await reloadSimulationList();
     } catch (err) {
@@ -206,25 +198,30 @@ async function handleUpload() {
  * @param {string} simId
  */
 async function handleDeleteSimulation(simId) {
-    if (!activeTenantId) return;
-    if (!confirm(`シミュレーション "${simId}" を削除しますか？`)) return;
-
     const statusEl = document.getElementById('fds-smoke-list-status');
+    if (!activeTenantId || !simId) return;
+    if (!window.confirm(`シミュレーション "${simId}" を削除しますか？`)) return;
+
     if (statusEl) {
         statusEl.textContent = '削除中…';
         statusEl.className = '';
     }
 
     try {
-        const res = await fetch(
+        const csrfRes = await fetch('/admin/csrf-token', { credentials: 'include' });
+        if (!csrfRes.ok) throw new Error(await csrfRes.text());
+        const { token } = await csrfRes.json();
+
+        const delRes = await fetch(
             `/admin/tenants/${encodeURIComponent(activeTenantId)}/simulations/${encodeURIComponent(simId)}`,
-            { method: 'DELETE', credentials: 'include' },
+            {
+                method: 'DELETE',
+                headers: { 'X-Admin-CSRF': token },
+                credentials: 'include',
+            },
         );
-        if (!res.ok) {
-            throw new Error(await res.text());
-        }
-        if (selectedSimId === simId) {
-            selectedSimId = null;
+        if (!delRes.ok) {
+            throw new Error(await delRes.text());
         }
         await reloadSimulationList();
         if (statusEl) statusEl.textContent = '削除しました。';
@@ -237,15 +234,12 @@ async function handleDeleteSimulation(simId) {
 }
 
 /**
- * 選択中ワールドに fdsSmokes エントリを追加して保存する
+ * シミュレーションを選択中ワールドのエディタに追加する
+ * @param {string} simId
  */
-async function handleAssignToWorld() {
-    const statusEl = document.getElementById('fds-smoke-assign-status');
-    const assignBtn = document.getElementById('fds-smoke-assign-btn');
-    if (!activeTenantId || !selectedSimId) return;
-
-    const worldId = getSelectedWorldIdFromDom();
-    if (!worldId) {
+async function handleAddToWorld(simId) {
+    const statusEl = document.getElementById('fds-smoke-add-status');
+    if (!getSelectedWorldIdFromDom()) {
         if (statusEl) {
             statusEl.textContent = 'ワールドを選択してください。';
             statusEl.className = 'error';
@@ -253,78 +247,26 @@ async function handleAssignToWorld() {
         return;
     }
 
-    const posX = Number(/** @type {HTMLInputElement} */ (document.getElementById('fds-smoke-pos-x'))?.value ?? 0);
-    const posY = Number(/** @type {HTMLInputElement} */ (document.getElementById('fds-smoke-pos-y'))?.value ?? 0);
-    const posZ = Number(/** @type {HTMLInputElement} */ (document.getElementById('fds-smoke-pos-z'))?.value ?? 0);
-    const scale = Number(/** @type {HTMLInputElement} */ (document.getElementById('fds-smoke-scale'))?.value ?? 1);
-
-    if (statusEl) {
-        statusEl.textContent = '紐付けを保存中…';
-        statusEl.className = '';
-    }
-    if (assignBtn) assignBtn.disabled = true;
-
     try {
-        const worldsRes = await fetch(`/admin/tenants/${encodeURIComponent(activeTenantId)}/worlds`, {
-            credentials: 'include',
-        });
-        if (!worldsRes.ok) {
-            throw new Error(await worldsRes.text());
+        const { addFdsSmokeFromSimulation } = await import('@metaverse-simple/setting.js');
+        const result = addFdsSmokeFromSimulation(simId);
+        if (!result.ok) {
+            if (statusEl) {
+                statusEl.textContent = result.error || '追加に失敗しました。';
+                statusEl.className = 'error';
+            }
+            return;
         }
-        const worlds = await worldsRes.json();
-        if (!worlds[worldId]) {
-            throw new Error(`ワールド "${worldId}" が見つかりません。`);
-        }
-
-        const world = worlds[worldId];
-        if (!Array.isArray(world.fdsSmokes)) {
-            world.fdsSmokes = [];
-        }
-
-        const manifestPath = `simulations/${selectedSimId}/manifest.json`;
-        const entryId = `${selectedSimId}-smoke`;
-        const existing = world.fdsSmokes.find((e) => e.manifest === manifestPath || e.id === entryId);
-        const entry = {
-            id: entryId,
-            manifest: manifestPath,
-            position: { x: posX, y: posY, z: posZ },
-            rotation: { x: 0, y: 0, z: 0 },
-            scale: scale > 0 ? scale : 1,
-            playback: {
-                autoplay: false,
-                startAtEnd: true,
-                loop: false,
-            },
-        };
-
-        if (existing) {
-            Object.assign(existing, entry);
-        } else {
-            world.fdsSmokes.push(entry);
-        }
-
-        const saveRes = await fetch(`/admin/tenants/${encodeURIComponent(activeTenantId)}/worlds`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(worlds),
-        });
-        if (!saveRes.ok) {
-            throw new Error(await saveRes.text());
-        }
-
         if (statusEl) {
-            statusEl.textContent = `ワールド "${worldId}" に紐付けました。エディタを反映するにはページを再読み込みしてください。`;
+            statusEl.textContent = result.duplicate
+                ? '既にワールドに追加済みです。オブジェクト一覧で選択できます。'
+                : 'ワールドに追加しました。位置を調整して「保存・管理」で保存してください。';
             statusEl.className = '';
         }
     } catch (err) {
         if (statusEl) {
-            statusEl.textContent = `紐付け失敗: ${err instanceof Error ? err.message : String(err)}`;
+            statusEl.textContent = `追加失敗: ${err instanceof Error ? err.message : String(err)}`;
             statusEl.className = 'error';
-        }
-    } finally {
-        if (assignBtn) {
-            assignBtn.disabled = !selectedSimId || !getSelectedWorldIdFromDom();
         }
     }
 }
@@ -354,32 +296,18 @@ function bindPanelEvents() {
             return;
         }
 
-        const item = /** @type {HTMLElement} */ (e.target).closest('.fds-smoke-sim-item');
-        if (!item?.dataset.simId) return;
-        selectedSimId = item.dataset.simId;
-        document.querySelectorAll('.fds-smoke-sim-item').forEach((el) => {
-            el.classList.toggle('selected', el.dataset.simId === selectedSimId);
-        });
-        const assignBtn = document.getElementById('fds-smoke-assign-btn');
-        if (assignBtn) {
-            assignBtn.disabled = !getSelectedWorldIdFromDom();
+        const addBtn = /** @type {HTMLElement} */ (e.target).closest('.fds-smoke-add-to-world-btn');
+        if (addBtn?.dataset.simId) {
+            e.stopPropagation();
+            void handleAddToWorld(addBtn.dataset.simId);
         }
-    });
-
-    document.getElementById('fds-smoke-assign-btn')?.addEventListener('click', () => {
-        void handleAssignToWorld();
     });
 
     document.getElementById('world-list')?.addEventListener('click', () => {
-        refreshSelectedWorldLabel();
-        const assignBtn = document.getElementById('fds-smoke-assign-btn');
-        if (assignBtn) {
-            assignBtn.disabled = !selectedSimId || !getSelectedWorldIdFromDom();
-        }
+        void reloadSimulationList();
     });
 
     document.querySelector('.we-category-btn[data-we-category="fds-smoke"]')?.addEventListener('click', () => {
-        refreshSelectedWorldLabel();
         void reloadSimulationList();
     });
 }
@@ -392,6 +320,5 @@ function bindPanelEvents() {
 export async function initFdsSmokePanel(tenantId) {
     activeTenantId = tenantId;
     bindPanelEvents();
-    refreshSelectedWorldLabel();
     await reloadSimulationList();
 }

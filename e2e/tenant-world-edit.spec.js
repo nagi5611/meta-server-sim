@@ -70,4 +70,55 @@ test.describe('tenant world edit', () => {
         expect(moduleFailures, `module load failures: ${moduleFailures.join(' | ')}`).toEqual([]);
         expect(pageErrors, `page errors: ${pageErrors.join(' | ')}`).toEqual([]);
     });
+
+    test('P-01 lobby model is reachable and worlds save round-trips', async ({ page, request }) => {
+        const csrfRes = await request.get('/admin/csrf-token');
+        expect(csrfRes.ok()).toBeTruthy();
+        const { token } = await csrfRes.json();
+
+        const worldsBeforeRes = await request.get('/admin/tenants/P-01/worlds');
+        expect(worldsBeforeRes.ok()).toBeTruthy();
+        const worldsBefore = await worldsBeforeRes.json();
+        const lobby = worldsBefore.lobby;
+        expect(lobby).toBeTruthy();
+
+        const marker = Date.now() % 1000;
+        const nextSpawn = {
+            ...(lobby.spawnPoint || { x: 0, y: 10, z: 0 }),
+            x: marker,
+        };
+        const payload = {
+            ...worldsBefore,
+            lobby: {
+                ...lobby,
+                spawnPoint: nextSpawn,
+            },
+        };
+
+        const saveRes = await request.post('/admin/tenants/P-01/worlds', {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-CSRF': token,
+            },
+            data: payload,
+        });
+        expect(saveRes.ok(), `worlds save status ${saveRes.status()}`).toBeTruthy();
+
+        const worldsAfterRes = await request.get('/admin/tenants/P-01/worlds');
+        expect(worldsAfterRes.ok()).toBeTruthy();
+        const worldsAfter = await worldsAfterRes.json();
+        expect(worldsAfter.lobby?.spawnPoint?.x).toBe(marker);
+
+        const modelHead = await request.head('/P-01/models/lobby.glb');
+        expect(modelHead.status(), 'lobby.glb should be served (R2 or local fallback)').toBe(200);
+
+        await page.goto('/admin/tenant/P-01/world-edit');
+        await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
+        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
+
+        const lobbyItem = page.locator('#world-list .item').filter({ hasText: /lobby/i });
+        await lobbyItem.click();
+        await page.locator('#spawn-x').fill(String(marker));
+        await expect(page.locator('#spawn-x')).toHaveValue(String(marker));
+    });
 });

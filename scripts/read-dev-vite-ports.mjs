@@ -8,12 +8,45 @@ const CONFIG_PATH = path.join(ROOT, 'data', 'platform', 'network-config.json');
 
 export const NODE_DEV_PORT = 3002;
 export const BASE_VITE_DEV_PORT = 3003;
+/** FDS 煙バルク（PORT+1 が Vite と衝突するため dev 既定） */
+export const FDS_SMOKE_BULK_DEV_PORT = 3012;
+
+/**
+ * @returns {number}
+ */
+export function resolveNodeDevPort() {
+    const port = parseInt(String(process.env.PORT ?? ''), 10);
+    return Number.isFinite(port) && port > 0 ? port : NODE_DEV_PORT;
+}
+
+/**
+ * @returns {number}
+ */
+export function resolveBaseViteDevPort() {
+    const port = parseInt(String(process.env.VITE_DEV_PORT ?? ''), 10);
+    return Number.isFinite(port) && port > 0 ? port : BASE_VITE_DEV_PORT;
+}
+
+/**
+ * @param {number} nodePort
+ * @returns {number}
+ */
+export function resolveFdsBulkDevPort(nodePort) {
+    const candidate = nodePort + 1;
+    const vitePort = resolveBaseViteDevPort();
+    if (candidate === vitePort) {
+        return FDS_SMOKE_BULK_DEV_PORT;
+    }
+    return candidate;
+}
 
 /**
  * network-config の系列サーバーから追加 Vite ポートを収集する
+ * @param {number} [nodePort]
+ * @param {number} [baseVitePort]
  * @returns {number[]}
  */
-export function readExtraVitePorts() {
+export function readExtraVitePorts(nodePort = resolveNodeDevPort(), baseVitePort = resolveBaseViteDevPort()) {
     const ports = new Set();
     try {
         if (!fs.existsSync(CONFIG_PATH)) return [];
@@ -23,7 +56,7 @@ export function readExtraVitePorts() {
             if (s?.bindService) continue;
             const port = parseInt(String(s.port ?? ''), 10);
             if (!Number.isFinite(port) || port < 1 || port > 65535) continue;
-            if (port === NODE_DEV_PORT || port === BASE_VITE_DEV_PORT) continue;
+            if (port === nodePort || port === baseVitePort) continue;
             ports.add(port);
         }
     } catch {
@@ -33,9 +66,19 @@ export function readExtraVitePorts() {
 }
 
 /**
- * free-dev-ports 用の全 dev ポート
+ * dev 起動で bind する全ポート（Node / Vite / FDS bulk / network-config 追加分）
  * @returns {number[]}
  */
 export function readAllDevPorts() {
-    return [NODE_DEV_PORT, BASE_VITE_DEV_PORT, ...readExtraVitePorts()];
+    const nodePort = resolveNodeDevPort();
+    const vitePort = resolveBaseViteDevPort();
+    const bulkPort = resolveFdsBulkDevPort(nodePort);
+    const ports = [nodePort, vitePort];
+    if (bulkPort > 0) {
+        ports.push(bulkPort);
+    }
+    for (const p of readExtraVitePorts(nodePort, vitePort)) {
+        ports.push(p);
+    }
+    return [...new Set(ports)].sort((a, b) => a - b);
 }

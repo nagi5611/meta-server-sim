@@ -121,6 +121,149 @@ header h1 {
     display: block;
 }
 
+.admin-panel[data-admin-panel-id="settings"] {
+    max-width: none;
+}
+
+.admin-panel[data-admin-panel-id="settings"] .admin-settings-tab[data-settings-tab-id="code"] {
+    max-width: none;
+}
+
+/* --- 設定パネル内サブナビ --- */
+.admin-settings-subnav {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-settings-subnav-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #555;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.admin-settings-subnav-item:hover {
+    background: #ebebeb;
+}
+
+.admin-settings-subnav-item.active {
+    background: #fff;
+    color: #1565c0;
+    font-weight: 500;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.admin-settings-tab {
+    display: none;
+}
+
+.admin-settings-tab.active {
+    display: block;
+}
+
+/* --- ヘッダー操作メニュー --- */
+.admin-ops-menu {
+    position: relative;
+}
+
+.admin-ops-menu-trigger {
+    list-style: none;
+    cursor: pointer;
+}
+
+.admin-ops-menu-trigger::-webkit-details-marker {
+    display: none;
+}
+
+.admin-ops-menu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 50;
+    min-width: 200px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.admin-ops-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #333;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.admin-ops-menu-item:hover {
+    background: #f5f5f5;
+}
+
+.admin-ops-menu-item-danger {
+    color: #c62828;
+}
+
+.admin-ops-menu-item-danger:hover {
+    background: #ffebee;
+}
+
+.btn-icon {
+    padding: 6px 10px;
+}
+
+body.admin-dark .admin-settings-subnav {
+    background: #1a1d24;
+}
+
+body.admin-dark .admin-settings-subnav-item {
+    color: #9aa3b2;
+}
+
+body.admin-dark .admin-settings-subnav-item:hover {
+    background: #252a33;
+}
+
+body.admin-dark .admin-settings-subnav-item.active {
+    background: #2d3a4d;
+    color: #8ec5e8;
+}
+
+body.admin-dark .admin-ops-menu-panel {
+    background: #1a1d24;
+    border-color: #2d3340;
+}
+
+body.admin-dark .admin-ops-menu-item {
+    color: #e6e8ec;
+}
+
+body.admin-dark .admin-ops-menu-item:hover {
+    background: #252a33;
+}
+
+body.admin-dark .admin-ops-menu-item-danger:hover {
+    background: #3a2020;
+}
+
 .stats-section {
     background: white;
     border-radius: 8px;
@@ -430,6 +573,8 @@ body.admin-tenant-page.admin-dark .admin-sidebar-dark .admin-nav-item.active {
 
 .section-header-row h2 {
     margin: 0;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 
 .btn-primary {
@@ -570,6 +715,31 @@ body.admin-dark .tenant-add-fieldset {
     font-size: 14px;
 }
 
+.admin-restart-mode-fieldset {
+    border: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.admin-form-field-inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.admin-restart-delay-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-restart-delay-row .admin-form-field {
+    flex: 1;
+}
+
 .admin-modal-actions {
     display: flex;
     justify-content: flex-end;
@@ -592,6 +762,296 @@ body.admin-dark .admin-form-field input {
     background: #252a33;
     border-color: #3d4450;
     color: #e6e8ec;
+}
+
+.hint-compact {
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+/* --- 環境変数（コンパクトリスト） --- */
+.env-config-section {
+    margin-bottom: 0;
+}
+
+.env-config-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.env-config-group-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #888;
+    padding: 10px 0 2px;
+    border-bottom: 1px solid #eee;
+}
+
+.env-config-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.env-config-row {
+    display: grid;
+    grid-template-columns: minmax(130px, 170px) 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 13px;
+}
+
+.env-config-row-key {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+}
+
+.env-config-row-value input,
+.env-config-row-value textarea {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.env-config-row-value textarea {
+    min-height: 28px;
+    max-height: 80px;
+    resize: vertical;
+    line-height: 1.35;
+}
+
+.env-config-badges {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: #888;
+}
+
+.env-config-restart-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: #fff3e0;
+    color: #e65100;
+    white-space: nowrap;
+}
+
+.env-config-locked .env-config-row-value input {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.env-config-banner {
+    margin: 8px 0;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #e8f5e9;
+    color: #1b5e20;
+    font-size: 12px;
+}
+
+.env-config-banner.env-config-banner-warn {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+/* --- R2 接続テスト --- */
+.r2-connection-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 10px 0 12px;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+.r2-connection-panel-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.r2-connection-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.r2-connection-badge--unknown {
+    background: #eceff1;
+    color: #546e7a;
+}
+
+.r2-connection-badge--local {
+    background: #eceff1;
+    color: #607d8b;
+}
+
+.r2-connection-badge--pending {
+    background: #fff8e1;
+    color: #f57f17;
+}
+
+.r2-connection-badge--connected {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.r2-connection-badge--failed {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.r2-connection-detail {
+    font-size: 12px;
+    color: #666;
+}
+
+body.admin-dark .r2-connection-panel {
+    background: #1e2229;
+    border-color: #3d4450;
+}
+
+body.admin-dark .r2-connection-detail {
+    color: #9aa0a8;
+}
+
+body.admin-dark .r2-connection-badge--unknown,
+body.admin-dark .r2-connection-badge--local {
+    background: #2d3340;
+    color: #9aa0a8;
+}
+
+body.admin-dark .r2-connection-badge--pending {
+    background: #3d2f1f;
+    color: #ffb74d;
+}
+
+body.admin-dark .r2-connection-badge--connected {
+    background: #1b3320;
+    color: #81c784;
+}
+
+body.admin-dark .r2-connection-badge--failed {
+    background: #3d1f24;
+    color: #ef9a9a;
+}
+
+/* --- 設定 JSON エディタ --- */
+.code-config-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.code-config-select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+}
+
+.code-config-editor {
+    width: 100%;
+    min-height: 420px;
+    margin-top: 8px;
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    resize: vertical;
+    tab-size: 2;
+}
+
+body.admin-dark .env-config-group-label {
+    color: #9aa0a8;
+    border-bottom-color: #3d4450;
+}
+
+body.admin-dark .env-config-row {
+    border-bottom-color: #2d3340;
+}
+
+body.admin-dark .env-config-row-key {
+    color: #c5cad3;
+}
+
+body.admin-dark .env-config-row-value input,
+body.admin-dark .env-config-row-value textarea {
+    background: #252a33;
+    border-color: #3d4450;
+    color: #e6e8ec;
+}
+
+body.admin-dark .env-config-locked .env-config-row-value input {
+    background: #1e2229;
+    color: #666;
+}
+
+body.admin-dark .env-config-restart-badge {
+    background: #3d2f1f;
+    color: #ffb74d;
+}
+
+body.admin-dark .env-config-banner {
+    background: #1b3320;
+    color: #81c784;
+}
+
+body.admin-dark .env-config-banner.env-config-banner-warn {
+    background: #3d2f1f;
+    color: #ffb74d;
+}
+
+body.admin-dark .code-config-select,
+body.admin-dark .code-config-editor {
+    background: #252a33;
+    border-color: #3d4450;
+    color: #e6e8ec;
+}
+
+/* 旧テーブル形式（未使用だが互換） */
+.env-config-group {
+    margin-top: 0;
+}
+
+.env-config-group-title {
+    display: none;
+}
+
+.env-config-table {
+    display: none;
 }
 
 /* --- ネットワーク設定 --- */

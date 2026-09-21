@@ -1,5 +1,7 @@
 // public/js/metaverse-portal-nav.js
 
+import { loadClientConfigOnce } from './tenant-client-config.js';
+
 /**
  * 開発 Vite（HTTP）上で https://localhost リンクを開けるよう scheme を揃える
  * @param {string} url
@@ -31,9 +33,8 @@ function toReachablePortalHref(url) {
 export async function renderMetaversePortalNav(container) {
     if (!container) return;
     try {
-        const res = await fetch('/api/client-config', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = await res.json();
+        const data = await loadClientConfigOnce();
+        if (!data || typeof data !== 'object') return;
         const links = Array.isArray(data.portalLinks) ? data.portalLinks : [];
         if (links.length === 0) {
             container.closest('.portal-nav')?.setAttribute('hidden', 'true');

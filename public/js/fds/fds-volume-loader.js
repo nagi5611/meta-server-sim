@@ -5,8 +5,27 @@
 import * as THREE from 'three';
 
 import VolumeRenderer from './VolumeRenderer.js';
-
+import {
+    applyVolumePlacementToRenderer,
+    buildFdsVolumeMirrorSign,
+    buildFdsVolumeRotationMatrices,
+    computeFdsVolumePlacement,
+    normalizeFdsVolumeMirror,
+} from './fds-volume-placement.js';
 import { toTenantUrl } from '../tenant-runtime-shim.js';
+import {
+    ensureFdsSmokeBulkConfig,
+    fetchFdsSmokeBinary,
+    withFdsSmokeHttpAuth,
+} from './fds-smoke-fetch-client.js';
+
+export {
+    applyVolumePlacementToRenderer,
+    buildFdsVolumeMirrorSign,
+    buildFdsVolumeRotationMatrices,
+    computeFdsVolumePlacement,
+    normalizeFdsVolumeMirror,
+};
 
 
 
@@ -71,10 +90,8 @@ const DEFAULT_PALETTE_PATH = '/images/palettes/smoke.png';
  * @property {{ x?: number, y?: number, z?: number }} rotation
 
  * @property {number} [scale]
-
+ * @property {{ x?: boolean, y?: boolean, z?: boolean }} [mirror]
  */
-
-
 
 /**
 
@@ -87,8 +104,49 @@ const DEFAULT_PALETTE_PATH = '/images/palettes/smoke.png';
  * @property {number} [minCutoff]
 
  * @property {number} [maxCutoff]
-
+ * @property {number} [cutoffFadeRange]
+ * @property {number} [valueAdded]
+ * @property {number} [valueMultiplier]
+ * @property {number} [alphaMultiplier]
+ * @property {number} [paletteMin]
+ * @property {number} [paletteMax]
+ * @property {boolean} [useRandomStart]
+ * @property {boolean} [useExtinctionCoefficient]
+ * @property {boolean} [useValueAsExtinctionCoefficient]
  */
+
+/**
+ * Donitzo/three.js-volume-renderer App.js 参考値（NIfTI デモは valueAdded 0.3 を維持するが、
+ * 当該 NIfTI の値域は 0〜1 に正規化済みでピークが 1 未満の場合が多い）
+ * @see https://github.com/Donitzo/three.js-volume-renderer/blob/main/App.js
+ */
+export const ORIGINAL_VOLUME_RENDER_DEFAULTS = {
+    valueAdded: 0.3,
+    valueMultiplier: 1.0,
+    minCutoff: 1e-3,
+    maxCutoff: 1.0 - 1e-3,
+    cutoffFadeRange: 0.0,
+    extinctionCoefficient: 1.0,
+    extinctionMultiplier: 1.0,
+    alphaMultiplier: 1.0,
+    paletteMin: 0,
+    paletteMax: 1,
+    raySteps: 64,
+    useRandomStart: true,
+    useExtinctionCoefficient: true,
+    useValueAsExtinctionCoefficient: false,
+    useVolumetricDepthTest: true,
+};
+
+/**
+ * export-fds-smoke.py の uint8（0〜1 正規化）向け既定値。
+ * valueAdded 0.3 だと濃い煙が scaledValue > maxCutoff で捨てられ、薄い煙だけ不透明になる。
+ */
+export const FDS_SMOKE_RENDER_DEFAULTS = {
+    ...ORIGINAL_VOLUME_RENDER_DEFAULTS,
+    valueAdded: 0,
+    useValueAsExtinctionCoefficient: true,
+};
 
 
 
@@ -104,9 +162,12 @@ const DEFAULT_PALETTE_PATH = '/images/palettes/smoke.png';
 
 export async function loadFdsSmokeManifestOnly(manifestPath) {
 
-    const manifestUrl = toTenantUrl(`/${manifestPath.replace(/^\/+/, '')}`);
+    await ensureFdsSmokeBulkConfig();
+    const manifestUrl = withFdsSmokeHttpAuth(
+        toTenantUrl(`/${manifestPath.replace(/^\/+/, '')}`),
+    );
 
-    const manifestResponse = await fetch(manifestUrl);
+    const manifestResponse = await fetch(manifestUrl, { credentials: 'include' });
 
     if (!manifestResponse.ok) {
 
@@ -154,19 +215,7 @@ async function loadFdsSmokeBinary(manifestPath, manifest) {
 
     const dataDir = getManifestDataDir(manifestPath);
 
-    const dataUrl = toTenantUrl(`/${dataDir}${manifest.dataFile}`);
-
-    const dataResponse = await fetch(dataUrl);
-
-    if (!dataResponse.ok) {
-
-        throw new Error(`Failed to load volume data (${dataResponse.status}): ${dataUrl}`);
-
-    }
-
-    const buffer = await dataResponse.arrayBuffer();
-
-    return new Uint8Array(buffer);
+    return fetchFdsSmokeBinary(`${dataDir}${manifest.dataFile}`);
 
 }
 
@@ -188,19 +237,7 @@ export async function loadFdsSmokePart(manifestPath, part) {
 
     const dataDir = getManifestDataDir(manifestPath);
 
-    const dataUrl = toTenantUrl(`/${dataDir}${part.dataFile}`);
-
-    const dataResponse = await fetch(dataUrl);
-
-    if (!dataResponse.ok) {
-
-        throw new Error(`Failed to load part data (${dataResponse.status}): ${dataUrl}`);
-
-    }
-
-    const buffer = await dataResponse.arrayBuffer();
-
-    return new Uint8Array(buffer);
+    return fetchFdsSmokeBinary(`${dataDir}${part.dataFile}`);
 
 }
 
@@ -240,72 +277,6 @@ export async function loadFdsSmokeManifest(manifestPath) {
 
 /**
 
- * FDS bounds + transform からワールド座標の volumeOrigin / voxelSize を算出する
-
- * @param {FdsSmokeManifest} manifest
-
- * @param {FdsSmokeTransform} transform
-
- * @returns {{ volumeOrigin: THREE.Vector3, voxelSize: THREE.Vector3, volumeResolution: THREE.Vector3 }}
-
- */
-
-export function computeFdsVolumePlacement(manifest, transform = {}) {
-
-    const [nx, ny, nz] = manifest.dims;
-
-    const bounds = manifest.bounds;
-
-    const scale = transform.scale ?? 1;
-
-    const position = transform.position ?? { x: 0, y: 0, z: 0 };
-
-
-
-    const dx = bounds.x[1] - bounds.x[0];
-
-    const dy = bounds.y[1] - bounds.y[0];
-
-    const dz = bounds.z[1] - bounds.z[0];
-
-
-
-    const volumeOrigin = new THREE.Vector3(
-
-        position.x,
-
-        position.y,
-
-        position.z,
-
-    );
-
-
-
-    const voxelSize = new THREE.Vector3(
-
-        (dx / Math.max(nx - 1, 1)) * scale,
-
-        (dz / Math.max(nz - 1, 1)) * scale,
-
-        (dy / Math.max(ny - 1, 1)) * scale,
-
-    );
-
-
-
-    const volumeResolution = new THREE.Vector3(nx, nz, ny);
-
-
-
-    return { volumeOrigin, voxelSize, volumeResolution };
-
-}
-
-
-
-/**
-
  * palette テクスチャを読み込む
 
  * @param {string} [palettePath]
@@ -315,29 +286,37 @@ export function computeFdsVolumePlacement(manifest, transform = {}) {
  */
 
 export function loadSmokePalette(palettePath = DEFAULT_PALETTE_PATH) {
-
-    const url = toTenantUrl(palettePath);
+    const fallbackUrl = palettePath.startsWith('/') ? palettePath : `/${palettePath}`;
+    // 共有パレットは public/ 直下。テナント配下に無い場合が多いので先に試す
+    const tenantUrl = toTenantUrl(palettePath);
 
     return new Promise((resolve) => {
-
-        new THREE.TextureLoader().load(
-
-            url,
-
-            (texture) => resolve(texture),
-
-            undefined,
-
-            () => {
-
-                resolve(createDefaultSmokePalette());
-
-            },
-
-        );
-
+        const loader = new THREE.TextureLoader();
+        const finalize = (texture) => {
+            if (texture.colorSpace !== undefined) {
+                texture.colorSpace = THREE.SRGBColorSpace;
+            }
+            texture.needsUpdate = true;
+            resolve(texture);
+        };
+        const tryLoad = (urls) => {
+            if (urls.length === 0) {
+                finalize(createDefaultSmokePalette());
+                return;
+            }
+            const [url, ...rest] = urls;
+            loader.load(
+                url,
+                finalize,
+                undefined,
+                () => tryLoad(rest),
+            );
+        };
+        const urls = fallbackUrl === tenantUrl
+            ? [fallbackUrl]
+            : [fallbackUrl, tenantUrl];
+        tryLoad(urls);
     });
-
 }
 
 
@@ -387,45 +366,38 @@ function createDefaultSmokePalette() {
  */
 
 async function applyFdsVolumeRenderOptions(volumeRenderer, renderOptions = {}) {
+    const defaults = FDS_SMOKE_RENDER_DEFAULTS;
+    const opts = { ...defaults, ...renderOptions };
 
     const uniforms = volumeRenderer.uniforms;
+    const minCutoff = opts.minCutoff;
+    const maxCutoff = opts.maxCutoff;
 
-    uniforms.valueAdded.value = 0;
-
-    uniforms.minCutoffValue.value = renderOptions.minCutoff ?? 0.02;
-
-    uniforms.maxCutoffValue.value = renderOptions.maxCutoff ?? 1.0;
-
-    uniforms.extinctionCoefficient.value = renderOptions.extinctionCoefficient ?? 2.5;
-
-    uniforms.alphaMultiplier.value = 1.2;
-
-
+    uniforms.valueAdded.value = opts.valueAdded;
+    uniforms.valueMultiplier.value = opts.valueMultiplier;
+    uniforms.minCutoffValue.value = minCutoff;
+    uniforms.maxCutoffValue.value = maxCutoff;
+    uniforms.cutoffFadeRange.value = opts.cutoffFadeRange;
+    uniforms.extinctionCoefficient.value = opts.extinctionCoefficient;
+    uniforms.extinctionMultiplier.value = opts.extinctionMultiplier;
+    uniforms.alphaMultiplier.value = opts.alphaMultiplier;
+    uniforms.minPaletteValue.value = minCutoff + (maxCutoff - minCutoff) * opts.paletteMin;
+    uniforms.maxPaletteValue.value = minCutoff + (maxCutoff - minCutoff) * opts.paletteMax;
 
     try {
-
         uniforms.palette.value = await loadSmokePalette();
-
     } catch (e) {
-
         console.warn('[fds-volume-loader] palette load failed:', e);
-
         uniforms.palette.value = createDefaultSmokePalette();
-
     }
 
-
-
     volumeRenderer.updateMaterial({
-
-        useExtinctionCoefficient: true,
-
-        useRandomStart: true,
-
-        raySteps: renderOptions.raySteps ?? 48,
-
+        useExtinctionCoefficient: opts.useExtinctionCoefficient,
+        useValueAsExtinctionCoefficient: opts.useValueAsExtinctionCoefficient,
+        useRandomStart: opts.useRandomStart,
+        useVolumetricDepthTest: opts.useVolumetricDepthTest,
+        raySteps: opts.raySteps,
     });
-
 }
 
 
@@ -450,19 +422,20 @@ export function applyFdsSmokePartToAtlas(volumeRenderer, manifest, part, partDat
 
     const voxelsPerFrame = nx * ny * nz;
 
-    const frameStart = part.frameStart;
-
-
-
+    // マルチパートはパート内ローカルフレーム (0..frameCount-1) だけをアトラスに書き込む
     volumeRenderer.updateAtlasTexture((xi, yi, zi, _x, _y, _z, t) => {
 
-        const localFrame = Math.floor(t) - frameStart;
+        const localFrame = Math.floor(t);
 
         const index = localFrame * voxelsPerFrame + xi + zi * nx + yi * nx * ny;
 
         return partData[index] / 255.0;
 
-    }, part.frameStart, part.frameCount);
+    }, 0, part.frameCount);
+
+    // シェーダの timeCount はアクティブパートのフレーム数に合わせる（maxPartFrames のままだと
+    // 未使用アトラススロットの古いデータをサンプルする）
+    volumeRenderer.uniforms.timeCount.value = part.frameCount;
 
 }
 
@@ -480,26 +453,17 @@ export function applyFdsSmokePartToAtlas(volumeRenderer, manifest, part, partDat
 
  */
 
-function createEmptyFdsVolumeRenderer(manifest, transform = {}) {
-
-    const { volumeOrigin, voxelSize, volumeResolution } = computeFdsVolumePlacement(manifest, transform);
-
+function createEmptyFdsVolumeRenderer(manifest, transform = {}, atlasTimeCount = manifest.frameCount) {
+    const placement = computeFdsVolumePlacement(manifest, transform);
     const volumeRenderer = new VolumeRenderer();
-
     volumeRenderer.createAtlasTexture(
-
-        volumeResolution,
-
-        volumeOrigin,
-
-        voxelSize,
-
-        manifest.frameCount,
-
+        placement.volumeResolution,
+        placement.volumeOrigin,
+        placement.voxelSize,
+        atlasTimeCount,
     );
-
+    applyVolumePlacementToRenderer(volumeRenderer, placement);
     return volumeRenderer;
-
 }
 
 
@@ -559,233 +523,214 @@ export async function createFdsVolumeRenderer(manifest, volumeData, transform = 
  */
 
 export class FdsMultipartSmokeController {
-
     /**
-
      * @param {VolumeRenderer} volumeRenderer
-
      * @param {FdsSmokeManifest} manifest
-
      * @param {string} manifestPath
-
      */
-
     constructor(volumeRenderer, manifest, manifestPath) {
-
         this.volumeRenderer = volumeRenderer;
-
         this.manifest = manifest;
-
         this.manifestPath = manifestPath;
-
         /** @type {FdsSmokePart[]} */
-
         this.parts = [...(manifest.parts ?? [])].sort((a, b) => a.frameStart - b.frameStart);
-
-        /** @type {Set<string>} */
-
-        this._loadedPartIds = new Set();
-
-        /** @type {Map<string, Promise<void>>} */
-
-        this._loadingParts = new Map();
-
+        /** @type {Map<string, Uint8Array>} ダウンロード済みバイナリ（アトラス未反映でも可） */
+        this._partDataCache = new Map();
+        /** @type {Map<string, Promise<Uint8Array>>} */
+        this._fetchingParts = new Map();
+        /** 現在アトラスに載っているパート ID */
+        this._activePartId = null;
         this._disposed = false;
-
+        /** VolumeRenderer.uniforms.time 用の直近有効ローカル時刻 */
+        this._lastRendererTime = 0;
     }
 
-
+    /**
+     * パートのバイナリがキャッシュ済みか（表示切替可能）
+     * @param {string} partId
+     * @returns {boolean}
+     */
+    isPartLoaded(partId) {
+        return this._partDataCache.has(partId);
+    }
 
     /**
-
-     * 指定パートを読み込んでアトラスに反映する
-
+     * 指定パートのバイナリを取得してキャッシュする（アトラスは触らない）
      * @param {FdsSmokePart} part
-
+     * @returns {Promise<Uint8Array | null>}
      */
+    async prefetchPart(part) {
+        if (this._disposed) return null;
+        const cached = this._partDataCache.get(part.id);
+        if (cached) return cached;
 
-    async loadPart(part) {
+        const existing = this._fetchingParts.get(part.id);
+        if (existing) return existing;
 
-        if (this._disposed || this._loadedPartIds.has(part.id)) {
-
-            return;
-
-        }
-
-
-
-        const existing = this._loadingParts.get(part.id);
-
-        if (existing) {
-
-            await existing;
-
-            return;
-
-        }
-
-
-
-        const loadPromise = (async () => {
-
+        const fetchPromise = (async () => {
             const partData = await loadFdsSmokePart(this.manifestPath, part);
-
-            if (this._disposed) return;
-
-            applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, partData);
-
-            this._loadedPartIds.add(part.id);
-
+            if (this._disposed) return partData;
+            this._partDataCache.set(part.id, partData);
+            return partData;
         })();
 
-
-
-        this._loadingParts.set(part.id, loadPromise);
-
+        this._fetchingParts.set(part.id, fetchPromise);
         try {
-
-            await loadPromise;
-
+            return await fetchPromise;
         } finally {
-
-            this._loadingParts.delete(part.id);
-
+            this._fetchingParts.delete(part.id);
         }
-
     }
 
+    /**
+     * 指定パートをアトラスに載せる（現在再生中パート以外で呼ぶと見た目が壊れる）
+     * @param {FdsSmokePart} part
+     * @returns {Promise<boolean>}
+     */
+    async activatePart(part) {
+        if (this._disposed) return false;
+        if (this._activePartId === part.id) return true;
 
+        const partData = await this.prefetchPart(part);
+        if (this._disposed || !partData) return false;
+
+        applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, partData);
+        this._activePartId = part.id;
+        return true;
+    }
 
     /**
+     * 指定パートを読み込み、アトラスに反映する（表示用）
+     * @param {FdsSmokePart} part
+     */
+    async loadPart(part) {
+        await this.activatePart(part);
+    }
 
+    /**
      * 先頭パートを読み込む
-
      */
-
     async loadInitialPart() {
-
         if (this.parts.length === 0) {
-
             throw new Error('Multipart manifest has no parts');
-
         }
-
-        await this.loadPart(this.parts[0]);
-
+        await this.activatePart(this.parts[0]);
     }
 
-
-
     /**
-
-     * 指定フレームを含むパートを読み込む
-
+     * 指定フレームを含むパートを読み込み、アトラスに反映する
      * @param {number} frameIndex
-
      */
-
     async loadPartForFrame(frameIndex) {
-
         const part = this._findPartForFrame(frameIndex);
-
         if (!part) {
-
             throw new Error(`No part found for frame ${frameIndex}`);
-
         }
-
-        await this.loadPart(part);
-
+        await this.activatePart(part);
+        this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
     }
 
-
+    /**
+     * 指定フレームのパートがキャッシュ済みになるまで待ち、アトラスへ反映する
+     * @param {number} frameIndex
+     * @returns {Promise<boolean>}
+     */
+    async ensurePartForFrame(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part) return false;
+        await this.activatePart(part);
+        this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
+        return true;
+    }
 
     /**
-
-     * 再生位置に応じて現在パートと次パートをプリフェッチする
-
+     * 現在フレームのパートをアトラスに載せ、次パートはバイナリのみプリフェッチする
      * @param {number} playbackTime フレームインデックス（小数可）
-
      */
-
     tick(playbackTime) {
-
         if (this._disposed || this.parts.length === 0) return;
 
-
-
         const frameIndex = Math.floor(playbackTime);
-
         const currentPart = this._findPartForFrame(frameIndex);
-
         if (!currentPart) return;
 
-
-
-        void this.loadPart(currentPart);
-
-
+        // 表示中パートのみアトラス反映（次パートの上書きを禁止）
+        if (this._activePartId !== currentPart.id && this._partDataCache.has(currentPart.id)) {
+            applyFdsSmokePartToAtlas(
+                this.volumeRenderer,
+                this.manifest,
+                currentPart,
+                this._partDataCache.get(currentPart.id),
+            );
+            this._activePartId = currentPart.id;
+        } else if (!this._partDataCache.has(currentPart.id)) {
+            void this.prefetchPart(currentPart);
+        }
 
         const currentPartIndex = this.parts.indexOf(currentPart);
-
         const progressInPart = frameIndex - currentPart.frameStart;
-
-        const prefetchThreshold = Math.max(1, Math.floor(currentPart.frameCount * 0.25));
-
-
+        const prefetchThreshold = Math.max(1, Math.floor(currentPart.frameCount * 0.5));
 
         if (progressInPart >= currentPart.frameCount - prefetchThreshold) {
-
             const nextPart = this.parts[currentPartIndex + 1];
-
             if (nextPart) {
-
-                void this.loadPart(nextPart);
-
+                // 次パートはキャッシュのみ。アトラスには載せない
+                void this.prefetchPart(nextPart);
             }
-
         }
-
     }
-
-
 
     /**
-
      * @param {number} frameIndex
-
      * @returns {FdsSmokePart | null}
-
      */
-
     _findPartForFrame(frameIndex) {
-
         for (const part of this.parts) {
-
             if (frameIndex >= part.frameStart && frameIndex < part.frameStart + part.frameCount) {
-
                 return part;
-
             }
-
         }
-
         return this.parts[this.parts.length - 1] ?? null;
-
     }
 
+    /**
+     * グローバルフレームインデックスを VolumeRenderer のローカル time に変換する
+     * @param {number} globalPlaybackTime
+     * @returns {number}
+     */
+    toRendererTime(globalPlaybackTime) {
+        const frameIndex = Math.floor(globalPlaybackTime);
+        const part = this._findPartForFrame(frameIndex);
+        if (!part || this._activePartId !== part.id) {
+            return this._lastRendererTime;
+        }
+        const localTime = globalPlaybackTime - part.frameStart;
+        this._lastRendererTime = localTime;
+        return localTime;
+    }
 
+    /**
+     * 指定グローバルフレームのボクセルデータ（キャッシュ済みパートのみ）
+     * @param {number} frameIndex
+     * @returns {{ data: Uint8Array, localFrameIndex: number } | null}
+     */
+    getCachedVolumeDataForFrame(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part) return null;
+        const data = this._partDataCache.get(part.id);
+        if (!data) return null;
+        return {
+            data,
+            localFrameIndex: Math.max(0, frameIndex - part.frameStart),
+        };
+    }
 
     dispose() {
-
         this._disposed = true;
-
-        this._loadingParts.clear();
-
-        this._loadedPartIds.clear();
-
+        this._fetchingParts.clear();
+        this._partDataCache.clear();
+        this._activePartId = null;
     }
-
 }
 
 
@@ -802,7 +747,7 @@ export class FdsMultipartSmokeController {
 
  * @param {{ initialFrame?: number }} [loadOptions]
 
- * @returns {Promise<{ volumeRenderer: VolumeRenderer, multipart: FdsMultipartSmokeController | null, manifest: FdsSmokeManifest }>}
+ * @returns {Promise<{ volumeRenderer: VolumeRenderer, multipart: FdsMultipartSmokeController | null, manifest: FdsSmokeManifest, volumeData: Uint8Array | null }>}
 
  */
 
@@ -816,7 +761,9 @@ export async function createFdsSmokeVolume(manifestPath, transform = {}, renderO
 
     if (manifest.multipart && Array.isArray(manifest.parts) && manifest.parts.length > 0) {
 
-        const volumeRenderer = createEmptyFdsVolumeRenderer(manifest, transform);
+        const maxPartFrames = Math.max(...manifest.parts.map((part) => part.frameCount));
+
+        const volumeRenderer = createEmptyFdsVolumeRenderer(manifest, transform, maxPartFrames);
 
         await applyFdsVolumeRenderOptions(volumeRenderer, renderOptions);
 
@@ -836,7 +783,7 @@ export async function createFdsSmokeVolume(manifestPath, transform = {}, renderO
 
 
 
-        return { volumeRenderer, multipart, manifest };
+        return { volumeRenderer, multipart, manifest, volumeData: null };
 
     }
 
@@ -856,7 +803,7 @@ export async function createFdsSmokeVolume(manifestPath, transform = {}, renderO
 
     );
 
-    return { volumeRenderer, multipart: null, manifest };
+    return { volumeRenderer, multipart: null, manifest, volumeData };
 
 }
 

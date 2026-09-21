@@ -1,6 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { defineConfig } from 'vite';
+import {
+    isFdsSmokeBulkDisabled,
+    resolveFdsSmokeBulkPort,
+} from './lib/fds-smoke-bulk-process.js';
 
 const projectRoot = path.resolve(process.cwd());
 const simpleRoot = path.resolve(projectRoot, '..', 'metaverse-simple');
@@ -11,9 +15,17 @@ const tenantAssetResolve = path.join(projectRoot, 'public/js/tenant-asset-resolv
 const simpleMeshBvhClient = path.join(simpleRoot, 'public/js/mesh-bvh-worker-client.js');
 const tenantMeshBvhClient = path.join(projectRoot, 'public/js/tenant-mesh-bvh-worker-client.js');
 const simpleMetaverseI18n = path.join(simpleRoot, 'public/js/metaverse-i18n.js');
+const simpleServiceWorkerRegister = path.join(simpleRoot, 'public/js/service-worker-register.js');
+const tenantServiceWorkerRegister = path.join(projectRoot, 'public/js/tenant-service-worker-register-shim.js');
 
 /** tenant パスと API / Socket / HTML を Node (3002) へプロキシ */
 const devPort = parseInt(String(process.env.VITE_DEV_PORT || '3003'), 10) || 3003;
+const nodeDevPort = parseInt(String(process.env.PORT || '3002'), 10) || 3002;
+const fdsSmokeBulkPort = resolveFdsSmokeBulkPort(nodeDevPort);
+const simulationsProxyTarget =
+    fdsSmokeBulkPort && !isFdsSmokeBulkDisabled()
+        ? `http://127.0.0.1:${fdsSmokeBulkPort}`
+        : `http://127.0.0.1:${nodeDevPort}`;
 
 const tenantProxy = {
     target: 'http://localhost:3002',
@@ -64,6 +76,10 @@ export default defineConfig({
                 replacement: tenantMeshBvhClient,
             },
             {
+                find: simpleServiceWorkerRegister,
+                replacement: tenantServiceWorkerRegister,
+            },
+            {
                 find: '@metaverse-simple/setting.js',
                 replacement: path.join(simpleRoot, 'public/js/setting.js'),
             },
@@ -74,6 +90,10 @@ export default defineConfig({
             {
                 find: '/js/metaverse-i18n.js',
                 replacement: simpleMetaverseI18n,
+            },
+            {
+                find: 'mediasoup-client',
+                replacement: path.join(simpleRoot, 'node_modules/mediasoup-client/lib/index.js'),
             },
         ],
     },
@@ -106,7 +126,16 @@ export default defineConfig({
             [`^/${TENANT_SEGMENT}/images`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/pdfs`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/env`]: tenantProxy,
-            [`^/${TENANT_SEGMENT}/simulations`]: tenantProxy,
+            [`^/${TENANT_SEGMENT}/simulations`]: {
+                target: simulationsProxyTarget,
+                changeOrigin: true,
+                configure(proxy) {
+                    proxy.on('proxyReq', (proxyReq) => {
+                        proxyReq.setHeader('X-Forwarded-Proto', 'https');
+                        proxyReq.setHeader('X-Forwarded-Host', `localhost:${devPort}`);
+                    });
+                },
+            },
             [`^/${TENANT_SEGMENT}/?$`]: tenantProxy,
         },
     },
