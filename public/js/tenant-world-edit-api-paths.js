@@ -8,8 +8,21 @@
 export function rewriteTenantWorldEditApiUrl(urlStr) {
     const raw = String(urlStr || '');
     const pathName = window.location.pathname;
+    // プラットフォーム全体の操作（再起動・設定再読み込み等）は /admin/* のまま
+    if (
+        raw === '/admin/restart' ||
+        raw.startsWith('/admin/restart?') ||
+        raw === '/admin/reload-settings' ||
+        raw.startsWith('/admin/reload-settings?') ||
+        raw === '/admin/planned-restart' ||
+        raw.startsWith('/admin/planned-restart?')
+    ) {
+        return raw;
+    }
     const adminMatch = pathName.match(/\/admin\/tenant\/([^/]+)/);
     if (!adminMatch?.[1]) return raw;
+    // ワールド編集以外（Tenant 概要など）では書き換えしない
+    if (!pathName.includes('/world-edit')) return raw;
 
     const tenantId = decodeURIComponent(adminMatch[1]);
     const adminBase = `/admin/tenants/${encodeURIComponent(tenantId)}`;

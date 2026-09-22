@@ -2,6 +2,7 @@
 
 import { initFdsSmokePanel } from './admin-fds-smoke-panel.js';
 import { initTenantWorldEditFdsSmokePreview } from './tenant-world-edit-fds-smoke.js';
+import { initTenantWorldEditFdsSmokePanel } from './tenant-world-edit-fds-smoke-panel.js';
 
 /**
  * アセットタブ表示時にアバター／HDR 情報を更新する
@@ -48,4 +49,5 @@ export async function initTenantSettingEditor(tenantId) {
     wireAssetsTabRefresh(tenantId);
     await initFdsSmokePanel(tenantId);
     await initTenantWorldEditFdsSmokePreview();
+    await initTenantWorldEditFdsSmokePanel();
 }

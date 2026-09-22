@@ -277,6 +277,16 @@ export class TenantFdsSmokeManager {
     }
 
     /**
+     * 指定 ID の煙が再生中か
+     * @param {string} smokeId
+     * @returns {boolean}
+     */
+    isSmokePlaying(smokeId) {
+        const entry = this._entries.find((e) => e.id === smokeId);
+        return Boolean(entry?.playback?.playing);
+    }
+
+    /**
      * フレーム更新（1秒ごとに次フレームへステップ）
      * @param {number} deltaTime
      */

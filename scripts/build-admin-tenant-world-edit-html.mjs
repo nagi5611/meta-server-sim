@@ -55,6 +55,7 @@ const html = `<!DOCTYPE html>
 ${body}
         </div>
     </main>
+    <div id="fds-smoke-panel-crosshair" class="fds-smoke-panel-crosshair" hidden aria-hidden="true"></div>
     <script src="/js/admin-url-sanitize.js"></script>
     <script type="module" src="/js/tenant-world-edit-bootstrap.js"></script>
     <script type="module" src="/js/admin-tenant-world-edit.js"></script>

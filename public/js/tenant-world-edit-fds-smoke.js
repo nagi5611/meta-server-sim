@@ -9,6 +9,38 @@ import {
 } from './fds/fds-volume-loader.js';
 import { FdsSmokeDepthPass } from './fds/fds-smoke-depth-pass.js';
 
+/** パネル再生中は静止プレビューを隠す（煙 ID） */
+const previewSuppressedSmokeIds = new Set();
+
+/**
+ * 静止プレビューの表示抑制（パネル再生と二重表示を防ぐ）
+ * @param {string | null} smokeId — null で全解除
+ * @param {boolean} suppress
+ */
+export function setWorldEditFdsSmokePreviewSuppressed(smokeId, suppress) {
+    if (smokeId == null) {
+        previewSuppressedSmokeIds.clear();
+        return;
+    }
+    if (suppress) {
+        previewSuppressedSmokeIds.add(smokeId);
+    } else {
+        previewSuppressedSmokeIds.delete(smokeId);
+    }
+}
+
+/**
+ * 再生が止まった煙は静止プレビューに戻す
+ * @param {import('./tenant-fds-smoke-manager.js').TenantFdsSmokeManager} smokeManager
+ */
+export function syncWorldEditFdsSmokePreviewSuppression(smokeManager) {
+    for (const smokeId of [...previewSuppressedSmokeIds]) {
+        if (!smokeManager.isSmokePlaying(smokeId)) {
+            previewSuppressedSmokeIds.delete(smokeId);
+        }
+    }
+}
+
 /**
  * ワールド編集プレビュー用 FDS 煙（静止：最終フレームまたは playback 設定の初期フレーム）
  */
@@ -63,8 +95,16 @@ export class TenantWorldEditFdsSmokePreview {
         this._depthPass.setSize(this._depthSize.x, this._depthSize.y);
 
         const volumeMeshes = [];
-        for (const entry of this._entries.values()) {
-            if (entry.renderer) volumeMeshes.push(entry.renderer);
+        for (const [group, entry] of this._entries) {
+            const smokeId = group.userData?.fdsSmokeConfig?.id;
+            const hidden =
+                entry.renderer &&
+                smokeId &&
+                previewSuppressedSmokeIds.has(String(smokeId));
+            if (entry.renderer) {
+                entry.renderer.visible = !hidden;
+                if (!hidden) volumeMeshes.push(entry.renderer);
+            }
         }
         if (volumeMeshes.length === 0) return;
 
