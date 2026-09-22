@@ -2,6 +2,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    ensureSharedSocketAuthSecretBeforeFork,
     resolveFdsSmokeBulkPort,
     resolveFdsSmokeBulkPublicOrigin,
 } from '../lib/fds-smoke-bulk-process.js';
@@ -28,6 +29,15 @@ describe('fds-smoke-bulk-process', () => {
     it('resolveFdsSmokeBulkPort honors explicit FDS_SMOKE_BULK_PORT', () => {
         process.env.FDS_SMOKE_BULK_PORT = '3999';
         assert.equal(resolveFdsSmokeBulkPort(3002), 3999);
+    });
+
+    it('ensureSharedSocketAuthSecretBeforeFork sets env when missing', () => {
+        delete process.env.SOCKET_AUTH_SECRET;
+        ensureSharedSocketAuthSecretBeforeFork();
+        assert.ok(String(process.env.SOCKET_AUTH_SECRET || '').length >= 32);
+        const before = process.env.SOCKET_AUTH_SECRET;
+        ensureSharedSocketAuthSecretBeforeFork();
+        assert.equal(process.env.SOCKET_AUTH_SECRET, before);
     });
 
     it('resolveFdsSmokeBulkPublicOrigin uses Vite front host in dev', () => {

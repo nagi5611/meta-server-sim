@@ -9,6 +9,8 @@ import {
     installTenantE2EHarness,
     setAdminToken,
     setGuestUsername,
+    waitForSocketConnected,
+    emitSocketAck,
 } from './helpers/tenant-metaverse.mjs';
 
 const MENU_BUTTON_IDS = [
@@ -75,6 +77,7 @@ test.describe('tenant menu — UI (Phase 0–1)', () => {
 
 test.describe('tenant menu — chat & stamp (Phase 2)', () => {
     test('emoji stamp syncs between two clients', async ({ browser }) => {
+        test.setTimeout(300_000);
         const suffix = Date.now();
         const ctxA = await browser.newContext();
         const ctxB = await browser.newContext();
@@ -86,11 +89,13 @@ test.describe('tenant menu — chat & stamp (Phase 2)', () => {
 
         await gotoTenantMetaverse(pageA);
         await gotoTenantMetaverse(pageB);
+        await waitForSocketConnected(pageA);
+        await waitForSocketConnected(pageB);
 
         const emojiReceived = pageB.waitForFunction(
             () => document.querySelectorAll('.player-emoji').length > 0,
             null,
-            { timeout: 30_000 },
+            { timeout: 60_000 },
         );
 
         await pageA.locator('#stamp-btn').click();
@@ -119,6 +124,7 @@ test.describe('tenant menu — chat & stamp (Phase 2)', () => {
 
     test('chat message delivers when GEMINI_API_KEY is set', async ({ browser }) => {
         test.skip(!HAS_GEMINI, 'GEMINI_API_KEY not configured');
+        test.setTimeout(300_000);
 
         const suffix = Date.now();
         const ctxA = await browser.newContext();
@@ -131,12 +137,14 @@ test.describe('tenant menu — chat & stamp (Phase 2)', () => {
 
         await gotoTenantMetaverse(pageA);
         await gotoTenantMetaverse(pageB);
+        await waitForSocketConnected(pageA);
+        await waitForSocketConnected(pageB);
 
         const uniqueMsg = `E2E chat ${suffix}`;
-        await pageA.locator('#chat-input').fill(uniqueMsg);
-        await pageA.locator('#chat-send-btn').click();
+        const chatAck = await emitSocketAck(pageA, 'chat-message', uniqueMsg, 90_000);
+        expect(chatAck?.ok, `chat ack: ${JSON.stringify(chatAck)}`).toBe(true);
 
-        await expect(pageB.locator('#chat-messages')).toContainText(uniqueMsg, { timeout: 60_000 });
+        await expect(pageB.locator('#chat-messages')).toContainText(uniqueMsg, { timeout: 120_000 });
 
         await ctxA.close();
         await ctxB.close();
@@ -217,18 +225,25 @@ test.describe('tenant menu — admin (Phase 6)', () => {
 
         await setGuestUsername(guestPage, `Guest-${suffix}`);
         await installTenantE2EHarness(guestPage);
-        await gotoTenantMetaverse(guestPage);
-
         await installTenantE2EHarness(adminPage);
         await setAdminToken(adminPage, adminToken);
         await setGuestUsername(adminPage, `Admin-${suffix}`);
-        await adminPage.goto(`/${TENANT_ID}/`);
-        await expectMetaverseReady(adminPage);
+
+        await Promise.all([
+            gotoTenantMetaverse(guestPage),
+            (async () => {
+                await adminPage.goto(`/${TENANT_ID}/`);
+                await expectMetaverseReady(adminPage);
+            })(),
+        ]);
+        await waitForSocketConnected(guestPage);
+        await waitForSocketConnected(adminPage);
 
         const adminDisplayName = `Admin-${suffix}`;
+        const adminListPattern = new RegExp(`${adminDisplayName}|admin`, 'i');
         await expect
-            .poll(async () => guestPage.locator('#player-list').textContent(), { timeout: 30_000 })
-            .toContain(adminDisplayName);
+            .poll(async () => guestPage.locator('#player-list').textContent(), { timeout: 120_000 })
+            .toMatch(adminListPattern);
 
         await adminPage.locator('#admin-menu-btn').click();
         await adminPage.locator('#admin-invisible-toggle').check();

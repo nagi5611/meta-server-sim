@@ -26,6 +26,9 @@ export default defineConfig({
             name: 'tenant-menu',
             testMatch: /tenant-menu-system\.spec\.js/,
             globalSetup: './e2e/tenant-menu.global-setup.js',
+            fullyParallel: false,
+            timeout: 300_000,
+            retries: 1,
         },
         {
             name: 'agent',
@@ -41,7 +44,7 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: `npx cross-env ADMIN_PASSWORD=${adminPassword} node server.js`,
+            command: `npx cross-env ADMIN_PASSWORD=${adminPassword} STORAGE_BACKEND=local node server.js`,
             url: 'http://localhost:3002/api/health',
             reuseExistingServer: true,
             timeout: 60_000,

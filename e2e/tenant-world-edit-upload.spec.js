@@ -48,8 +48,9 @@ test.describe('tenant world edit uploads', () => {
         await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
 
         await page.locator('.we-category-btn[data-we-category="assets"]').click();
-        const hdrLabel = await page.locator('#we-hdr-current-filename').textContent();
-        expect(hdrLabel || '').toContain('env/default.hdr');
+        await expect(page.locator('#we-hdr-current-filename')).toContainText('env/default.hdr', {
+            timeout: 30_000,
+        });
     });
 
     test('P-01 GLB model upload appears in model list', async ({ page, request }) => {
@@ -96,8 +97,8 @@ test.describe('tenant world edit uploads', () => {
         await page.goto('/admin/tenant/P-01/world-edit');
         await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
 
-        await page.locator('.we-category-btn[data-we-category="assets"]').click();
-        await expect(page.locator('#we-cat-assets.active')).toBeVisible({ timeout: 30_000 });
+        await page.locator('.we-category-btn[data-we-category="file"]').click();
+        await expect(page.locator('#we-cat-file.active')).toBeVisible({ timeout: 30_000 });
         const uploadOpenBtn = page.locator('#btn-model-upload-open');
         await uploadOpenBtn.scrollIntoViewIfNeeded();
         await uploadOpenBtn.click();

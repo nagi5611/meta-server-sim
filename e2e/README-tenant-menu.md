@@ -5,6 +5,9 @@
 ## 実行方法
 
 ```bash
+# 3002/3003 が別 dev で占有されているときは先に解放
+npm run dev:free-ports
+
 # メニュー専用スイート（推奨）
 npm run test:e2e:tenant-menu
 

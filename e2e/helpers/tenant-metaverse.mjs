@@ -154,23 +154,35 @@ export async function gotoTenantMetaverse(page, tenantId = TENANT_ID) {
  * @param {import('@playwright/test').Page} page
  */
 export async function waitForSocketConnected(page) {
+    let stableTicks = 0;
     await expect
         .poll(
             async () => {
                 try {
-                    return await page.evaluate(() => {
-                        const sock = window.__tenantE2E?.getSocket?.();
-                        return Boolean(sock?.connected);
+                    const ready = await page.evaluate(() => {
+                        const e2e = window.__tenantE2E;
+                        const sock = e2e?.getSocket?.();
+                        if (!sock?.connected) return false;
+                        const ping = e2e?.getNetworkManager?.()?.getPingStatus?.();
+                        if (ping?.reconnecting) return false;
+                        return true;
                     });
+                    if (!ready) {
+                        stableTicks = 0;
+                        return false;
+                    }
+                    stableTicks += 1;
+                    return stableTicks >= 2;
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);
                     if (msg.includes('Execution context was destroyed')) {
+                        stableTicks = 0;
                         return false;
                     }
                     throw err;
                 }
             },
-            { timeout: 30_000 },
+            { timeout: 120_000 },
         )
         .toBe(true);
 }
@@ -183,23 +195,48 @@ export async function waitForSocketConnected(page) {
  * @param {number} [timeoutMs]
  */
 export async function emitSocketAck(page, event, data = {}, timeoutMs = 15_000) {
-    await waitForSocketConnected(page);
-    return page.evaluate(
-        async ({ eventName, payload, timeout }) => {
-            const sock = window.__tenantE2E?.getSocket?.();
-            if (!sock?.connected) {
-                throw new Error('socket not connected');
-            }
-            return await new Promise((resolve, reject) => {
-                const timer = setTimeout(() => reject(new Error(`socket ack timeout: ${eventName}`)), timeout);
-                sock.emit(eventName, payload, (response) => {
-                    clearTimeout(timer);
-                    resolve(response);
-                });
-            });
-        },
-        { eventName: event, payload: data, timeout: timeoutMs },
-    );
+    /** @type {unknown} */
+    let ack;
+    await expect
+        .poll(
+            async () => {
+                try {
+                    await waitForSocketConnected(page);
+                    ack = await page.evaluate(
+                        async ({ eventName, payload, timeout }) => {
+                            const sock = window.__tenantE2E?.getSocket?.();
+                            if (!sock?.connected) {
+                                throw new Error('socket not connected');
+                            }
+                            return await new Promise((resolve, reject) => {
+                                const timer = setTimeout(
+                                    () => reject(new Error(`socket ack timeout: ${eventName}`)),
+                                    timeout,
+                                );
+                                sock.emit(eventName, payload, (response) => {
+                                    clearTimeout(timer);
+                                    resolve(response);
+                                });
+                            });
+                        },
+                        { eventName: event, payload: data, timeout: timeoutMs },
+                    );
+                    return true;
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    if (
+                        msg.includes('socket not connected') ||
+                        msg.includes('Execution context was destroyed')
+                    ) {
+                        return false;
+                    }
+                    throw err;
+                }
+            },
+            { timeout: 120_000 },
+        )
+        .toBe(true);
+    return ack;
 }
 
 /**

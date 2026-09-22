@@ -525,6 +525,7 @@ class TenantMetaverseApp {
                 onInvisibleChange: (enabled) => {
                     if (this.networkManager) {
                         this.networkManager.setAdminInvisible(enabled);
+                        this.networkManager.flushPlayerUpdate?.(this.characterController);
                     }
                     this.refreshLocalAvatarVisibility();
                 },

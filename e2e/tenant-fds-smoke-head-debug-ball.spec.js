@@ -113,65 +113,40 @@ async function expectMetaverseStableForFds(page) {
 }
 
 /**
- * school 定義から FDS smoke を読み込み、エントリが揃うまで待つ（ロビー自動読込も許容）
+ * school 定義から FDS smoke を1回だけ起動し、エントリが揃うまで poll する
  * @param {import('@playwright/test').Page} page
  * @param {string} worldId
  */
 async function loadSchoolFdsSmokeWhenStable(page, worldId) {
-    let schoolLoadTriggered = false;
-    let pollCount = 0;
-    const lobbyAutoloadPolls = 40;
-
     await expect
         .poll(
             async () => {
-                pollCount += 1;
                 try {
-                    const status = await page.evaluate(
-                        async ({ id, runSchoolLoad }) => {
-                            const e2e = window.__tenantE2E;
-                            if (!e2e?.loadFdsSmokeFromWorld) {
-                                return 'wait-harness';
-                            }
-                            if (e2e.fdsSmokeHasEntries()) {
-                                return 'ready';
-                            }
-                            if (!runSchoolLoad) {
-                                return 'wait-load';
-                            }
-                            await e2e.loadFdsSmokeFromWorld(id);
-                            return e2e.fdsSmokeHasEntries() ? 'ready' : 'wait-load';
-                        },
-                        {
-                            id: worldId,
-                            runSchoolLoad:
-                                schoolLoadTriggered ||
-                                pollCount > lobbyAutoloadPolls,
-                        },
-                    );
-
-                    if (status === 'wait-harness' || status === 'wait-load') {
-                        if (
-                            status === 'wait-load' &&
-                            !schoolLoadTriggered &&
-                            pollCount > lobbyAutoloadPolls
-                        ) {
-                            schoolLoadTriggered = true;
+                    return await page.evaluate(async (id) => {
+                        const e2e = window.__tenantE2E;
+                        if (!e2e?.loadFdsSmokeFromWorld) {
+                            return false;
                         }
-                        return false;
-                    }
-                    return status === 'ready';
+                        if (e2e.fdsSmokeHasEntries()) {
+                            return true;
+                        }
+                        if (!window.__e2eHeadDebugSchoolLoadStarted) {
+                            window.__e2eHeadDebugSchoolLoadStarted = true;
+                            void e2e.loadFdsSmokeFromWorld(id).catch(() => {
+                                window.__e2eHeadDebugSchoolLoadStarted = false;
+                            });
+                        }
+                        return e2e.fdsSmokeHasEntries();
+                    }, worldId);
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);
                     if (msg.includes('Execution context was destroyed')) {
-                        schoolLoadTriggered = false;
-                        pollCount = 0;
                         return false;
                     }
                     throw err;
                 }
             },
-            { timeout: 600_000 },
+            { timeout: 300_000 },
         )
         .toBe(true);
 }
@@ -185,7 +160,7 @@ test.describe('FDS smoke head debug ball (ボール1台)', () => {
         page,
         request,
     }) => {
-        test.setTimeout(900_000);
+        test.setTimeout(600_000);
 
         const zipPath = process.env.FUGAKU_SMOKE_ZIP || DEFAULT_ZIP;
         await ensureSimulationUploaded(request, zipPath);
@@ -209,7 +184,7 @@ test.describe('FDS smoke head debug ball (ボール1台)', () => {
         const manifestPromise = page
             .waitForResponse(
                 (res) => res.url().includes(MANIFEST_PATH) && res.ok(),
-                { timeout: 600_000 },
+                { timeout: 300_000 },
             )
             .catch(() => null);
 

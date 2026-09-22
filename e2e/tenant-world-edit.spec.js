@@ -118,7 +118,15 @@ test.describe('tenant world edit', () => {
 
         const lobbyItem = page.locator('#world-list .item').filter({ hasText: /lobby/i });
         await lobbyItem.click();
-        await page.locator('#spawn-x').fill(String(marker));
+        await page.locator('.we-right-category-btn[data-we-right-category="settings"]').click();
+        await page
+            .locator('#panel-spawn details')
+            .filter({ hasText: 'スポーン位置' })
+            .locator('summary')
+            .click();
+        const spawnX = page.locator('#spawn-x');
+        await expect(spawnX).toBeVisible();
+        await spawnX.fill(String(marker));
         await expect(page.locator('#spawn-x')).toHaveValue(String(marker));
     });
 });

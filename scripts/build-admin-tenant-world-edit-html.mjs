@@ -14,6 +14,10 @@ const body = fs
         'class="admin-panel admin-panel-world-edit active"'
     );
 
+const importMapJson = fs
+    .readFileSync(path.join(ROOT, 'public', 'js', 'world-edit-importmap.json'), 'utf8')
+    .trim();
+
 const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -24,16 +28,7 @@ const html = `<!DOCTYPE html>
     <link rel="stylesheet" href="/metaverse-simple-static/css/admin.css">
     <link rel="stylesheet" href="/metaverse-simple-static/css/setting.css">
     <link rel="stylesheet" href="/css/admin-tenant-world-edit.css">
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-            "three/examples/jsm/utils/BufferGeometryUtils": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js"
-        }
-    }
-    </script>
+    <script type="importmap">${importMapJson}</script>
 </head>
 <body>
     <div id="admin-chart-save-toast" class="admin-chart-save-toast" role="status" aria-live="polite" hidden></div>
