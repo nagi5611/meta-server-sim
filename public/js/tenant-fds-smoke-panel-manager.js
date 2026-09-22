@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import {
     createFdsSmokeControlPanelMesh,
+    ensureFdsSmokeButtonPanel,
     fdsSmokePanelUvHitsButton,
     isFdsSmokePanelButton,
     normalizeFdsSmokePanelEntry,
@@ -65,7 +66,8 @@ export class TenantFdsSmokePanelManager {
     loadForWorld(world) {
         this.disposePanels();
         const buttons = Array.isArray(world?.fdsSmokeButtons) ? world.fdsSmokeButtons : [];
-        for (const btn of buttons) {
+        for (const raw of buttons) {
+            const btn = ensureFdsSmokeButtonPanel(raw);
             if (!isFdsSmokePanelButton(btn)) continue;
             const config = normalizeFdsSmokePanelEntry(btn);
             if (!config) continue;

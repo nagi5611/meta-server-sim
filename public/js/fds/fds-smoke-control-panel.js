@@ -26,6 +26,38 @@ const COLOR_BTN_HOVER = '#2a9d62';
 const COLOR_BTN_BORDER = '#7dffb8';
 const COLOR_BTN_TEXT = '#f0fff6';
 
+/** 再生ボタンに付与する既定の in-world パネル設定 */
+export const DEFAULT_FDS_SMOKE_BUTTON_PANEL = Object.freeze({
+    rotation: { x: 0, y: 180, z: 0 },
+    scale: { x: 1.4, y: 1.4, z: 1 },
+    maxDistance: 18,
+});
+
+/**
+ * panel 未設定の再生ボタンに既定パネルを付与する（panel: false は近接 E のみ）
+ * @param {object} btn
+ * @returns {object}
+ */
+export function ensureFdsSmokeButtonPanel(btn) {
+    if (!btn || typeof btn !== 'object') {
+        return btn;
+    }
+    if (btn.panel === false) {
+        return btn;
+    }
+    if (btn.panel != null && typeof btn.panel === 'object') {
+        return btn;
+    }
+    return {
+        ...btn,
+        panel: {
+            rotation: { ...DEFAULT_FDS_SMOKE_BUTTON_PANEL.rotation },
+            scale: { ...DEFAULT_FDS_SMOKE_BUTTON_PANEL.scale },
+            maxDistance: DEFAULT_FDS_SMOKE_BUTTON_PANEL.maxDistance,
+        },
+    };
+}
+
 /**
  * fdsSmokeButtons エントリが in-world パネル操作か
  * @param {object | null | undefined} btn

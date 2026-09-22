@@ -55,6 +55,23 @@ export async function enableDeveloperMode(page) {
 /** FDS 煙ヘッドデバッグ球の mesh 名 */
 export const FDS_SMOKE_HEAD_DEBUG_MESH_NAME = 'fds-smoke-head-debug';
 
+/** in-world 煙再生パネルの mesh 名 */
+export const FDS_SMOKE_CONTROL_PANEL_MESH_NAME = 'fds-smoke-control-panel';
+
+/**
+ * シーン内の煙再生パネル数（__tenantE2E 必須）
+ * @param {import('@playwright/test').Page} page
+ */
+export async function getFdsSmokeControlPanelCounts(page) {
+    return page.evaluate((meshName) => {
+        const e2e = window.__tenantE2E;
+        if (!e2e?.countMeshesNamed) {
+            throw new Error('__tenantE2E.countMeshesNamed missing — use installTenantE2EHarness');
+        }
+        return e2e.countMeshesNamed(meshName);
+    }, FDS_SMOKE_CONTROL_PANEL_MESH_NAME);
+}
+
 /**
  * シーン内のヘッドデバッグ球数（__tenantE2E 必須）
  * @param {import('@playwright/test').Page} page

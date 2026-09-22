@@ -1,4 +1,5 @@
 // public/js/tenant-world-edit-fds-snapshot.js — ワールド編集 editGroup から FDS 設定を抽出
+import { ensureFdsSmokeButtonPanel } from './fds/fds-smoke-control-panel.js';
 
 /**
  * editGroup から FDS 煙・再生ボタン設定をスナップショットする（ギズモ位置を反映）
@@ -25,7 +26,9 @@ export function collectFdsWorldSnapshotFromEditGroup(editGroup) {
             fdsSmokes.push(s);
         }
         if (child.userData?.fdsSmokeButtonConfig) {
-            const b = JSON.parse(JSON.stringify(child.userData.fdsSmokeButtonConfig));
+            const b = ensureFdsSmokeButtonPanel(
+                JSON.parse(JSON.stringify(child.userData.fdsSmokeButtonConfig)),
+            );
             b.position = { x: child.position.x, y: child.position.y, z: child.position.z };
             fdsSmokeButtons.push(b);
         }

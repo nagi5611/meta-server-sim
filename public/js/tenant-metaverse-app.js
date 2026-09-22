@@ -33,7 +33,7 @@ import { DEFAULT_HDR_PATH } from '../../../metaverse-simple/public/js/ibl-setup.
 import { TenantFdsSmokeManager } from './tenant-fds-smoke-manager.js';
 import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
 import { TenantFdsSmokeExposureMonitor } from './tenant-fds-smoke-exposure.js';
-import { isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
+import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
 import { TenantFdsSmokePanelManager } from './tenant-fds-smoke-panel-manager.js';
 import { fetchAdminMetaverseEntry } from '../../../metaverse-simple/public/js/admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
@@ -164,7 +164,8 @@ class TenantMetaverseApp {
 
         this.teleportManager.clearFdsSmokeInteractZonesForWorld(worldId);
         const buttons = Array.isArray(world?.fdsSmokeButtons) ? world.fdsSmokeButtons : [];
-        for (const btn of buttons) {
+        for (const raw of buttons) {
+            const btn = ensureFdsSmokeButtonPanel(raw);
             if (!btn?.fdsSmokeId || !btn.position) continue;
             if (isFdsSmokePanelButton(btn)) continue;
             this.teleportManager.addFdsSmokeInteractZone({

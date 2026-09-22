@@ -101,8 +101,8 @@
     ],
     "spawnPoint": {
       "x": 0,
-      "y": 10,
-      "z": 0
+      "y": 1,
+      "z": 5
     },
     "lights": [
       {
@@ -151,34 +151,7 @@
     ],
     "pdfs": [],
     "flightBoards": [],
-    "fdsSmokes": [
-      {
-        "id": "fugaku-prod01-smoke",
-        "manifest": "simulations/fugaku-prod01/manifest.json",
-        "position": {
-          "x": 40,
-          "y": 20,
-          "z": 15
-        },
-        "rotation": {
-          "x": 0,
-          "y": 0,
-          "z": 0
-        },
-        "scale": 1,
-        "mirror": {
-          "x": false,
-          "y": false,
-          "z": false
-        },
-        "playback": {
-          "autoplay": false,
-          "startAtEnd": true,
-          "loop": false,
-          "secondsPerFrame": 1
-        }
-      }
-    ],
+    "fdsSmokes": [],
     "fdsSmokeButtons": [],
     "vdbs": [],
     "floorEnabled": false,
@@ -221,8 +194,8 @@
     ],
     "spawnPoint": {
       "x": 27,
-      "y": 10,
-      "z": 15
+      "y": 5,
+      "z": 20
     },
     "lights": [
       {
@@ -296,20 +269,12 @@
         "fdsSmokeId": "fugaku-prod01-smoke",
         "position": {
           "x": 26.94456725160255,
-          "y": 1.35,
-          "z": 15.320683172032496
+          "y": 1.8994004055364115,
+          "z": 21.677761644385267
         },
         "panel": {
-          "rotation": {
-            "x": 0,
-            "y": 180,
-            "z": 0
-          },
-          "scale": {
-            "x": 1.4,
-            "y": 1.4,
-            "z": 1
-          },
+          "rotation": { "x": 0, "y": 180, "z": 0 },
+          "scale": { "x": 1.4, "y": 1.4, "z": 1 },
           "maxDistance": 18
         },
         "playback": {

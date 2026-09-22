@@ -39,4 +39,22 @@ describe('tenant-world-edit-fds-smoke-panel', () => {
         assert.equal(snap.fdsSmokeButtons.length, 1);
         assert.deepEqual(snap.fdsSmokeButtons[0].position, { x: 4, y: 5, z: 6 });
     });
+
+    it('collectFdsWorldSnapshotFromEditGroup adds default panel when missing', () => {
+        const editGroup = {
+            children: [
+                {
+                    position: { x: 0, y: 1, z: 2 },
+                    userData: {
+                        fdsSmokeButtonConfig: {
+                            id: 'btn-2',
+                            fdsSmokeId: 'smoke-a',
+                        },
+                    },
+                },
+            ],
+        };
+        const snap = collectFdsWorldSnapshotFromEditGroup(editGroup);
+        assert.equal(snap.fdsSmokeButtons[0].panel?.maxDistance, 18);
+    });
 });
