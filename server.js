@@ -217,6 +217,11 @@ app.get('/api/client-config', (req, res) => {
 
 app.use(express.static(STATIC_DIR, { index: false }));
 
+const PUBLIC_DIR = path.join(__dirname, 'public');
+/** Production dist omits public/css and public/js; mount before /:tenantId to avoid tenantId=css|js. */
+app.use('/css', express.static(path.join(PUBLIC_DIR, 'css'), { index: false }));
+app.use('/js', express.static(path.join(PUBLIC_DIR, 'js'), { index: false }));
+
 
 
 app.get('/', (_req, res) => {
