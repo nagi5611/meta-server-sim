@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# mmh-virtual.jp の A レコードを自宅グローバル IPv4 に同期（Xserver ドメイン API）
-# 必要: XSERVER_API_TOKEN（Bearer）
-# 任意: /etc/mmh-virtual/xserver-ddns.env を読み込む
+# mmh-virtual.jp の A レコードを自宅グローバル IPv4 に同期
+# 権威 DNS が Xserver レンタルサーバー (ns*.xserver.jp) の場合は Server API を使う（必須）
 set -euo pipefail
 
 CONFIG_ENV="${MMH_DDNS_ENV:-/etc/mmh-virtual/xserver-ddns.env}"
@@ -13,11 +12,12 @@ if [[ -f "$CONFIG_ENV" ]]; then
 fi
 
 DOMAIN="${XSERVER_DNS_DOMAIN:-mmh-virtual.jp}"
-API_BASE="${XSERVER_API_BASE:-https://api.xserver.ne.jp/v1/domain}"
+# server = レンタルサーバー DNS（ns*.xserver.jp）。domain = XserverドメインAPI（権威と一致しない場合あり）
+API_MODE="${XSERVER_API_MODE:-server}"
+SERVER_NAME="${XSERVER_SERVER_NAME:-}"
 STATE_DIR="${MMH_DDNS_STATE_DIR:-/var/lib/mmh-virtual-ddns}"
 STATE_FILE="${STATE_DIR}/current-ipv4.txt"
 IPV4_URL="${MMH_DDNS_IPV4_URL:-https://ipv4.icanhazip.com}"
-# nginx 本番サブドメイン（ホスト名部分のみ）
 DEFAULT_HOSTS="meta,metair,sim,metapre,metadogo,metaprehub"
 HOSTS_CSV="${MMH_DDNS_HOSTS:-$DEFAULT_HOSTS}"
 
@@ -27,6 +27,11 @@ log() {
 
 if [[ -z "${XSERVER_API_TOKEN:-}" ]]; then
   log "ERROR: XSERVER_API_TOKEN unset (see ${CONFIG_ENV}.example)"
+  exit 1
+fi
+
+if [[ "$API_MODE" == "server" && -z "$SERVER_NAME" ]]; then
+  log "ERROR: set XSERVER_SERVER_NAME (e.g. xs123456.xsrv.jp) for server API mode"
   exit 1
 fi
 
@@ -48,106 +53,93 @@ if [[ -f "$STATE_FILE" ]] && [[ "$(cat "$STATE_FILE")" == "$current_ip" ]]; then
   exit 0
 fi
 
-log "public IPv4=${current_ip} (updating Xserver DNS)"
+log "public IPv4=${current_ip} mode=${API_MODE} (updating DNS)"
 
-auth=(-H "Authorization: Bearer ${XSERVER_API_TOKEN}" -H "Content-Type: application/json")
-list_json=$(curl -fsS "${API_BASE}/${DOMAIN}/dns" "${auth[@]}") || {
-  log "ERROR: GET DNS list failed"
-  exit 1
-}
-
-export LIST_JSON="$list_json"
-export HOSTS_CSV="$HOSTS_CSV"
-export CURRENT_IP="$current_ip"
-export API_BASE="$API_BASE"
-export DOMAIN="$DOMAIN"
-
-updates=$(python3 <<'PY'
-import json, os, sys, urllib.request
-
-list_json = os.environ["LIST_JSON"]
-hosts = [h.strip() for h in os.environ["HOSTS_CSV"].split(",") if h.strip()]
-current_ip = os.environ["CURRENT_IP"]
-data = json.loads(list_json)
-records = data.get("records") or []
-
-by_host = {}
-for r in records:
-    if r.get("type") == "A":
-        by_host[r.get("host", "")] = r
-
-plan = []
-for host in hosts:
-    rec = by_host.get(host)
-    if not rec:
-        plan.append({"action": "create", "host": host, "content": current_ip})
-        continue
-    if rec.get("content") == current_ip:
-        continue
-    plan.append({
-        "action": "update",
-        "host": host,
-        "id": rec["id"],
-        "old": rec.get("content"),
-        "content": current_ip,
-    })
-
-print(json.dumps(plan))
-PY
-)
-
-if [[ "$updates" == "[]" ]]; then
-  log "all A records already ${current_ip}"
-  echo "$current_ip" >"$STATE_FILE"
-  exit 0
-fi
-
-export UPDATES_PLAN="$updates"
+export XSERVER_API_TOKEN
+export DOMAIN HOSTS_CSV current_ip API_MODE SERVER_NAME
 
 python3 <<'PY'
-import json, os, sys, urllib.error, urllib.request
+import json, os, urllib.error, urllib.parse, urllib.request
 
-plan = json.loads(os.environ["UPDATES_PLAN"])
 token = os.environ["XSERVER_API_TOKEN"]
 domain = os.environ["DOMAIN"]
-api_base = os.environ["API_BASE"]
+hosts = [h.strip() for h in os.environ["HOSTS_CSV"].split(",") if h.strip()]
+current_ip = os.environ["current_ip"]
+mode = os.environ["API_MODE"]
+server_name = os.environ.get("SERVER_NAME", "")
 
-def api(method, url, body=None):
-    data = None
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    if body is not None:
-        data = json.dumps(body).encode()
+headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+
+def request(method, url, body=None):
+    data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read().decode()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode()
+        raise SystemExit(f"HTTP {e.code} {url}: {err}")
 
-for item in plan:
-    host = item["host"]
-    if item["action"] == "create":
-        api(
-            "POST",
-            f"{api_base}/{domain}/dns",
-            {
-                "type": "A",
-                "host": host,
-                "content": item["content"],
-                "ttl": 3600,
-                "priority": 0,
-            },
-        )
-        print(f"created A {host} -> {item['content']}")
-    else:
-        api(
+
+if mode == "server":
+    q = urllib.parse.urlencode({"domain": domain})
+    list_url = f"https://api.xserver.ne.jp/v1/server/{server_name}/dns?{q}"
+    data = request("GET", list_url)
+    records = [r for r in data.get("records", []) if r.get("type") == "A" and r.get("domain") == domain]
+    by_host = {r.get("host"): r for r in records}
+    for host in hosts:
+        rec = by_host.get(host)
+        if not rec:
+            request(
+                "POST",
+                f"https://api.xserver.ne.jp/v1/server/{server_name}/dns",
+                {
+                    "domain": domain,
+                    "host": host,
+                    "type": "A",
+                    "content": current_ip,
+                    "ttl": 3600,
+                },
+            )
+            print(f"created A {host}.{domain} -> {current_ip}")
+            continue
+        if rec.get("content") == current_ip:
+            print(f"ok A {host}.{domain} already {current_ip}")
+            continue
+        rid = rec["id"]
+        request(
             "PUT",
-            f"{api_base}/{domain}/dns/{item['id']}",
-            {"content": item["content"]},
+            f"https://api.xserver.ne.jp/v1/server/{server_name}/dns/{rid}",
+            {"content": current_ip},
         )
-        print(
-            f"updated A {host} {item.get('old')} -> {item['content']} (id={item['id']})"
-        )
+        print(f"updated A {host}.{domain} {rec.get('content')} -> {current_ip} (id={rid})")
+else:
+    api_base = "https://api.xserver.ne.jp/v1/domain"
+    data = request("GET", f"{api_base}/{domain}/dns")
+    by_host = {r.get("host"): r for r in data.get("records", []) if r.get("type") == "A"}
+    for host in hosts:
+        rec = by_host.get(host)
+        if not rec:
+            request(
+                "POST",
+                f"{api_base}/{domain}/dns",
+                {
+                    "type": "A",
+                    "host": host,
+                    "content": current_ip,
+                    "ttl": 3600,
+                    "priority": 0,
+                },
+            )
+            print(f"created A {host} -> {current_ip}")
+        elif rec.get("content") != current_ip:
+            request(
+                "PUT",
+                f"{api_base}/{domain}/dns/{rec['id']}",
+                {"content": current_ip},
+            )
+            print(f"updated A {host} {rec.get('content')} -> {current_ip}")
 PY
 
 echo "$current_ip" >"$STATE_FILE"
