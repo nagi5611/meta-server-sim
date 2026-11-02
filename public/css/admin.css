@@ -1,4 +1,12 @@
 
+.admin-panel {
+    display: none;
+}
+
+.admin-panel.active {
+    display: block;
+}
+
 .fleet-ops-section .fleet-active-ok {
     color: #15803d;
     font-weight: 600;

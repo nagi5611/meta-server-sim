@@ -13,9 +13,12 @@
             <a class="admin-nav-back" href="/admin.html" title="Tenant 一覧へ戻る">
                 <i class="bi bi-arrow-left"></i> 一覧へ戻る
             </a>
-            <span class="admin-nav-item active" aria-current="page">
+            <button type="button" class="admin-nav-item" data-tenant-panel="overview">
                 <i class="bi bi-building"></i> 概要
-            </span>
+            </button>
+            <button type="button" class="admin-nav-item" data-tenant-panel="plugins">
+                <i class="bi bi-puzzle"></i> プラグイン
+            </button>
             <a class="admin-nav-item admin-nav-link" id="tenant-world-edit-nav" href="#">
                 <i class="bi bi-pencil-square"></i> ワールド編集
             </a>
@@ -60,7 +63,7 @@
         </header>
 
         <div class="admin-panels">
-            <div id="panel-overview" class="admin-panel active">
+            <div id="panel-overview" class="admin-panel active" data-tenant-panel-id="overview">
                 <section class="stats-section">
                     <h2>ステータス</h2>
                     <div class="stats-grid stats-grid-compact">
@@ -133,6 +136,41 @@
                         <tbody id="worlds-table-body"></tbody>
                     </table>
                     <p id="worlds-status" class="status-text" role="status"></p>
+                </section>
+            </div>
+
+            <div id="panel-plugins" class="admin-panel" data-tenant-panel-id="plugins">
+                <section class="stats-section">
+                    <div class="section-header-row">
+                        <h2>テナントプラグイン</h2>
+                        <button type="button" class="btn btn-warning btn-sm" id="tenant-plugins-reload-btn">
+                            プラグイン Reload
+                        </button>
+                    </div>
+                    <p class="hint">
+                        有効化後は <strong>Reload</strong> が必要です。HTTP API は
+                        <code>/admin/tenant/:tenantId/plugins</code> と同じです。
+                    </p>
+                    <p id="tenant-plugins-status" class="status-text" role="status"></p>
+                    <table class="worlds-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>由来</th>
+                                <th>状態</th>
+                                <th>操作</th>
+                                <th>設定</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tenant-plugins-table-body">
+                            <tr><td colspan="5">読み込み中…</td></tr>
+                        </tbody>
+                    </table>
+                    <div id="tenant-plugin-config-panel" class="stats-section" hidden>
+                        <h3>設定: <code id="tenant-plugin-config-plugin-id"></code></h3>
+                        <div id="tenant-plugin-config-form"></div>
+                        <button type="button" class="btn btn-primary btn-sm" id="tenant-plugin-config-save-btn">保存</button>
+                    </div>
                 </section>
             </div>
         </div>
