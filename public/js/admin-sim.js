@@ -1,4 +1,5 @@
 // public/js/admin-sim.js — プラットフォーム管理ランディング（Tenant 一覧）
+import '../css/admin.css';
 import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';

@@ -1,4 +1,5 @@
 // public/js/admin-tenant.js — Tenant 別管理パネル
+import '../css/admin.css';
 import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';
