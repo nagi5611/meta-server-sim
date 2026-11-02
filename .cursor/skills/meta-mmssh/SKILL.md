@@ -100,6 +100,15 @@ HTTPS / Tunnel のホスト名は Cloudflare 側。mediasoup UDP は **数値の
 
 IP 変更で restart したときは `/etc/mmh-virtual/metasim-mediasoup-ip.env` の **`METASIM_MEDIASOUP_IP_WEBHOOK_URL`** へ JSON POST（`content` / `text` に同文）。
 
+## git pull 後の自動ビルド・再起動
+
+| 項目 | 内容 |
+|------|------|
+| サービス | **`metasim-server`**（mediasoup / sim API） |
+| post-pull | `scripts/metasim-production-post-pull.sh` — `npm ci`, `npm rebuild`, `npm run build`, `systemctl restart metasim-server` |
+| 推奨 | `sudo /usr/local/bin/metasim-production-git-sync.sh`（pull + post-pull） |
+| フック | `install-metasim-production-git-hook.sh` → `.git/hooks/post-merge`（main の pull 後、`nagi` から passwordless sudo で post-pull） |
+
 ## スクリプト
 
 | ファイル | 用途 |
