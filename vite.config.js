@@ -140,6 +140,7 @@ export default defineConfig({
                     });
                 },
             },
+            [`^/${TENANT_SEGMENT}/addons-client`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/?$`]: tenantProxy,
         },
     },
