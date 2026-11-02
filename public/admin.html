@@ -121,6 +121,9 @@
                 <button type="button" class="admin-settings-subnav-item" data-settings-tab="network">
                     <i class="bi bi-diagram-3"></i> ネットワーク
                 </button>
+                <button type="button" class="admin-settings-subnav-item" data-settings-tab="fleet">
+                    <i class="bi bi-hdd-network"></i> 系列 Fleet
+                </button>
                 <button type="button" class="admin-settings-subnav-item" data-settings-tab="code">
                     <i class="bi bi-code-slash"></i> JSON
                 </button>
@@ -224,6 +227,44 @@
                 </div>
 
                 <p id="network-config-error" class="form-error" hidden></p>
+            </section>
+            </div>
+
+            <div class="admin-settings-tab" data-settings-tab-id="fleet">
+            <section class="stats-section fleet-ops-section">
+                <div class="section-header-row">
+                    <h2>系列サーバー Fleet（統合 ops）</h2>
+                    <button type="button" class="btn btn-secondary btn-sm" id="fleet-refresh-btn">
+                        <i class="bi bi-arrow-clockwise"></i> 状態更新
+                    </button>
+                </div>
+                <p class="hint hint-compact">
+                    meta / metair / metasim / metapre / metadogo の systemd と各コア <code>.env</code>
+                    （IP・ポート・mediasoup）を一括管理。MCP: <code>npm run mcp:fleet</code>
+                </p>
+                <div id="fleet-ops-disabled-banner" class="env-config-banner" hidden></div>
+                <p id="fleet-ops-status" class="hint hint-compact"></p>
+                <table class="tenants-table fleet-cores-table">
+                    <thead>
+                        <tr>
+                            <th>コア</th>
+                            <th>systemd</th>
+                            <th>公開</th>
+                            <th>状態</th>
+                            <th>env</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fleet-cores-body"></tbody>
+                </table>
+                <div id="fleet-env-editor" class="fleet-env-editor" hidden>
+                    <h3 id="fleet-env-editor-title">環境変数</h3>
+                    <div id="fleet-env-fields" class="fleet-env-fields"></div>
+                    <div class="fleet-env-editor-actions">
+                        <button type="button" class="btn btn-primary btn-sm" id="fleet-env-save-btn">保存</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="fleet-env-cancel-btn">閉じる</button>
+                    </div>
+                </div>
             </section>
             </div>
 

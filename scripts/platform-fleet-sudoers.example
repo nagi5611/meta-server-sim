@@ -1,0 +1,4 @@
+# Passwordless sudo for MetaSim fleet ops (install on production as root)
+# visudo -cf /etc/sudoers.d/platform-fleet-ops
+
+nagi ALL=(root) NOPASSWD: /home/nagi/sim-server/meta-server-sim/scripts/platform-fleet-systemctl.sh *

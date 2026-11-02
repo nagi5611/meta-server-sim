@@ -109,6 +109,8 @@ IP 変更で restart したときは `/etc/mmh-virtual/metasim-mediasoup-ip.env`
 | 推奨 | `sudo /usr/local/bin/metasim-production-git-sync.sh`（pull + post-pull） |
 | フック | `install-metasim-production-git-hook.sh` → `.git/hooks/post-merge`（main の pull 後、`nagi` から passwordless sudo で post-pull） |
 
+**系列 Fleet（Stage B）:** 管理画面 **設定 → 系列 Fleet**、`docs/fleet-ops.md`、`npm run mcp:fleet`。本番は `scripts/install-platform-fleet-ops.sh` で sudoers。
+
 ## スクリプト
 
 | ファイル | 用途 |

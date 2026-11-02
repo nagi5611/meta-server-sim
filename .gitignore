@@ -50,6 +50,7 @@ data/*
 !data/platform/
 data/platform/*
 !data/platform/network-config.example.json
+!data/platform/fleet-registry.json
 
 # Test / coverage
 test-results/
