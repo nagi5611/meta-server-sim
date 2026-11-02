@@ -56,24 +56,33 @@ Dashboard: Cloud Agent の Environment → **Secrets** に `META_MMH_VIRTUAL_SSH
 
 ## Xserver DNS 自動更新（変動グローバル IP）
 
-自宅回線の IPv4 変更時に **mmh-virtual.jp** の A レコードを Xserver ドメイン API で更新する。
+自宅回線の IPv4 変更時に **mmh-virtual.jp** の A レコードを更新する。
 
-| 種別 | 変数名 / パス | 説明 |
-|------|----------------|------|
-| **Secret（本番サーバー）** | `/etc/mmh-virtual/xserver-ddns.env` 内 **`XSERVER_API_TOKEN`** | Bearer トokens（git 禁止、chmod 600） |
-| **Secret（Agent 用・任意）** | `XSERVER_API_TOKEN` | リモートから手動実行するとき |
-| スクリプト | `scripts/mmh-virtual-xserver-ddns.sh` | 5 分 cron 用 |
-| インストール | `sudo bash scripts/install-mmh-virtual-xserver-ddns.sh` | `/usr/local/bin` + `/etc/cron.d/` |
+### 重要（プラン・API の種類）
 
-既定で更新するホスト: `meta`, `metair`, `sim`, `metapre`, `metadogo`, `metaprehub`（`MMH_DDNS_HOSTS` で変更）。
+| 項目 | 内容 |
+|------|------|
+| 権威 DNS | **ns1〜5.xserver.jp**（レンタルサーバーの DNS レコード設定） |
+| **Server API** | 上記を API 更新。**学生（有料版）等は API キーにサーバーを追加できず利用不可** |
+| **Domain API** | Xserver ドメイン製品向け。**権威 DNS と一致しない場合あり**（自動更新の主経路にしない） |
+
+本番例: サーバー **buildtc.xsrv.jp**、ホスト名 **sv16902.xserver.jp**（API の `servername` は `buildtc.xsrv.jp`）。
+
+| 種別 | 変数 / パス |
+|------|-------------|
+| 本番 Secret | `/etc/mmh-virtual/xserver-ddns.env` の **`XSERVER_API_TOKEN`** |
+| サーバー ID | **`XSERVER_SERVER_NAME=buildtc.xsrv.jp`** |
+| モード | **`XSERVER_API_MODE=server`**（API 非対応プランでは 403） |
+
+Server API が使えないときは **サーバーパネル → DNSレコード設定 → mmh-virtual.jp** で `meta` / `metair` / **`sim`** 等の **A → 自宅 IPv4** を手動更新。反映確認:
 
 ```bash
-# 本番（token 設定後）
-sudo /usr/local/bin/mmh-virtual-xserver-ddns.sh
-sudo tail -20 /var/log/mmh-virtual-xserver-ddns.log
+dig @ns1.xserver.jp sim.mmh-virtual.jp A +short
 ```
 
-API 仕様: [Xserver ドメイン API – DNS](https://developer.xserver.ne.jp/api/domain/)
+スクリプト・cron（API 対応プラン時）: `scripts/mmh-virtual-xserver-ddns.sh`, `install-mmh-virtual-xserver-ddns.sh`
+
+API 仕様: [Server API DNS](https://developer.xserver.ne.jp/api/server/) / [Domain API DNS](https://developer.xserver.ne.jp/api/domain/)
 
 ## スクリプト
 

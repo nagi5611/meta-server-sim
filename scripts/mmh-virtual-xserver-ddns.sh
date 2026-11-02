@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # mmh-virtual.jp の A レコードを自宅グローバル IPv4 に同期
-# 権威 DNS が Xserver レンタルサーバー (ns*.xserver.jp) の場合は Server API を使う（必須）
+# 権威 DNS が ns*.xserver.jp のときはレンタルサーバー DNS を更新する必要がある。
+# Server API はプランにより利用不可（学生（有料版）等）→ サーバーパネル手動 or プラン変更。
 set -euo pipefail
 
 CONFIG_ENV="${MMH_DDNS_ENV:-/etc/mmh-virtual/xserver-ddns.env}"
@@ -79,6 +80,13 @@ def request(method, url, body=None):
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         err = e.read().decode()
+        if e.code == 403 and "FORBIDDEN" in err:
+            raise SystemExit(
+                "HTTP 403: API key cannot use Server API. "
+                "Student (paid) and some plans cannot select servers in API settings. "
+                "Update A records in server panel (DNSレコード設定) or upgrade plan. "
+                f"Detail: {err}"
+            )
         raise SystemExit(f"HTTP {e.code} {url}: {err}")
 
 
