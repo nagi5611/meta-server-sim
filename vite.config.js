@@ -92,6 +92,10 @@ export default defineConfig({
                 replacement: simpleMetaverseI18n,
             },
             {
+                find: '/js/three-cdn-entry.js',
+                replacement: path.join(projectRoot, 'node_modules/three/build/three.module.js'),
+            },
+            {
                 find: 'mediasoup-client',
                 replacement: path.join(simpleRoot, 'node_modules/mediasoup-client/lib/index.js'),
             },
