@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 系列コア向け mediasoup 公衆 IP 同期 cron をインストール（root）。DDNS は使わない。
-# Usage: sudo install-mediasoup-announced-ip-sync.sh <metasim|meta|metair>
+# Usage: sudo install-mediasoup-announced-ip-sync.sh <metasim|metasim-staging|meta|metair>
 set -euo pipefail
 
 CORE="${1:-}"
 if [[ -z "$CORE" ]]; then
-  echo "usage: $0 <metasim|meta|metair>" >&2
+  echo "usage: $0 <metasim|metasim-staging|meta|metair>" >&2
   exit 2
 fi
 
@@ -17,6 +17,9 @@ ENV_DIR="/etc/mmh-virtual"
 case "$CORE" in
   metasim)
     ENV_BASENAME="metasim-mediasoup-ip"
+    ;;
+  metasim-staging)
+    ENV_BASENAME="metasim-staging-mediasoup-ip"
     ;;
   meta)
     ENV_BASENAME="meta-mediasoup-ip"
@@ -64,3 +67,7 @@ chmod 644 "$LOG_FILE"
 echo "install: core=${CORE} cron=${CRON_FILE} (every 5 minutes)"
 echo "install: log ${LOG_FILE}"
 echo "install: test: METASIM_MEDIASOUP_IP_ENV=${ENV_FILE} METASIM_MEDIASOUP_IP_DRY_RUN=1 ${INSTALL_BIN}"
+
+if [[ -x "${REPO_DIR}/scripts/sync-mediasoup-ip-webhook-env.sh" ]]; then
+  "${REPO_DIR}/scripts/sync-mediasoup-ip-webhook-env.sh" || true
+fi

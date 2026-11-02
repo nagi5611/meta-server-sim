@@ -91,14 +91,14 @@ configured_ip=""
 configured_ip=$(grep -E '^MEDIASOUP_ANNOUNCED_IP=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)
 
 if [[ "$configured_ip" == "$current_ip" ]]; then
-  log "unchanged MEDIASOUP_ANNOUNCED_IP=${current_ip}"
+  log "unchanged MEDIASOUP_ANNOUNCED_IP=${current_ip} (webhook skipped)"
   exit 0
 fi
 
 log "MEDIASOUP_ANNOUNCED_IP ${configured_ip:-<unset>} -> ${current_ip}"
 
 if is_dry_run; then
-  log "dry-run: skip .env update and ${SERVICE_NAME} restart"
+  log "dry-run: skip .env update, ${SERVICE_NAME} restart, and webhook"
   exit 0
 fi
 
