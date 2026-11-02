@@ -48,11 +48,19 @@ print(json.dumps({
 PY
   )"
 
-  if ! curl -fsS --max-time 15 -X POST -H 'Content-Type: application/json' -d "$payload" "$url" >/dev/null; then
-    log "WARN: webhook POST failed"
-    return 1
-  fi
-  log "webhook notified"
+  local http_code
+  http_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X POST \
+    -H 'Content-Type: application/json' \
+    -d "$payload" \
+    "$url" || echo 000)
+
+  case "$http_code" in
+    200 | 204) log "webhook notified (HTTP ${http_code})" ;;
+    *)
+      log "WARN: webhook POST failed (HTTP ${http_code})"
+      return 1
+      ;;
+  esac
 }
 
 is_dry_run() {
