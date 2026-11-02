@@ -45,6 +45,7 @@ import { initPlatformRuntime } from './lib/platform-runtime.js';
 import { ensureTenantMediasoupWorkers } from './lib/tenant-socket-features.js';
 import { notifyDiscordActivity, registerActivityShutdownSignals } from './lib/discord-activity-webhook.js';
 import { startFdsSmokeBulkServer, stopFdsSmokeBulkServer } from './lib/fds-smoke-bulk-process.js';
+import { initUsersDb } from './db/users.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -342,6 +343,12 @@ async function bootHttpServer() {
         await startFdsSmokeBulkServer({ host: HOST, mainPort: PORT });
     } catch (err) {
         console.error('[fds-smoke-bulk] startup failed:', err);
+    }
+
+    try {
+        await initUsersDb();
+    } catch (err) {
+        console.error('[users] init failed:', err);
     }
 
     httpServer.listen(PORT, HOST, () => {
