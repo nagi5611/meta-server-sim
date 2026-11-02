@@ -84,6 +84,22 @@ dig @ns1.xserver.jp sim.mmh-virtual.jp A +short
 
 API 仕様: [Server API DNS](https://developer.xserver.ne.jp/api/server/) / [Domain API DNS](https://developer.xserver.ne.jp/api/domain/)
 
+## mediasoup 公衆 IP（DDNS なし）
+
+WebRTC の `MEDIASOUP_ANNOUNCED_IP` は **DNS/DDNS を更新しない**。5 分ごとに `ipv4.icanhazip.com` 等で自宅グローバル IPv4 を取得し、`.env` と不一致なら **`.env` を書き換えて `metasim-server` を restart** する。
+
+| パス / 変数 | 内容 |
+|-------------|------|
+| 設定 | `/etc/mmh-virtual/metasim-mediasoup-ip.env` |
+| 対象 `.env` | `METASIM_ENV_FILE`（既定: `/home/nagi/sim-server/meta-server-sim/.env`） |
+| cron インストール | `scripts/install-metasim-mediasoup-ip-sync.sh` |
+| 手動実行 | `/usr/local/bin/metasim-mediasoup-announced-ip-sync.sh` |
+| ログ | `/var/log/metasim-mediasoup-ip-sync.log` |
+
+HTTPS / Tunnel のホスト名は Cloudflare 側。mediasoup UDP は **数値の公衆 IP + ルータポート転送** のまま。
+
+IP 変更で restart したときは `/etc/mmh-virtual/metasim-mediasoup-ip.env` の **`METASIM_MEDIASOUP_IP_WEBHOOK_URL`** へ JSON POST（`content` / `text` に同文）。
+
 ## スクリプト
 
 | ファイル | 用途 |
