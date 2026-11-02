@@ -83,6 +83,32 @@ test.describe('tenant plugins (sample-echo)', () => {
         expect(await page.evaluate(() => window.__tenantSampleEchoLoaded === true)).toBe(true);
     });
 
+    test('arxr plugin serves static AR page and npm deps when enabled', async ({ request }) => {
+        const arxrId = 'arxr';
+        await request.post(`/admin/tenant/${TENANT_ID}/plugins/${arxrId}/enable`, {
+            headers: { 'X-Admin-CSRF': await fetchAdminCsrf(request) },
+        });
+        await request.post(`/admin/tenant/${TENANT_ID}/plugins/reload`, {
+            headers: { 'X-Admin-CSRF': await fetchAdminCsrf(request) },
+        });
+
+        const indexRes = await request.get(
+            `/${TENANT_ID}/api/tenant-plugins/${arxrId}/`
+        );
+        expect(indexRes.ok()).toBeTruthy();
+        expect(await indexRes.text()).toContain('QR-AR');
+
+        const threeRes = await request.get(
+            `/${TENANT_ID}/api/tenant-plugins/${arxrId}/deps/three/build/three.module.js`
+        );
+        expect(threeRes.ok()).toBeTruthy();
+
+        const modRes = await request.get(
+            `/${TENANT_ID}/addons-client/${arxrId}/client/game.js`
+        );
+        expect(modRes.ok()).toBeTruthy();
+    });
+
     test('double reload does not duplicate sample-echo socket hook emissions', async ({
         request,
     }) => {

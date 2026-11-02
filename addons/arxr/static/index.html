@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1220" />
+    <title>QR-AR — Open WebAR SDK</title>
+    <link rel="stylesheet" href="./ar.css" />
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./deps/three/build/three.module.js",
+            "three/examples/jsm/loaders/GLTFLoader.js": "./deps/three/examples/jsm/loaders/GLTFLoader.js",
+            "three/examples/jsm/loaders/RGBELoader.js": "./deps/three/examples/jsm/loaders/RGBELoader.js",
+            "@web-ar-studio/webar-engine-sdk": "./deps/webar/dist/index.mjs"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="qr-ar-start-guide" class="qr-ar-start-guide">
+        <div class="qr-ar-start-card">
+            <h1>QR-AR</h1>
+            <p>カメラを起動し、印刷したマーカーを映してください。マーカーの上に 3D モデルが表示されます。</p>
+            <div class="qr-ar-marker-preview">
+                <figure>
+                    <img src="./assets/trigger.jpg" alt="画像マーカー trigger.jpg" width="160" />
+                    <figcaption>画像マーカー（推奨）</figcaption>
+                </figure>
+                <figure>
+                    <img src="./assets/trigger.png" alt="QR コード trigger.png" width="120" />
+                    <figcaption>QR コード</figcaption>
+                </figure>
+            </div>
+            <p class="qr-ar-start-hint">
+                画像マーカーは斜め角度の追跡に強いです。マーカー非表示時は IMU で位置を維持します（スマホのみ）。
+                iPhone では「モーションと画面の向き」の許可が表示されます。Android では表示されない場合があります（正常です）。
+            </p>
+            <button type="button" id="qr-ar-start-image-btn" class="qr-ar-start-btn">画像マーカーで AR 開始</button>
+            <button type="button" id="qr-ar-start-qr-btn" class="qr-ar-start-btn qr-ar-start-btn-secondary">QR コードで AR 開始</button>
+            <p id="qr-ar-error" class="qr-ar-error" hidden></p>
+        </div>
+    </div>
+    <div id="qr-ar-mount" class="App"></div>
+    <div id="qr-ar-status" class="qr-ar-status" hidden>
+        <span id="qr-ar-status-text">マーカーを探しています…</span>
+    </div>
+    <script type="module" src="./ar-app.js"></script>
+</body>
+</html>

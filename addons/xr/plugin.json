@@ -1,0 +1,12 @@
+{
+    "id": "xr",
+    "version": "1.0.0",
+    "main": "server.js",
+    "engines": {
+        "meta-server-sim": "^1.0.0"
+    },
+    "scope": "platform",
+    "client": {
+        "game": "client/game.js"
+    }
+}
