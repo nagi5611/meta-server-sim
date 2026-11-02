@@ -25,6 +25,14 @@
       "nginxPort": 3004
     },
     {
+      "id": "metasim-staging",
+      "label": "MetaSim staging",
+      "systemdUnit": "metasim-staging-server.service",
+      "envFile": "/home/nagi/sim-server/meta-server-sim-staging/.env",
+      "publicHost": "staging.mmh-virtual.jp",
+      "nginxPort": 3104
+    },
+    {
       "id": "metapre",
       "label": "metapre",
       "systemdUnit": "metapre-server.service",
