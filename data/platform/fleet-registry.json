@@ -1,0 +1,44 @@
+{
+  "cores": [
+    {
+      "id": "meta",
+      "label": "Meta（みんなでメタ）",
+      "systemdUnit": "meta-server.service",
+      "envFile": "/home/nagi/meta-server/.env",
+      "publicHost": "meta.mmh-virtual.jp",
+      "nginxPort": 3001
+    },
+    {
+      "id": "metair",
+      "label": "MetaAI / metair",
+      "systemdUnit": "metair-server.service",
+      "envFile": "/home/nagi/diorama/meta-server/.env",
+      "publicHost": "metair.mmh-virtual.jp",
+      "nginxPort": 3002
+    },
+    {
+      "id": "metasim",
+      "label": "MetaSim（sim）",
+      "systemdUnit": "metasim-server.service",
+      "envFile": "/home/nagi/sim-server/meta-server-sim/.env",
+      "publicHost": "sim.mmh-virtual.jp",
+      "nginxPort": 3004
+    },
+    {
+      "id": "metapre",
+      "label": "metapre",
+      "systemdUnit": "metapre-server.service",
+      "envFile": "/home/nagi/pre-server/meta-server/.env",
+      "publicHost": "metapre.mmh-virtual.jp",
+      "nginxPort": 3400
+    },
+    {
+      "id": "metadogo",
+      "label": "metadogo",
+      "systemdUnit": "metadogo-server.service",
+      "envFile": "/home/nagi/dogo/meta-server/.env",
+      "publicHost": "metadogo.mmh-virtual.jp",
+      "nginxPort": 3003
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';
+import { initFleetOpsPanel } from './admin-fleet-ops.js';
 
 const UPDATE_INTERVAL = 2000;
 
@@ -756,7 +757,8 @@ const ENV_SOURCE_LABELS = {
 };
 
 const ADMIN_PANEL_IDS = ['overview', 'settings'];
-const SETTINGS_TAB_IDS = ['env', 'network', 'code'];
+const SETTINGS_TAB_IDS = ['env', 'network', 'fleet', 'code'];
+let fleetPanelInitialized = false;
 const LEGACY_PANEL_TO_SETTINGS_TAB = {
     env: 'env',
     network: 'network',
@@ -803,6 +805,10 @@ function initAdminSideNav() {
         }
         if (panelId === 'settings') {
             activateSettingsTab(settingsTab || 'env');
+            if ((settingsTab || 'env') === 'fleet' && !fleetPanelInitialized) {
+                fleetPanelInitialized = true;
+                void initFleetOpsPanel();
+            }
         }
         try {
             const hash = panelId === 'settings'
@@ -825,6 +831,11 @@ function initAdminSideNav() {
         const btn = e.target.closest('[data-settings-tab]');
         if (!btn) return;
         activate('settings', btn.getAttribute('data-settings-tab') || 'env');
+        const tab = btn.getAttribute('data-settings-tab') || 'env';
+        if (tab === 'fleet' && !fleetPanelInitialized) {
+            fleetPanelInitialized = true;
+            void initFleetOpsPanel();
+        }
     });
 
     const hash = location.hash.replace(/^#/, '');
