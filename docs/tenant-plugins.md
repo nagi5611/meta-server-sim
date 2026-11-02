@@ -83,6 +83,14 @@ Enable **`sample-echo`** for a tenant in admin, POST reload, then:
 - `GET /:tenantId/api/tenant-plugins/sample-echo/hello`
 - Socket event `tenant-plugin:sample-echo` on connect
 
+## XR (`addons/xr`)
+
+Port of meta **`webxr-vr`**. Client hooks into `metaverse-simple` via `__tenantPluginClientBridge` (set in `tenant-plugin-client-loader.js`). Enable **`xr`** for a tenant; legacy `/api/addons/enabled` exposes `{ "xr": true }`.
+
+## ARXR (`addons/arxr`)
+
+Port of meta **`qr-ar`**. Static AR UI at **`GET /:tenantId/api/tenant-plugins/arxr/`** (import map + `/deps/` for Three.js and `@web-ar-studio/webar-engine-sdk`). Client **`client/game.js`** sets `window.__tenantArxrEntryUrl` for in-world links. Optional env: **`VITE_WEBAR_API_KEY`** (falls back to meta test key in `ar-app.js`).
+
 ## Reload caveat
 
 `POST …/reload` clears plugin HTTP routers and reloads server modules. Hook handlers registered with `hooks.on` may duplicate if reload is called repeatedly; prefer disable/enable or process restart for production hook changes.

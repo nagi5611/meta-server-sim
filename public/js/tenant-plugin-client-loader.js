@@ -1,5 +1,11 @@
 // public/js/tenant-plugin-client-loader.js — fetch enabled plugins and load game modules
 import { getTenantIdFromPath } from './tenant-runtime-shim.js';
+import * as clientAddonRegistry from '../../../metaverse-simple/lib/client-addon-registry.js';
+
+function ensureTenantPluginClientBridge() {
+    if (globalThis.__tenantPluginClientBridge) return;
+    globalThis.__tenantPluginClientBridge = clientAddonRegistry;
+}
 
 /**
  * @param {string} tenantId
@@ -24,6 +30,8 @@ async function fetchEnabledPlugins(tenantId) {
 export async function loadTenantPluginClientModules() {
     const tenantId = getTenantIdFromPath();
     if (!tenantId) return;
+
+    ensureTenantPluginClientBridge();
 
     const plugins = await fetchEnabledPlugins(tenantId);
     for (const plugin of plugins) {

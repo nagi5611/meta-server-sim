@@ -38,6 +38,7 @@
         "@google-cloud/translate": "^10.0.1",
         "@google/generative-ai": "^0.24.1",
         "@modelcontextprotocol/sdk": "^1.32.2",
+        "@web-ar-studio/webar-engine-sdk": "^1.0.24",
         "aws4fetch": "^1.0.20",
         "better-sqlite3": "^12.11.1",
         "bootstrap-icons": "^1.13.1",
