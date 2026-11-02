@@ -37,6 +37,7 @@ import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smok
 import { TenantFdsSmokePanelManager } from './tenant-fds-smoke-panel-manager.js';
 import { fetchAdminMetaverseEntry } from '../../../metaverse-simple/public/js/admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
+import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 
 const DEFAULT_ROOM = 'lobby';
 
@@ -273,6 +274,7 @@ class TenantMetaverseApp {
         await ensureControlSchemeChosen();
         ensureGuestUsername();
         await this._resolveUserRole();
+        await loadTenantPluginClientModules();
 
         const titleEl = document.getElementById('tenant-title');
         if (titleEl) titleEl.textContent = tenantId;

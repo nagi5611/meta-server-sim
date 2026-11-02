@@ -30,6 +30,11 @@ import { tenantResolver } from './lib/tenant-context.js';
 import { createTenantRouter } from './lib/tenant-api.js';
 
 import { registerTenantSocketServers } from './lib/tenant-socket.js';
+import {
+    initTenantPluginsPlatform,
+    registerTenantPluginShutdownHooks,
+    setSharedTenantRouter,
+} from './lib/tenant-plugin-runtime.js';
 
 import { isValidTenantId } from './lib/tenant-id.js';
 
@@ -138,6 +143,9 @@ if (requireSecureHttp) {
 
 registerPlatformAdmin(app, { staticDir: STATIC_DIR });
 
+initTenantPluginsPlatform();
+registerTenantPluginShutdownHooks(httpServer);
+
 if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
     app.use('/metaverse-simple-static', express.static(SIMPLE_PUBLIC_DIR, { index: false }));
     app.get('/js/metaverse-i18n.js', (_req, res) => {
@@ -234,6 +242,7 @@ app.get('/:tenantId', (req, res, next) => {
 
 
 const tenantRouter = createTenantRouter(STATIC_DIR);
+setSharedTenantRouter(tenantRouter);
 
 app.use('/:tenantId', tenantResolver, tenantRouter);
 
