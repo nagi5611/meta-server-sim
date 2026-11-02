@@ -1,6 +1,7 @@
 // server.js — metaverse-simulation プラットフォームコア
 
 import 'dotenv/config';
+import './lib/discord-console-webhook-install.js';
 
 import express from 'express';
 
@@ -42,9 +43,9 @@ import { registerPlatformAdmin } from './lib/platform-admin.js';
 
 import { initPlatformRuntime } from './lib/platform-runtime.js';
 import { ensureTenantMediasoupWorkers } from './lib/tenant-socket-features.js';
+import { notifyDiscordActivity, registerActivityShutdownSignals } from './lib/discord-activity-webhook.js';
 import { startFdsSmokeBulkServer, stopFdsSmokeBulkServer } from './lib/fds-smoke-bulk-process.js';
-
-
+import { initUsersDb } from './db/users.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -53,6 +54,8 @@ const __dirname = path.dirname(__filename);
 
 
 const boot = resolveServerBootConfig();
+
+registerActivityShutdownSignals();
 
 for (const w of boot.warnings) {
 
@@ -342,6 +345,12 @@ async function bootHttpServer() {
         console.error('[fds-smoke-bulk] startup failed:', err);
     }
 
+    try {
+        await initUsersDb();
+    } catch (err) {
+        console.error('[users] init failed:', err);
+    }
+
     httpServer.listen(PORT, HOST, () => {
 
     void ensureTenantMediasoupWorkers().catch((err) => {
@@ -401,6 +410,10 @@ async function bootHttpServer() {
         }
 
     }
+
+    notifyDiscordActivity('server_start', {
+        detail: `platform :${PORT}${PROXY_SERVICE_DOMAIN ? ` (${PROXY_SERVICE_DOMAIN})` : ''}`,
+    });
 
     });
 }

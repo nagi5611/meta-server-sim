@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 自宅グローバル IPv4 を直接取得し、meta-server-sim .env の MEDIASOUP_ANNOUNCED_IP と
-# 比較して違えば .env を更新して metasim を再起動する（DDNS / DNS 更新は行わない）。
+# 自宅グローバル IPv4 を直接取得し、対象コア .env の MEDIASOUP_ANNOUNCED_IP と
+# 比較して違えば .env を更新して systemd サービスを再起動する（DDNS / DNS 更新は行わない）。
 set -euo pipefail
 
 CONFIG_ENV="${METASIM_MEDIASOUP_IP_ENV:-/etc/mmh-virtual/metasim-mediasoup-ip.env}"
@@ -31,7 +31,8 @@ send_webhook() {
   local host
   host="$(hostname -f 2>/dev/null || hostname)"
   local msg
-  msg="[metasim] MEDIASOUP_ANNOUNCED_IP changed: ${old_ip:-<unset>} -> ${new_ip} on ${host}; ${SERVICE_NAME} restarted."
+  local label="${MEDIASOUP_IP_SYNC_LABEL:-${SERVICE_NAME}}"
+  msg="[${label}] MEDIASOUP_ANNOUNCED_IP changed: ${old_ip:-<unset>} -> ${new_ip} on ${host}; ${SERVICE_NAME} restarted."
 
   local payload
   payload="$(
@@ -90,14 +91,14 @@ configured_ip=""
 configured_ip=$(grep -E '^MEDIASOUP_ANNOUNCED_IP=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '[:space:]' || true)
 
 if [[ "$configured_ip" == "$current_ip" ]]; then
-  log "unchanged MEDIASOUP_ANNOUNCED_IP=${current_ip}"
+  log "unchanged MEDIASOUP_ANNOUNCED_IP=${current_ip} (webhook skipped)"
   exit 0
 fi
 
 log "MEDIASOUP_ANNOUNCED_IP ${configured_ip:-<unset>} -> ${current_ip}"
 
 if is_dry_run; then
-  log "dry-run: skip .env update and ${SERVICE_NAME} restart"
+  log "dry-run: skip .env update, ${SERVICE_NAME} restart, and webhook"
   exit 0
 fi
 
