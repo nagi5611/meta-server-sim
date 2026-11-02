@@ -20,6 +20,41 @@ log() {
   printf '[%s] %s\n' "$(date -Iseconds)" "$*"
 }
 
+send_webhook() {
+  local old_ip="$1"
+  local new_ip="$2"
+  local url="${METASIM_MEDIASOUP_IP_WEBHOOK_URL:-}"
+  if [[ -z "$url" ]]; then
+    return 0
+  fi
+
+  local host
+  host="$(hostname -f 2>/dev/null || hostname)"
+  local msg
+  msg="[metasim] MEDIASOUP_ANNOUNCED_IP changed: ${old_ip:-<unset>} -> ${new_ip} on ${host}; ${SERVICE_NAME} restarted."
+
+  local payload
+  payload="$(
+    OLD_IP="$old_ip" NEW_IP="$new_ip" MSG="$msg" SVC="$SERVICE_NAME" HOST="$host" python3 <<'PY'
+import json, os
+print(json.dumps({
+    "content": os.environ["MSG"],
+    "text": os.environ["MSG"],
+    "old_ip": os.environ.get("OLD_IP") or "",
+    "new_ip": os.environ["NEW_IP"],
+    "service": os.environ["SVC"],
+    "host": os.environ["HOST"],
+}))
+PY
+  )"
+
+  if ! curl -fsS --max-time 15 -X POST -H 'Content-Type: application/json' -d "$payload" "$url" >/dev/null; then
+    log "WARN: webhook POST failed"
+    return 1
+  fi
+  log "webhook notified"
+}
+
 is_dry_run() {
   case "$(echo "$DRY_RUN" | tr '[:upper:]' '[:lower:]')" in
     1 | true | yes | on) return 0 ;;
@@ -74,5 +109,7 @@ if ! systemctl restart "${SERVICE_NAME}.service"; then
   log "ERROR: systemctl restart ${SERVICE_NAME}.service failed"
   exit 1
 fi
+
+send_webhook "${configured_ip:-}" "$current_ip" || true
 
 log "updated ${ENV_FILE} and restarted ${SERVICE_NAME}.service"

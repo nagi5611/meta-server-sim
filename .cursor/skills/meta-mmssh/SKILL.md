@@ -98,6 +98,8 @@ WebRTC の `MEDIASOUP_ANNOUNCED_IP` は **DNS/DDNS を更新しない**。5 分�
 
 HTTPS / Tunnel のホスト名は Cloudflare 側。mediasoup UDP は **数値の公衆 IP + ルータポート転送** のまま。
 
+IP 変更で restart したときは `/etc/mmh-virtual/metasim-mediasoup-ip.env` の **`METASIM_MEDIASOUP_IP_WEBHOOK_URL`** へ JSON POST（`content` / `text` に同文）。
+
 ## スクリプト
 
 | ファイル | 用途 |
