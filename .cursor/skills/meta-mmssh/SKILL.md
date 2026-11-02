@@ -54,6 +54,27 @@ Dashboard: Cloud Agent の Environment → **Secrets** に `META_MMH_VIRTUAL_SSH
 
 4. 初回接続は `StrictHostKeyChecking=accept-new` でホスト鍵を記録する。既知ホストと不一致の場合は接続を止め、ユーザーに確認する（`StrictHostKeyChecking=no` は使わない）。
 
+## Xserver DNS 自動更新（変動グローバル IP）
+
+自宅回線の IPv4 変更時に **mmh-virtual.jp** の A レコードを Xserver ドメイン API で更新する。
+
+| 種別 | 変数名 / パス | 説明 |
+|------|----------------|------|
+| **Secret（本番サーバー）** | `/etc/mmh-virtual/xserver-ddns.env` 内 **`XSERVER_API_TOKEN`** | Bearer トokens（git 禁止、chmod 600） |
+| **Secret（Agent 用・任意）** | `XSERVER_API_TOKEN` | リモートから手動実行するとき |
+| スクリプト | `scripts/mmh-virtual-xserver-ddns.sh` | 5 分 cron 用 |
+| インストール | `sudo bash scripts/install-mmh-virtual-xserver-ddns.sh` | `/usr/local/bin` + `/etc/cron.d/` |
+
+既定で更新するホスト: `meta`, `metair`, `sim`, `metapre`, `metadogo`, `metaprehub`（`MMH_DDNS_HOSTS` で変更）。
+
+```bash
+# 本番（token 設定後）
+sudo /usr/local/bin/mmh-virtual-xserver-ddns.sh
+sudo tail -20 /var/log/mmh-virtual-xserver-ddns.log
+```
+
+API 仕様: [Xserver ドメイン API – DNS](https://developer.xserver.ne.jp/api/domain/)
+
 ## スクリプト
 
 | ファイル | 用途 |
