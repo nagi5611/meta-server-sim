@@ -122,22 +122,11 @@ server {
     listen [::]:80;
     server_name ${DOMAIN};
 
+    client_max_body_size 500m;
+
     location /.well-known/acme-challenge/ {
         root /var/www/html;
     }
-
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${DOMAIN};
-
-    client_max_body_size 500m;
-    include /etc/nginx/snippets/metaverse-proxy-error-pages.conf;
 
     location / {
         include /etc/nginx/snippets/metaverse-proxy-headers.conf;
@@ -154,7 +143,11 @@ sudo nginx -t
 sudo systemctl reload nginx
 
 if [[ ! -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
-  sudo certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email || true
+  sudo certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email --redirect || true
+fi
+
+if [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]] && ! grep -q ssl_certificate "$NGINX_SNIP"; then
+  sudo certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely-without-email --redirect || true
 fi
 
 sudo nginx -t && sudo systemctl reload nginx
