@@ -129,9 +129,10 @@ export async function fetchSnapshot(watchUrl, userAgent, options = {}) {
  */
 export async function postWebhookNotify(opts) {
     const at = new Date().toISOString();
-    const text = `${opts.message}\n${opts.watchUrl}\n(${at})`;
+    const text = `@everyone\n${opts.message}\n${opts.watchUrl}\n(${at})`;
     const payload = {
         content: text,
+        allowed_mentions: { parse: ['everyone'] },
         text,
         message: opts.message,
         url: opts.watchUrl,
