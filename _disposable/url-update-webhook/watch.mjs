@@ -3,6 +3,9 @@
 import crypto from 'node:crypto';
 import process from 'node:process';
 
+/** @type {Map<string, string | null>} */
+const guildIdByWebhook = new Map();
+
 /**
  * 環境変数から設定を読み込む
  */
@@ -120,38 +123,94 @@ export async function fetchSnapshot(watchUrl, userAgent, options = {}) {
 }
 
 /**
+ * Incoming Webhook URL から guild_id を取得（@everyone ロール ID と同じ）
+ * @param {string} webhookUrl
+ */
+export async function resolveDiscordGuildId(webhookUrl) {
+    const cached = guildIdByWebhook.get(webhookUrl);
+    if (cached !== undefined) return cached;
+
+    const fromEnv = String(process.env.DISCORD_GUILD_ID || '').trim();
+    if (fromEnv) {
+        guildIdByWebhook.set(webhookUrl, fromEnv);
+        return fromEnv;
+    }
+
+    try {
+        const res = await fetch(webhookUrl.replace(/\/$/, ''));
+        if (!res.ok) {
+            guildIdByWebhook.set(webhookUrl, null);
+            return null;
+        }
+        const data = await res.json();
+        const guildId = data?.guild_id ? String(data.guild_id) : null;
+        guildIdByWebhook.set(webhookUrl, guildId);
+        return guildId;
+    } catch {
+        guildIdByWebhook.set(webhookUrl, null);
+        return null;
+    }
+}
+
+/**
+ * Discord Execute Webhook 用 payload（@everyone / @here + @everyone ロール）
+ * @param {string | null} guildId
+ */
+export function buildDiscordWebhookPayload(message, watchUrl, at, guildId) {
+    const lines = [message, watchUrl, `(${at})`];
+    let content;
+    /** @type {{ parse?: string[], roles?: string[] }} */
+    let allowed_mentions;
+
+    if (guildId) {
+        content = `@everyone @here <@&${guildId}>\n${lines.join('\n')}`;
+        allowed_mentions = { parse: ['everyone'], roles: [guildId] };
+    } else {
+        content = `@everyone @here\n${lines.join('\n')}`;
+        allowed_mentions = { parse: ['everyone'] };
+    }
+
+    return { content, allowed_mentions };
+}
+
+/**
  * @param {object} opts
  * @param {string} opts.webhookUrl
  * @param {string} opts.message
  * @param {string} opts.watchUrl
  * @param {number} opts.status
  * @param {string} opts.fingerprint
+ * @param {boolean} [opts.waitForMessage]
  */
 export async function postWebhookNotify(opts) {
     const at = new Date().toISOString();
-    const text = `@everyone\n${opts.message}\n${opts.watchUrl}\n(${at})`;
-    const payload = {
-        content: text,
-        allowed_mentions: { parse: ['everyone'] },
-        text,
-        message: opts.message,
-        url: opts.watchUrl,
-        watchUrl: opts.watchUrl,
-        updatedAt: at,
-        httpStatus: opts.status,
-        fingerprint: opts.fingerprint,
-    };
+    const guildId = await resolveDiscordGuildId(opts.webhookUrl);
+    const discordBody = buildDiscordWebhookPayload(opts.message, opts.watchUrl, at, guildId);
 
-    const res = await fetch(opts.webhookUrl, {
+    const executeUrl = opts.waitForMessage
+        ? `${opts.webhookUrl.replace(/\/$/, '')}?wait=true`
+        : opts.webhookUrl;
+
+    const res = await fetch(executeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(discordBody),
     });
 
     if (!res.ok) {
         const snippet = (await res.text()).slice(0, 200);
         throw new Error(`Webhook HTTP ${res.status}: ${snippet}`);
     }
+
+    if (opts.waitForMessage && res.status === 200) {
+        const msg = await res.json().catch(() => null);
+        return {
+            mentionEveryone: Boolean(msg?.mention_everyone),
+            guildIdUsed: guildId,
+            contentPreview: typeof msg?.content === 'string' ? msg.content.slice(0, 120) : null,
+        };
+    }
+    return { mentionEveryone: null, guildIdUsed: guildId, contentPreview: null };
 }
 
 /**
@@ -234,6 +293,18 @@ const isMain =
 if (isMain) {
     try {
         const cfg = loadConfig();
+        if (process.argv.includes('--test-webhook')) {
+            const result = await postWebhookNotify({
+                webhookUrl: cfg.webhookUrl,
+                message: '【検証】更新されました',
+                watchUrl: cfg.watchUrl,
+                status: 200,
+                fingerprint: 'test-verify',
+                waitForMessage: true,
+            });
+            console.log('test webhook result:', JSON.stringify(result));
+            process.exit(0);
+        }
         await runLoop(cfg);
     } catch (e) {
         console.error(e instanceof Error ? e.message : e);

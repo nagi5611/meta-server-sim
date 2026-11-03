@@ -1,7 +1,20 @@
 // _disposable/url-update-webhook/watch.test.mjs
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildFingerprint, normalizeHtmlBody } from './watch.mjs';
+import {
+    buildDiscordWebhookPayload,
+    buildFingerprint,
+    normalizeHtmlBody,
+} from './watch.mjs';
+
+describe('buildDiscordWebhookPayload', () => {
+    it('includes role mention when guild id is known', () => {
+        const body = buildDiscordWebhookPayload('更新', 'https://example.com/', '2026-01-01T00:00:00.000Z', '999');
+        assert.match(body.content, /<@&999>/);
+        assert.deepEqual(body.allowed_mentions.roles, ['999']);
+        assert.ok(body.allowed_mentions.parse?.includes('everyone'));
+    });
+});
 
 describe('buildFingerprint', () => {
     it('prefers etag and last-modified over body hash', () => {
