@@ -16,6 +16,7 @@ function loadConfig() {
     const notifyOnStart = isTruthy(process.env.NOTIFY_ON_START);
     const userAgent = String(process.env.USER_AGENT || 'url-update-webhook/1.0').trim();
     const message = String(process.env.NOTIFY_MESSAGE || '更新されました').trim() || '更新されました';
+    const fingerprintMode = String(process.env.FINGERPRINT_MODE || 'html-text').trim().toLowerCase();
 
     if (!watchUrl) throw new Error('WATCH_URL が未設定です');
     if (!webhookUrl) throw new Error('WEBHOOK_URL が未設定です');
@@ -47,6 +48,7 @@ function loadConfig() {
         notifyOnStart,
         userAgent,
         message,
+        fingerprintMode: fingerprintMode === 'raw' ? 'raw' : 'html-text',
     };
 }
 
@@ -59,17 +61,39 @@ function isTruthy(v) {
 }
 
 /**
+ * HTML 本文から表示テキスト相当を抜き出す（広告・乱数埋め込み対策）
+ * @param {ArrayBuffer} body
+ */
+export function normalizeHtmlBody(body) {
+    const html = new TextDecoder('utf-8', { fatal: false }).decode(body);
+    return html
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
  * レスポンスから更新判定用フィンガープリントを作る
  * @param {Response} res
  * @param {ArrayBuffer} body
+ * @param {{ fingerprintMode?: 'html-text' | 'raw' }} [options]
  */
-export function buildFingerprint(res, body) {
+export function buildFingerprint(res, body, options = {}) {
     const etag = res.headers.get('etag')?.trim() || '';
     const lastModified = res.headers.get('last-modified')?.trim() || '';
     if (etag || lastModified) {
         return `meta:${etag}|${lastModified}`;
     }
-    const hash = crypto.createHash('sha256').update(Buffer.from(body)).digest('hex');
+    const mode = options.fingerprintMode === 'raw' ? 'raw' : 'html-text';
+    const contentType = res.headers.get('content-type') || '';
+    let payload = Buffer.from(body);
+    if (mode === 'html-text' && /text\/html/i.test(contentType)) {
+        payload = Buffer.from(normalizeHtmlBody(body), 'utf8');
+    }
+    const hash = crypto.createHash('sha256').update(payload).digest('hex');
     return `body:${hash}`;
 }
 
@@ -77,7 +101,7 @@ export function buildFingerprint(res, body) {
  * @param {string} watchUrl
  * @param {string} userAgent
  */
-export async function fetchSnapshot(watchUrl, userAgent) {
+export async function fetchSnapshot(watchUrl, userAgent, options = {}) {
     const res = await fetch(watchUrl, {
         method: 'GET',
         redirect: 'follow',
@@ -90,7 +114,7 @@ export async function fetchSnapshot(watchUrl, userAgent) {
     return {
         ok: res.ok,
         status: res.status,
-        fingerprint: buildFingerprint(res, body),
+        fingerprint: buildFingerprint(res, body, options),
         bodyByteLength: body.byteLength,
     };
 }
@@ -141,7 +165,9 @@ async function runLoop(cfg) {
         tick += 1;
         const label = `[url-watch #${tick}]`;
         try {
-            const snap = await fetchSnapshot(cfg.watchUrl, cfg.userAgent);
+            const snap = await fetchSnapshot(cfg.watchUrl, cfg.userAgent, {
+                fingerprintMode: cfg.fingerprintMode,
+            });
             if (!snap.ok) {
                 console.warn(`${label} GET ${snap.status} (${cfg.watchUrl})`);
             }
@@ -184,8 +210,16 @@ async function runLoop(cfg) {
 
     await check();
     setInterval(check, cfg.intervalMs);
+    const webhookHint = (() => {
+        try {
+            const u = new URL(cfg.webhookUrl);
+            return `${u.origin}${u.pathname.slice(0, 24)}…`;
+        } catch {
+            return '(configured)';
+        }
+    })();
     console.log(
-        `監視開始: ${cfg.watchUrl}\n間隔: ${cfg.intervalMs}ms\nWebhook: ${cfg.webhookUrl}\n終了: Ctrl+C`
+        `監視開始: ${cfg.watchUrl}\n間隔: ${cfg.intervalMs}ms\nWebhook: ${webhookHint}\n終了: Ctrl+C`
     );
 }
 
