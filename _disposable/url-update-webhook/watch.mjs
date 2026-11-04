@@ -75,6 +75,22 @@ function loadConfig() {
     };
 }
 
+/** 通知用タイムスタンプ（日本時間） */
+export function formatJapanTime(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).formatToParts(date);
+    const get = (type) => parts.find((p) => p.type === type)?.value ?? '';
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')} JST`;
+}
+
 /**
  * @param {unknown} v
  */
@@ -203,7 +219,7 @@ export function buildDiscordWebhookPayload(message, watchUrl, at, guildId) {
  * @param {boolean} [opts.waitForMessage]
  */
 export async function postWebhookNotify(opts) {
-    const at = new Date().toISOString();
+    const at = formatJapanTime();
     const guildId = await resolveDiscordGuildId(opts.webhookUrl);
     const discordBody = buildDiscordWebhookPayload(opts.message, opts.watchUrl, at, guildId);
 

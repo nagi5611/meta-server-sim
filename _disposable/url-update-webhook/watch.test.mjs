@@ -5,8 +5,16 @@ import {
     buildDiscordWebhookPayload,
     buildFingerprint,
     normalizeHtmlBody,
+    formatJapanTime,
     parseWatchUrlsFromEnv,
 } from './watch.mjs';
+
+describe('formatJapanTime', () => {
+    it('formats UTC instant as JST wall clock', () => {
+        const s = formatJapanTime(new Date('2026-11-03T15:00:00.000Z'));
+        assert.equal(s, '2026-11-04 00:00:00 JST');
+    });
+});
 
 describe('parseWatchUrlsFromEnv', () => {
     it('merges WATCH_URLS and WATCH_URL without duplicates', () => {
