@@ -67,6 +67,16 @@ export function io(url, options = {}) {
     if (joinToken && !auth.joinToken && !auth.socketSecret) {
         auth.joinToken = joinToken;
     }
+    try {
+        const tenantBase = getTenantBase();
+        const tenantId = tenantBase ? tenantBase.replace(/^\//, '') : '';
+        if (tenantId) {
+            const stored = localStorage.getItem(`metaverseAvatarId:${tenantId}`);
+            if (stored && !auth.avatarId) auth.avatarId = stored;
+        }
+    } catch {
+        /* ignore */
+    }
     return originalIo(url ?? window.location.origin, {
         ...options,
         withCredentials: options.withCredentials ?? true,

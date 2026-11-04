@@ -1,0 +1,14 @@
+{
+    "id": "meta-bench-r1",
+    "version": "1.0.0",
+    "main": "server.js",
+    "engines": {
+        "meta-server-sim": "^1.0.0"
+    },
+    "scope": "platform",
+    "client": {
+        "admin": "client/admin.js"
+    },
+    "migrationsDir": "migrations",
+    "socketPrefix": "addon:meta-bench-r1"
+}

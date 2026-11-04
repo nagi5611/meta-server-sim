@@ -9,6 +9,44 @@
     <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
     <style>
+        .tenant-login-gate {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.55);
+        }
+        .tenant-login-gate-panel {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            min-width: min(360px, 92vw);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        .tenant-login-label {
+            display: block;
+            margin-top: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .tenant-login-gate-panel input,
+        .tenant-login-gate-panel select {
+            width: 100%;
+            margin-top: 6px;
+            padding: 8px 10px;
+            box-sizing: border-box;
+        }
+        .tenant-login-enter-btn {
+            margin-top: 16px;
+            width: 100%;
+            padding: 10px;
+            font-weight: 700;
+        }
+        body.tenant-login-gate-open #canvas-container {
+            visibility: hidden;
+        }
         .fds-smoke-panel-crosshair {
             position: fixed;
             left: 50%;
@@ -70,6 +108,16 @@
     </script>
 </head>
 <body>
+    <div id="tenant-login-gate" class="tenant-login-gate" hidden>
+        <div class="tenant-login-gate-panel">
+            <h2>入場</h2>
+            <label class="tenant-login-label" for="tenant-login-display-name">表示名</label>
+            <input id="tenant-login-display-name" type="text" maxlength="32" autocomplete="nickname" />
+            <label class="tenant-login-label" for="tenant-login-avatar-select">アバター</label>
+            <select id="tenant-login-avatar-select"></select>
+            <button type="button" id="tenant-login-enter-btn" class="tenant-login-enter-btn">ワールドへ</button>
+        </div>
+    </div>
     <div id="info">
         <h1 id="tenant-title">Tenant</h1>
         <p class="subtitle"><a href="/">← プラットフォーム hub</a></p>

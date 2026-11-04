@@ -4,6 +4,7 @@ import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';
 import { initTenantPluginsPanel, wireTenantAdminPanelNav } from './admin-tenant-plugins.js';
+import { loadTenantPluginAdminClientModules } from './tenant-plugin-admin-client-loader.js';
 
 const UPDATE_INTERVAL = 2000;
 
@@ -351,6 +352,9 @@ if (!tenantId) {
             loadTenantWorlds();
             initTenantPluginsPanel(tenantId).catch((e) => {
                 console.error('tenant plugins panel failed:', e);
+            });
+            loadTenantPluginAdminClientModules(tenantId).catch((e) => {
+                console.error('tenant plugin admin modules failed:', e);
             });
             setInterval(() => {
                 loadTenantStats();

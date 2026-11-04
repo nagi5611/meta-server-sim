@@ -91,6 +91,18 @@ Port of meta **`webxr-vr`**. Client hooks into `metaverse-simple` via `__tenantP
 
 Port of meta **`qr-ar`**. Static AR UI at **`GET /:tenantId/api/tenant-plugins/arxr/`** (import map + `/deps/` for Three.js and `@web-ar-studio/webar-engine-sdk`). Client **`client/game.js`** sets `window.__tenantArxrEntryUrl` for in-world links. Optional env: **`VITE_WEBAR_API_KEY`** (falls back to meta test key in `ar-app.js`).
 
+## time-machine (`addons/time-machine`)
+
+Backup / rollback addon (ported from meta-server). Platform admin routes at **`/admin/addons/time-machine/*`** when enabled for an allowed tenant (`tenantIds` in `plugin.json`, default **`P-01`**). Config: `ADDON_TIME_MACHINE_MOUNTS`, `ADDON_TIME_MACHINE_ROLLBACK_PIN`, `systemdServiceName` (default **`meta-server-sim`**). Snapshots use mount prefix **`meta-server-sim/`** (not `metaverse-simple`). CloudFront invalidation is a no-op on sim (R2).
+
+## meta-bench-r1 (`addons/meta-bench-r1`)
+
+Load-test orchestration (ported from meta-server). Admin UI via **`client/admin.js`** and **`/admin/addons/meta-bench-r1/*`**. Runner socket events use tenant Socket.io from the enabling tenant. Worlds list comes from that tenant's **`worlds.json`**.
+
+## Platform admin bridge
+
+Plugins may implement **`ctx.registerPlatformAdmin((app, guards) => …)`** for global admin routes. **`client.admin`** modules load on **`admin-tenant.html`** via **`tenant-plugin-admin-client-loader.js`**.
+
 ## Reload caveat
 
 `POST …/reload` clears plugin HTTP routers and reloads server modules. Hook handlers registered with `hooks.on` may duplicate if reload is called repeatedly; prefer disable/enable or process restart for production hook changes.
