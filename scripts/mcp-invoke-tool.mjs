@@ -5,6 +5,7 @@
  */
 import {
     fleetGetAddonEnv,
+    fleetGetEnv,
     getFleetOpsMeta,
     getFleetServiceStatus,
     isFleetOpsEnabled,
@@ -29,6 +30,9 @@ async function main() {
             break;
         case 'fleet_addon_env_get':
             payload = await fleetGetAddonEnv(String(args.coreId || 'metasim'));
+            break;
+        case 'fleet_env_get':
+            payload = await fleetGetEnv(String(args.coreId || 'metasim'));
             break;
         case 'platform_env_config_get':
             payload = platformEnvConfigGetForMcp();
