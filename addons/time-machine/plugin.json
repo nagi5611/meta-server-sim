@@ -1,0 +1,14 @@
+{
+    "id": "time-machine",
+    "version": "1.0.0",
+    "main": "server.js",
+    "engines": {
+        "meta-server-sim": "^1.0.0"
+    },
+    "scope": "platform",
+    "tenantIds": ["P-01"],
+    "client": {
+        "admin": "client/admin.js"
+    },
+    "migrationsDir": "migrations"
+}
