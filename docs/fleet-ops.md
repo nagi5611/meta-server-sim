@@ -75,6 +75,22 @@ npm run mcp:fleet
 | `fleet_service_control` | `start` / `stop` / `restart` |
 | `fleet_env_get` | 編集可能 env 取得 |
 | `fleet_env_set` | env 更新（ホワイトリスト） |
+| `fleet_addon_env_get` | コア `.env` の `ADDON_*` / `TENANT_*_ADDON_*` 取得 |
+| `fleet_addon_env_set` | 上記 addon env 更新 |
+| `platform_env_config_get` | MetaSim `env-config.json` 編集点（管理画面と同じ） |
+| `platform_env_config_set` | env-config 更新 |
+| `tenant_plugins_list` | テナントプラグイン一覧 |
+| `tenant_plugin_set_enabled` | 有効/無効 |
+| `tenant_plugin_config_get` / `tenant_plugin_config_set` | プラグイン config KV |
+
+デプロイ後スモーク（本番 clone 上）:
+
+```bash
+cd /home/nagi/sim-server/meta-server-sim
+node scripts/mcp-invoke-tool.mjs fleet_list_cores
+node scripts/mcp-invoke-tool.mjs fleet_service_status '{"coreId":"metasim"}'
+node scripts/mcp-invoke-tool.mjs tenant_plugins_list '{"tenantId":"P-01"}'
+```
 
 ## HTTP API（管理 API と同一 Basic 認証）
 
