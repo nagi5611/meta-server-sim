@@ -5,7 +5,18 @@ import {
     buildDiscordWebhookPayload,
     buildFingerprint,
     normalizeHtmlBody,
+    parseWatchUrlsFromEnv,
 } from './watch.mjs';
+
+describe('parseWatchUrlsFromEnv', () => {
+    it('merges WATCH_URLS and WATCH_URL without duplicates', () => {
+        const urls = parseWatchUrlsFromEnv({
+            WATCH_URL: 'https://example.com/a/',
+            WATCH_URLS: 'https://example.com/a/\nhttps://example.com/b/',
+        });
+        assert.deepEqual(urls, ['https://example.com/a/', 'https://example.com/b/']);
+    });
+});
 
 describe('buildDiscordWebhookPayload', () => {
     it('includes role mention when guild id is known', () => {

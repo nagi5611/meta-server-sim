@@ -9,8 +9,37 @@ const guildIdByWebhook = new Map();
 /**
  * 環境変数から設定を読み込む
  */
+/**
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
+ */
+export function parseWatchUrlsFromEnv(env = process.env) {
+    const seen = new Set();
+    /** @type {string[]} */
+    const out = [];
+    const add = (raw) => {
+        const u = String(raw ?? '').trim();
+        if (!u || seen.has(u)) return;
+        let href;
+        try {
+            const parsed = new URL(u);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+            href = parsed.href;
+        } catch {
+            return;
+        }
+        seen.add(href);
+        out.push(href);
+    };
+    for (const part of String(env.WATCH_URLS || '').split(/[\r\n,]+/)) {
+        add(part);
+    }
+    add(env.WATCH_URL);
+    return out;
+}
+
 function loadConfig() {
-    const watchUrl = String(process.env.WATCH_URL || '').trim();
+    const watchUrls = parseWatchUrlsFromEnv();
     const webhookUrl = String(process.env.WEBHOOK_URL || '').trim();
     const intervalMs = Math.max(
         5000,
@@ -21,18 +50,8 @@ function loadConfig() {
     const message = String(process.env.NOTIFY_MESSAGE || '更新されました').trim() || '更新されました';
     const fingerprintMode = String(process.env.FINGERPRINT_MODE || 'html-text').trim().toLowerCase();
 
-    if (!watchUrl) throw new Error('WATCH_URL が未設定です');
+    if (watchUrls.length === 0) throw new Error('WATCH_URL または WATCH_URLS が未設定です');
     if (!webhookUrl) throw new Error('WEBHOOK_URL が未設定です');
-
-    let parsedWatch;
-    try {
-        parsedWatch = new URL(watchUrl);
-        if (parsedWatch.protocol !== 'http:' && parsedWatch.protocol !== 'https:') {
-            throw new Error('http/https のみ');
-        }
-    } catch {
-        throw new Error('WATCH_URL が不正です');
-    }
 
     let parsedWebhook;
     try {
@@ -45,7 +64,8 @@ function loadConfig() {
     }
 
     return {
-        watchUrl: parsedWatch.href,
+        watchUrls,
+        watchUrl: watchUrls[0],
         webhookUrl: parsedWebhook.href,
         intervalMs,
         notifyOnStart,
@@ -216,24 +236,34 @@ export async function postWebhookNotify(opts) {
 /**
  * @param {ReturnType<typeof loadConfig>} cfg
  */
+function watchUrlLabel(watchUrl) {
+    try {
+        const u = new URL(watchUrl);
+        const q = u.search ? u.search.slice(0, 24) : '';
+        return `${u.pathname}${q}` || u.hostname;
+    } catch {
+        return watchUrl.slice(0, 48);
+    }
+}
+
 async function runLoop(cfg) {
-    /** @type {string | null} */
-    let previous = null;
+    /** @type {Map<string, string>} */
+    const previous = new Map();
     let tick = 0;
 
-    const check = async () => {
-        tick += 1;
-        const label = `[url-watch #${tick}]`;
+    const checkOne = async (watchUrl, tickNum) => {
+        const label = `[url-watch ${watchUrlLabel(watchUrl)} #${tickNum}]`;
         try {
-            const snap = await fetchSnapshot(cfg.watchUrl, cfg.userAgent, {
+            const snap = await fetchSnapshot(watchUrl, cfg.userAgent, {
                 fingerprintMode: cfg.fingerprintMode,
             });
             if (!snap.ok) {
-                console.warn(`${label} GET ${snap.status} (${cfg.watchUrl})`);
+                console.warn(`${label} GET ${snap.status}`);
             }
 
-            const changed = previous !== null && snap.fingerprint !== previous;
-            const first = previous === null;
+            const prev = previous.get(watchUrl);
+            const changed = prev !== undefined && snap.fingerprint !== prev;
+            const first = prev === undefined;
 
             if (first) {
                 console.log(
@@ -243,7 +273,7 @@ async function runLoop(cfg) {
                     await postWebhookNotify({
                         webhookUrl: cfg.webhookUrl,
                         message: cfg.message,
-                        watchUrl: cfg.watchUrl,
+                        watchUrl,
                         status: snap.status,
                         fingerprint: snap.fingerprint,
                     });
@@ -253,7 +283,7 @@ async function runLoop(cfg) {
                 await postWebhookNotify({
                     webhookUrl: cfg.webhookUrl,
                     message: cfg.message,
-                    watchUrl: cfg.watchUrl,
+                    watchUrl,
                     status: snap.status,
                     fingerprint: snap.fingerprint,
                 });
@@ -262,9 +292,16 @@ async function runLoop(cfg) {
                 console.log(`${label} 変更なし`);
             }
 
-            previous = snap.fingerprint;
+            previous.set(watchUrl, snap.fingerprint);
         } catch (e) {
             console.error(`${label} エラー:`, e instanceof Error ? e.message : e);
+        }
+    };
+
+    const check = async () => {
+        tick += 1;
+        for (const watchUrl of cfg.watchUrls) {
+            await checkOne(watchUrl, tick);
         }
     };
 
@@ -279,7 +316,7 @@ async function runLoop(cfg) {
         }
     })();
     console.log(
-        `監視開始: ${cfg.watchUrl}\n間隔: ${cfg.intervalMs}ms\nWebhook: ${webhookHint}\n終了: Ctrl+C`
+        `監視開始 (${cfg.watchUrls.length} URL, ${cfg.intervalMs}ms):\n${cfg.watchUrls.join('\n')}\nWebhook: ${webhookHint}\n終了: Ctrl+C`
     );
 }
 
