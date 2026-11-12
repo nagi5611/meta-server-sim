@@ -17,12 +17,13 @@ import {
 } from '../lib/mcp-browser-metamask.js';
 
 const TENANT = 'P-01';
-/** 自宅サーバの hairpin 不可時は nginx 直叩き（docs: Host: sim.mmh-virtual.jp） */
+/**
+ * 公開 URL は https://sim.mmh-virtual.jp/P-01/。自宅サーバ内は hairpin 不可のため
+ * loopback + X-Forwarded-Proto: https（REQUIRE_SECURE_HTTP 互換）で入場する。
+ */
 const TENANT_URL =
-    process.env.MCP_VERIFY_TENANT_URL ||
-    process.env.MCP_SMOKE_TENANT_URL ||
-    `https://127.0.0.1/${TENANT}/`;
-const TENANT_HOST_HEADER = process.env.MCP_VERIFY_TENANT_HOST || 'sim.mmh-virtual.jp';
+    process.env.MCP_VERIFY_TENANT_URL || `http://127.0.0.1:3004/${TENANT}/`;
+const TENANT_PUBLIC_HOST = process.env.MCP_VERIFY_TENANT_HOST || 'sim.mmh-virtual.jp';
 const OFFENSIVE = process.env.MCP_VERIFY_OFFENSIVE_MSG || 'てめえ殺すぞ';
 const artifactDir =
     process.env.MCP_VERIFY_ARTIFACT_DIR ||
@@ -100,11 +101,13 @@ async function main() {
 
     const appPage0 =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app') || (await ctx.newPage());
-    await appPage0.setExtraHTTPHeaders({ Host: TENANT_HOST_HEADER });
+    await appPage0.setExtraHTTPHeaders({
+        'X-Forwarded-Proto': 'https',
+        'X-Forwarded-Host': TENANT_PUBLIC_HOST,
+    });
     await appPage0.goto(TENANT_URL, {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
-        ignoreHTTPSErrors: true,
     });
     const appPage =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
