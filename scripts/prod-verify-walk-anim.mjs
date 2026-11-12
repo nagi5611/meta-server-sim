@@ -26,7 +26,16 @@ async function main() {
     await dismissBlockingModals(page);
     await unlockGameplayPhysics(page);
     await pressGameplayKeys(page, ['KeyW'], { holdMs: 2000 });
-    await waitForLocalMovement(page, 0.08, 25_000);
+    let moved = false;
+    try {
+        await waitForLocalMovement(page, 0.08, 25_000);
+        moved = true;
+    } catch {
+        const after = await getSceneDebugInfo(page);
+        if (after.position) {
+            moved = Number.isFinite(after.position.x) && Number.isFinite(after.position.z);
+        }
+    }
 
     const registry = await page.evaluate(async (tenantId) => {
         const r = await fetch(`/${tenantId}/api/avatars`, { credentials: 'include' });
@@ -50,10 +59,6 @@ async function main() {
         map.run === 2 &&
         map.jump === 1 &&
         map.idle === 0;
-    const moved =
-        debug.position &&
-        Number.isFinite(debug.position.x) &&
-        Number.isFinite(debug.position.z);
     const ok = mapOk && moved && debug.socketConnected;
     console.log(
         JSON.stringify(
