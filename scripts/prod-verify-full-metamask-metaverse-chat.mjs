@@ -21,9 +21,11 @@ const TENANT = 'P-01';
  * 公開 URL は https://sim.mmh-virtual.jp/P-01/。自宅サーバ内は hairpin 不可のため
  * loopback + X-Forwarded-Proto: https（REQUIRE_SECURE_HTTP 互換）で入場する。
  */
-const TENANT_URL =
-    process.env.MCP_VERIFY_TENANT_URL || `http://127.0.0.1:3004/${TENANT}/`;
 const TENANT_PUBLIC_HOST = process.env.MCP_VERIFY_TENANT_HOST || 'sim.mmh-virtual.jp';
+/** 本番内検証は /etc/hosts で sim → 127.0.0.1（sudo 設定）し HTTPS 公開 URL を使う */
+const TENANT_URL =
+    process.env.MCP_VERIFY_TENANT_URL ||
+    `https://${TENANT_PUBLIC_HOST}/${TENANT}/`;
 const OFFENSIVE = process.env.MCP_VERIFY_OFFENSIVE_MSG || 'てめえ殺すぞ';
 const artifactDir =
     process.env.MCP_VERIFY_ARTIFACT_DIR ||
@@ -61,13 +63,29 @@ async function waitMetaverseReady(page) {
 }
 
 async function waitForSocket(page) {
-    await page.waitForFunction(
-        () => {
-            const s = window.__tenantE2E?.getSocket?.();
-            return !!s?.connected;
-        },
-        { timeout: 120_000 },
-    );
+    const deadline = Date.now() + 120_000;
+    let stableTicks = 0;
+    while (Date.now() < deadline) {
+        const ready = await page
+            .evaluate(() => {
+                const e2e = window.__tenantE2E;
+                const sock = e2e?.getSocket?.();
+                if (!sock?.connected) return false;
+                const ping = e2e?.getNetworkManager?.()?.getPingStatus?.();
+                if (ping?.reconnecting) return false;
+                return true;
+            })
+            .catch(() => false);
+        if (!ready) {
+            stableTicks = 0;
+            await page.waitForTimeout(500);
+            continue;
+        }
+        stableTicks += 1;
+        if (stableTicks >= 2) return;
+        await page.waitForTimeout(400);
+    }
+    throw new Error('socket not connected after wait');
 }
 
 /**
@@ -94,30 +112,35 @@ async function emitChatAckViaBrowser(page, message) {
 async function main() {
     const report = { steps: [], offensiveMessage: OFFENSIVE, tenantUrl: TENANT_URL };
 
-    report.steps.push({ step: 'browser_session_start', note: 'getOrLaunchBrowserSession' });
+    report.steps.push({
+        step: 'browser_session_start',
+        note: 'getOrLaunchBrowserSession (MetaMask MCP 同等)',
+    });
+    report.publicTenantUrl = TENANT_URL;
     const ctx = await getOrLaunchBrowserSession();
-    for (const p of ctx.pages()) {
-        await p.addInitScript(() => {
-            window.__TENANT_E2E_HARNESS__ = '1';
-            document.documentElement.dataset.e2eHarness = '1';
-            try {
-                localStorage.setItem('metaverse-control-scheme', 'keyboard');
-            } catch {
-                /* ignore */
-            }
-        });
-    }
+    await ctx.addInitScript(() => {
+        window.__TENANT_E2E_HARNESS__ = '1';
+        document.documentElement.dataset.e2eHarness = '1';
+        try {
+            localStorage.setItem('metaverse-control-scheme', 'keyboard');
+        } catch {
+            /* ignore */
+        }
+    });
     report.steps.push({ step: 'browser_session_started', pageCount: ctx.pages().length, ok: true });
 
     const appPage0 =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app') || (await ctx.newPage());
-    await appPage0.setExtraHTTPHeaders({
-        'X-Forwarded-Proto': 'https',
-        'X-Forwarded-Host': TENANT_PUBLIC_HOST,
-    });
+    if (TENANT_URL.startsWith('http://127.0.0.1')) {
+        await appPage0.setExtraHTTPHeaders({
+            'X-Forwarded-Proto': 'https',
+            'X-Forwarded-Host': TENANT_PUBLIC_HOST,
+        });
+    }
     await appPage0.goto(TENANT_URL, {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
+        ignoreHTTPSErrors: true,
     });
     const appPage =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
@@ -150,7 +173,13 @@ async function main() {
     report.moderationDirect = moderationDirect;
     report.steps.push({ step: 'jev_gemini_pipeline_direct', moderation: moderationDirect });
 
-    const chatAck = await emitChatAckViaBrowser(appPage, OFFENSIVE);
+    let chatAck = null;
+    try {
+        await waitForSocket(appPage);
+        chatAck = await emitChatAckViaBrowser(appPage, OFFENSIVE);
+    } catch (e) {
+        report.steps.push({ step: 'chat_message_ack_warn', error: String(e) });
+    }
     report.chatAck = chatAck;
     report.steps.push({ step: 'chat_message_ack', ack: chatAck });
 
@@ -172,9 +201,13 @@ async function main() {
 
     await closeBrowserSession();
     const mod = report.moderationDirect || {};
+    const reasonJa = String(mod.reason_ja || '');
+    const categoryMatch = /暴言/.test(reasonJa);
+    report.category_ja = categoryMatch ? '暴言' : reasonJa.match(/カテゴリ[：:]\s*(\S+)/)?.[1] || null;
     report.ok =
         mod.inappropriate === true &&
         (mod.moderation_stage === 'jev_reject_gemini_detail' || mod.moderation_stage === 'gemini_only') &&
+        (categoryMatch || report.category_ja === '暴言') &&
         chatAck?.ok === false &&
         chatAck?.code === 'inappropriate';
 
