@@ -152,9 +152,10 @@ registerTenantPluginShutdownHooks(httpServer);
 if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
     app.use('/metaverse-simple-static', express.static(SIMPLE_PUBLIC_DIR, { index: false }));
     const simpleSharedJs = ['metaverse-i18n.js', 'prefab-glb-fetch-worker.js', 'mesh-bvh-worker.js'];
+    const tenantSharedJsDir = path.join(__dirname, 'public', 'js');
     for (const jsName of simpleSharedJs) {
         app.get(`/js/${jsName}`, (_req, res) => {
-            const tenantOverride = path.join(STATIC_DIR, 'js', jsName);
+            const tenantOverride = path.join(tenantSharedJsDir, jsName);
             const abs = fs.existsSync(tenantOverride)
                 ? tenantOverride
                 : path.join(SIMPLE_PUBLIC_DIR, 'js', jsName);
