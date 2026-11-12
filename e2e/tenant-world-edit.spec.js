@@ -129,4 +129,41 @@ test.describe('tenant world edit', () => {
         await spawnX.fill(String(marker));
         await expect(page.locator('#spawn-x')).toHaveValue(String(marker));
     });
+
+    test('P-01 world-edit save button succeeds (worlds/patch)', async ({ page }) => {
+        const consoleLines = attachConsoleWatchers(page);
+
+        await page.goto('/admin/tenant/P-01/world-edit');
+        await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
+        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
+
+        const lobbyItem = page.locator('#world-list .item').filter({ hasText: /lobby/i });
+        await lobbyItem.click();
+
+        await page.locator('.we-right-category-btn[data-we-right-category="settings"]').click();
+        await page
+            .locator('#panel-spawn details')
+            .filter({ hasText: 'スポーン位置' })
+            .locator('summary')
+            .click();
+
+        const spawnX = page.locator('#spawn-x');
+        await expect(spawnX).toBeVisible();
+        const current = Number(await spawnX.inputValue());
+        const next = Number.isFinite(current) ? current + 0.001 : 42;
+        await spawnX.fill(String(next));
+
+        const saveBtn = page.locator('#btn-save');
+        await expect(saveBtn).toBeEnabled();
+        await saveBtn.click();
+
+        const saveStatus = page.locator('#save-status');
+        await expect(saveStatus).toContainText(/保存しました/, { timeout: 120_000 });
+        await expect(saveStatus).not.toHaveClass(/error/);
+
+        const failures = consoleLines.filter(
+            (t) => t.includes('tenant_not_found') || t.includes('tenant not found')
+        );
+        expect(failures, failures.join(' | ')).toEqual([]);
+    });
 });

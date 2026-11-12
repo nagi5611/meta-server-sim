@@ -47,11 +47,37 @@ function resolveAdminRequestUrl(input) {
 }
 
 /**
+ * @param {string} url
+ * @returns {string}
+ */
+function adminFetchPath(url) {
+    const raw = String(url || '');
+    if (raw.startsWith('/admin') || raw.startsWith('/host-monitor')) {
+        return raw;
+    }
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+        try {
+            const u = new URL(raw);
+            if (typeof window !== 'undefined') {
+                const here = window.location;
+                if (u.origin === `${here.protocol}//${here.host}`) {
+                    return `${u.pathname}${u.search}`;
+                }
+            }
+        } catch {
+            /* ignore */
+        }
+    }
+    return raw;
+}
+
+/**
  * URL が管理 API 向け fetch ラップ対象か
  * @param {string} url
  */
 function needsAdminFetch(url) {
-    return url.startsWith('/admin') || url.startsWith('/host-monitor');
+    const path = adminFetchPath(url);
+    return path.startsWith('/admin') || path.startsWith('/host-monitor');
 }
 
 /**
