@@ -39,23 +39,11 @@ export METAMASK_EXTENSION_PATH=/path/to/metamask-extension/dist/chrome
 npm run mcp:browser-metamask
 ```
 
-## Cursor 設定例（`.cursor/mcp.json`）
+## Cursor 設定（`.cursor/mcp.json`）
 
-```json
-{
-  "mcpServers": {
-    "metasim-browser-metamask": {
-      "command": "node",
-      "args": ["mcp/browser-metamask-mcp-server.js"],
-      "cwd": "/path/to/meta-server-sim",
-      "env": {
-        "METAMASK_EXTENSION_PATH": "/path/to/metamask-extension/dist/chrome",
-        "BROWSER_METAMASK_BASE_URL": "http://127.0.0.1:3003/P-01/"
-      }
-    }
-  }
-}
-```
+本番ホスト向け設定はリポジトリ直下 **`.cursor/mcp.json`** に同梱（`metasim-fleet` と `metasim-browser-metamask`）。`env` は `/etc/mmh-virtual/mcp-metamask.env` と同一です。
+
+ローカル開発では `METAMASK_EXTENSION_PATH` と `BROWSER_METAMASK_BASE_URL`（例: `http://127.0.0.1:3003`）だけ差し替えてください。
 
 ## 典型フロー（メタバース + MetaMask）
 
