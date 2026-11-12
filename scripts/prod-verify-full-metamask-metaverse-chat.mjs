@@ -60,6 +60,16 @@ async function waitMetaverseReady(page) {
     );
 }
 
+async function waitForSocket(page) {
+    await page.waitForFunction(
+        () => {
+            const s = window.__tenantE2E?.getSocket?.();
+            return !!s?.connected;
+        },
+        { timeout: 120_000 },
+    );
+}
+
 /**
  * @param {import('playwright').Page} page
  * @param {string} message
@@ -116,6 +126,11 @@ async function main() {
     await waitMetaverseReady(appPage).catch((e) => {
         report.steps.push({ step: 'metaverse_ready_warn', error: String(e) });
     });
+    await appPage.keyboard.press('KeyW').catch(() => {});
+    await waitForSocket(appPage).catch((e) => {
+        report.steps.push({ step: 'socket_wait_warn', error: String(e) });
+    });
+    await appPage.waitForTimeout(3000);
 
     const metaSnap = await snapshotPlaywrightPage(appPage);
     savePng('prod-verify-metaverse.png', metaSnap.screenshotBase64);
@@ -156,9 +171,12 @@ async function main() {
     }
 
     await closeBrowserSession();
+    const mod = report.moderationDirect || {};
     report.ok =
+        mod.inappropriate === true &&
+        (mod.moderation_stage === 'jev_reject_gemini_detail' || mod.moderation_stage === 'gemini_only') &&
         chatAck?.ok === false &&
-        (chatAck?.code === 'inappropriate' || String(chatAck?.message || '').length > 0);
+        chatAck?.code === 'inappropriate';
 
     const out = path.join(artifactDir, 'prod-verify-full-report.json');
     fs.writeFileSync(out, JSON.stringify(report, null, 2));
