@@ -176,6 +176,14 @@ app.get('/api/health', (_req, res) => {
 
 });
 
+app.get('/mcp-wallet-smoke.html', (_req, res) => {
+    const smokePath = path.join(__dirname, 'public', 'mcp-wallet-smoke.html');
+    if (!fs.existsSync(smokePath)) {
+        return res.status(404).type('text/plain').send('mcp-wallet-smoke.html not found');
+    }
+    res.sendFile(smokePath);
+});
+
 
 
 app.get('/api/tenants', (_req, res) => {
