@@ -44,10 +44,9 @@ function savePng(name, b64) {
 
 async function dismissGate(page) {
     const deadline = Date.now() + 180_000;
+    const gatePanel = page.locator('#tenant-login-gate');
     while (Date.now() < deadline) {
-        const open = await page
-            .evaluate(() => document.body.classList.contains('tenant-login-gate-open'))
-            .catch(() => false);
+        const open = await gatePanel.isVisible().catch(() => false);
         if (open) {
             const name = `McpVerify-${Date.now()}`;
             await page.locator('#tenant-login-display-name').fill(name, { timeout: 15_000 });
@@ -56,9 +55,20 @@ async function dismissGate(page) {
                 const val = await avatarSelect.locator('option').first().getAttribute('value');
                 if (val) await avatarSelect.selectOption(val);
             }
-            await page.locator('#tenant-login-enter-btn').click({ timeout: 15_000 });
+            const enter = page.locator('#tenant-login-enter-btn');
+            if (await enter.isVisible().catch(() => false)) {
+                await enter.click({ timeout: 15_000 });
+            } else {
+                await page.evaluate(() => document.getElementById('tenant-login-enter-btn')?.click());
+            }
             await page.waitForFunction(
-                () => !document.body.classList.contains('tenant-login-gate-open'),
+                () => {
+                    const g = document.getElementById('tenant-login-gate');
+                    return (
+                        !document.body.classList.contains('tenant-login-gate-open') &&
+                        (g?.hidden !== false || g == null)
+                    );
+                },
                 { timeout: 60_000 },
             );
             break;
