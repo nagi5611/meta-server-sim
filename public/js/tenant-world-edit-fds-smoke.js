@@ -211,7 +211,7 @@ export class TenantWorldEditFdsSmokePreview {
                 manifestPath,
                 transform,
                 cfg.render ?? {},
-                { initialFrame },
+                { initialFrame, manifest },
             );
 
             if (!this._entries.get(group) || this._entries.get(group).loadId !== loadId) {

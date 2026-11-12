@@ -2,9 +2,11 @@
 
 import {
     applyFdsSmokePartToAtlas,
+    clearFdsSmokeManifestCache,
     computeFdsVolumePlacement,
     createFdsSmokeVolume,
     loadFdsSmokeManifestOnly,
+    prefetchFdsSmokeManifests,
 } from './fds/fds-volume-loader.js';
 import {
     SMOKE_INSIDE_NORMALIZED_THRESHOLD,
@@ -13,8 +15,8 @@ import {
 import { FdsSmokeDepthPass } from './fds/fds-smoke-depth-pass.js';
 import * as THREE from 'three';
 
-/** 同時にロードする FDS 煙ボリューム数（ワールド本体ロード後に実行） */
-const FDS_SMOKE_LOAD_CONCURRENCY = 2;
+/** 同時にロードする FDS 煙ボリューム数（バイナリ取得；manifest は事前並列） */
+const FDS_SMOKE_LOAD_CONCURRENCY = 3;
 
 /**
  * @param {number} concurrency
@@ -142,12 +144,16 @@ export class TenantFdsSmokeManager {
      */
     async loadForWorld(world) {
         this.dispose();
+        clearFdsSmokeManifestCache();
         const configs = Array.isArray(world?.fdsSmokes) ? world.fdsSmokes : [];
         if (configs.length === 0) {
             return;
         }
 
         const token = ++this._loadToken;
+
+        const manifestPaths = configs.map((c) => c?.manifest).filter(Boolean);
+        await prefetchFdsSmokeManifests(manifestPaths);
 
         const factories = configs.map((config) => async () => {
             if (!config?.manifest) {
@@ -176,7 +182,7 @@ export class TenantFdsSmokeManager {
                     config.manifest,
                     transform,
                     config.render ?? {},
-                    { initialFrame },
+                    { initialFrame, manifest },
                 );
                 const placement = computeFdsVolumePlacement(manifest, transform);
                 if (token !== this._loadToken) {

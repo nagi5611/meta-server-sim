@@ -342,7 +342,6 @@ class TenantMetaverseApp {
 
         this.uiManager = new UIManager();
         this.worldManager = new WorldManager(this.sceneManager);
-        await ensureFdsSmokeBulkConfig();
         await this.worldManager.init();
 
         this.worldManager.onWorldChange((world) => {
