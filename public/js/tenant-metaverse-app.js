@@ -21,6 +21,7 @@ import MobileUIManager from '../../../metaverse-simple/public/js/mobile-ui-manag
 import MobileJoystickManager from '../../../metaverse-simple/public/js/mobile-joystick-manager.js';
 import { TenantTeleportManager } from './tenant-teleport-manager.js';
 import { getTenantIdFromPath, toTenantUrl } from './tenant-runtime-shim.js';
+import { renderMetaversePortalNav } from './metaverse-portal-nav.js';
 import { applyMetaverseI18nToDocument, t } from '../../../metaverse-simple/public/js/metaverse-i18n.js';
 import { resolveEnvAssetHref } from './tenant-asset-resolve.js';
 import {
@@ -305,8 +306,9 @@ class TenantMetaverseApp {
         const titleEl = document.getElementById('tenant-title');
         if (titleEl) titleEl.textContent = tenantId;
 
-        const portalNav = document.getElementById('metaverse-portal-nav');
-        if (portalNav) portalNav.setAttribute('hidden', '');
+        renderMetaversePortalNav(document.getElementById('metaverse-portal-links'), {
+            hideSeriesLinks: true,
+        });
 
         this.setupPageVisibility();
         this.isMobileMode = isMobile();

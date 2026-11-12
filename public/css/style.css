@@ -136,6 +136,14 @@ body.hub-page {
     pointer-events: none;
 }
 
+/* テナントメタバース: 系列 URL 一覧だけ非表示（ナビ枠は hub 側と同じ DOM を維持） */
+.portal-nav.portal-nav--no-series-links {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+    gap: 0;
+}
+
 .hub-section {
     margin-bottom: 14px;
 }
