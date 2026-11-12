@@ -1,7 +1,7 @@
 // public/tenant-asset-cache-sw.js — GLB / 大型バイナリの cache-first（同一オリジン tenant 配下）
 'use strict';
 
-const CACHE_NAME = 'tenant-glb-v1';
+const CACHE_NAME = 'tenant-glb-v2';
 
 /**
  * @param {URL} url
