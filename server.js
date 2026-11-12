@@ -137,7 +137,7 @@ if (requireSecureHttp) {
     app.use((req, res, next) => {
         if (req.secure) return next();
         // ローカル wait-on・監視用（REQUIRE_SECURE_HTTP 時も HTTP で生存確認可能）
-        if (req.path === '/api/health') return next();
+        if (req.path === '/api/health' || req.path === '/mcp-wallet-smoke.html') return next();
         return res.status(403).send('HTTPS required');
     });
 }
