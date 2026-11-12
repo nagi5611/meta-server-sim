@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { t, getMetaverseLocale } from './metaverse-i18n.js';
+import { t, getMetaverseLocale } from '../../../metaverse-simple/public/js/metaverse-i18n.js';
 
 /**
  * チャット時刻表示用 BCP 47 タグ（UI 言語に合わせる）
