@@ -2,8 +2,9 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
-import { STORAGE_PATHS } from '../../../../config/storage-paths.js';
 import { countBenchUsers } from '../../../../db/users.js';
+
+const USERS_DB_PATH = path.join(process.cwd(), 'data', 'users.db');
 
 /**
  * @param {string} dbPath
@@ -30,7 +31,7 @@ export function runDbSqliteBenchmark(addonDbPath) {
     /** @type {Array<{ target: string, latencyMs: number }>} */
     const details = [];
 
-    const usersPath = path.join(STORAGE_PATHS.DB_DIR, 'users.db');
+    const usersPath = USERS_DB_PATH;
     details.push({
         target: 'users.db SELECT',
         latencyMs: measureQuery(usersPath, (db) => {
