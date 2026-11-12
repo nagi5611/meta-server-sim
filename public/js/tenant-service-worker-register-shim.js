@@ -2,9 +2,26 @@
 import {
     registerMetaverseServiceWorker as registerMetaverseServiceWorkerCore,
 } from '../../../metaverse-simple/public/js/service-worker-register.js';
-import { toTenantUrl } from './tenant-runtime-shim.js';
+import { getTenantIdFromPath, toTenantUrl } from './tenant-runtime-shim.js';
 
 export { registerMetaverseServiceWorkerCore as registerMetaverseServiceWorker };
+
+/**
+ * GLB 専用 cache-first SW（テナントスコープ）
+ */
+export async function registerTenantAssetCacheServiceWorker() {
+    const tenantId = getTenantIdFromPath();
+    if (!tenantId || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+        return;
+    }
+    const swUrl = `/${encodeURIComponent(tenantId)}/tenant-asset-cache-sw.js`;
+    const scope = `/${encodeURIComponent(tenantId)}/`;
+    try {
+        await navigator.serviceWorker.register(swUrl, { scope });
+    } catch (err) {
+        console.warn('[tenant-asset-cache-sw] register failed:', err);
+    }
+}
 
 /**
  * @param {string} assetPath
@@ -33,7 +50,12 @@ export async function notifyServiceWorkerInvalidate(urls) {
                 setTimeout(() => reject(new Error('service_worker_ready_timeout')), SW_READY_TIMEOUT_MS);
             }),
         ]);
-        reg?.active?.postMessage({ type: 'INVALIDATE', urls: list });
+        const message = { type: 'INVALIDATE', urls: list };
+        reg?.active?.postMessage(message);
+        const tenantReg = (await navigator.serviceWorker.getRegistrations()).find((r) =>
+            r.active?.scriptURL?.includes('tenant-asset-cache-sw.js'),
+        );
+        tenantReg?.active?.postMessage(message);
     } catch {
         /* 管理画面では SW 未登録が通常 */
     }

@@ -38,6 +38,7 @@ import { fetchAdminMetaverseEntry } from './tenant-admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
+import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 
 const DEFAULT_ROOM = 'lobby';
 
@@ -295,6 +296,7 @@ class TenantMetaverseApp {
         if (isTenantE2EHarnessEnabled()) {
             window.__tenantInitPhase = 'after-login-gate';
         }
+        void registerTenantAssetCacheServiceWorker();
         await ensureFdsSmokeBulkConfig();
         ensureGuestUsername();
         await this._resolveUserRole();
