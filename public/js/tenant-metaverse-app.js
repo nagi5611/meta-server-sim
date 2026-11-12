@@ -34,7 +34,7 @@ import { TenantFdsSmokeManager } from './tenant-fds-smoke-manager.js';
 import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
 import { TenantFdsSmokeExposureMonitor } from './tenant-fds-smoke-exposure.js';
 import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
-import { fetchAdminMetaverseEntry } from '../../../metaverse-simple/public/js/admin-metaverse-auth.js';
+import { fetchAdminMetaverseEntry } from './tenant-admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
