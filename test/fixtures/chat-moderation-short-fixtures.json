@@ -1,0 +1,17 @@
+[
+  {
+    "id": "safe-short-1",
+    "text": "今日の実験、培養うまくいった",
+    "expected_jev_class": "pass"
+  },
+  {
+    "id": "safe-short-2",
+    "text": "誰かプレゼンの資料見れる？",
+    "expected_jev_class": "pass"
+  },
+  {
+    "id": "edge-short-1",
+    "text": "てめえ殺すぞ",
+    "expected_jev_class": "reject"
+  }
+]
