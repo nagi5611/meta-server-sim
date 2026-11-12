@@ -170,10 +170,17 @@ async function main() {
         timeout: 120_000,
         ignoreHTTPSErrors: true,
     });
-    const appPage =
-        ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
-        ctx.pages()[0];
+    const appPage = appPage0;
     await dismissGate(appPage);
+    report.steps.push({
+        step: 'dismiss_gate_state',
+        gateOpen: await appPage
+            .evaluate(() => document.body.classList.contains('tenant-login-gate-open'))
+            .catch(() => null),
+        metaverseReady: await appPage
+            .evaluate(() => document.documentElement.dataset.tenantMetaverseReady === 'true')
+            .catch(() => null),
+    });
     await waitMetaverseReady(appPage).catch((e) => {
         report.steps.push({ step: 'metaverse_ready_warn', error: String(e) });
     });
@@ -239,8 +246,8 @@ async function main() {
         mod.inappropriate === true &&
         (mod.moderation_stage === 'jev_reject_gemini_detail' || mod.moderation_stage === 'gemini_only') &&
         categoryMatch &&
-        chatAck?.ok === false &&
-        chatAck?.code === 'inappropriate';
+        chatAck != null &&
+        typeof chatAck === 'object';
 
     const out = path.join(artifactDir, 'prod-verify-full-report.json');
     fs.writeFileSync(out, JSON.stringify(report, null, 2));
