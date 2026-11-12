@@ -95,6 +95,13 @@ function ensureTenantControlSchemeDefault() {
 /**
  * ゲスト名を localStorage に用意
  */
+function isTenantE2EHarnessEnabled() {
+    return (
+        document.documentElement?.dataset?.e2eHarness === '1' ||
+        window.__TENANT_E2E_HARNESS__ === '1'
+    );
+}
+
 function ensureGuestUsername() {
     try {
         const existing = localStorage.getItem('username');
@@ -272,10 +279,7 @@ class TenantMetaverseApp {
 
         applyMetaverseI18nToDocument();
         ensureTenantControlSchemeDefault();
-        const e2eHarnessEarly =
-            document.documentElement.dataset.e2eHarness === '1' ||
-            window.__TENANT_E2E_HARNESS__ === '1';
-        if (e2eHarnessEarly) {
+        if (isTenantE2EHarnessEnabled()) {
             try {
                 localStorage.setItem('metaverse-control-scheme', 'keyboard');
             } catch {
@@ -398,6 +402,10 @@ class TenantMetaverseApp {
         });
 
         await this.networkManager.connect();
+
+        if (isTenantE2EHarnessEnabled()) {
+            this._publishTenantE2EHarness();
+        }
 
         await this.worldManager.loadWorld(defaultWorldId, () => {
             this.updateTeleportZones();
@@ -590,11 +598,14 @@ class TenantMetaverseApp {
         });
 
         console.log(`[tenant-metaverse] initialized for ${tenantId}`);
-        const e2eHarnessEnabled =
-            document.documentElement.dataset.e2eHarness === '1' ||
-            window.__TENANT_E2E_HARNESS__ === '1';
-        if (e2eHarnessEnabled) {
-            window.__tenantE2E = {
+        document.documentElement.dataset.tenantMetaverseReady = 'true';
+        if (isTenantE2EHarnessEnabled()) {
+            this._publishTenantE2EHarness();
+        }
+    }
+
+    _publishTenantE2EHarness() {
+        window.__tenantE2E = {
                 getSocket: () => this.networkManager?.socket ?? null,
                 getVoiceChatManager: () => this.voiceChatManager ?? null,
                 getVideoChatManager: () => this.videoChatManager ?? null,
@@ -686,9 +697,7 @@ class TenantMetaverseApp {
                             );
                         }, ms);
                     }),
-            };
-        }
-        document.documentElement.dataset.tenantMetaverseReady = 'true';
+        };
     }
 
     async onWorldChanged(world) {

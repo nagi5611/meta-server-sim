@@ -146,8 +146,8 @@ async function main() {
     const ctx = await getOrLaunchBrowserSession();
     await ctx.addInitScript(() => {
         window.__TENANT_E2E_HARNESS__ = '1';
-        document.documentElement.dataset.e2eHarness = '1';
         try {
+            document.documentElement?.dataset && (document.documentElement.dataset.e2eHarness = '1');
             localStorage.setItem('metaverse-control-scheme', 'keyboard');
             localStorage.setItem('username', `McpVerify-${Date.now()}`);
         } catch {
@@ -162,7 +162,9 @@ async function main() {
     /** @type {string[]} */
     const browserConsole = [];
     appPage0.on('console', (msg) => browserConsole.push(`[${msg.type()}] ${msg.text()}`));
-    appPage0.on('pageerror', (err) => browserConsole.push(`[pageerror] ${err.message}`));
+    appPage0.on('pageerror', (err) =>
+        browserConsole.push(`[pageerror] ${err.message}\n${err.stack || ''}`),
+    );
     if (TENANT_URL.startsWith('http://127.0.0.1')) {
         await appPage0.setExtraHTTPHeaders({
             'X-Forwarded-Proto': 'https',
@@ -170,8 +172,8 @@ async function main() {
         });
     }
     await appPage0.goto(TENANT_URL, {
-        waitUntil: 'domcontentloaded',
-        timeout: 120_000,
+        waitUntil: 'load',
+        timeout: 180_000,
         ignoreHTTPSErrors: true,
     });
     const appPage = appPage0;
