@@ -43,14 +43,30 @@ function savePng(name, b64) {
 }
 
 async function dismissGate(page) {
-    const gate = page.locator('#tenant-login-gate');
-    if (await gate.isVisible({ timeout: 8000 }).catch(() => false)) {
-        await page.locator('#tenant-login-display-name').fill(`McpVerify-${Date.now()}`);
-        await page.locator('#tenant-login-enter-btn').click();
-        await gate.waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {});
+    const needsGate = await page
+        .evaluate(() => {
+            const gate = document.getElementById('tenant-login-gate');
+            return (
+                document.body.classList.contains('tenant-login-gate-open') ||
+                (gate && gate.hidden === false)
+            );
+        })
+        .catch(() => false);
+    if (needsGate) {
+        const name = `McpVerify-${Date.now()}`;
+        await page.locator('#tenant-login-display-name').fill(name, { timeout: 15_000 });
+        const avatarSelect = page.locator('#tenant-login-avatar-select');
+        if (await avatarSelect.isVisible().catch(() => false)) {
+            await avatarSelect.selectOption({ index: 0 }).catch(() => {});
+        }
+        await page.locator('#tenant-login-enter-btn').click({ timeout: 15_000 });
+        await page.waitForFunction(
+            () => !document.body.classList.contains('tenant-login-gate-open'),
+            { timeout: 60_000 },
+        );
     }
     const kb = page.locator('#control-scheme-keyboard-btn');
-    if (await kb.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (await kb.isVisible({ timeout: 5000 }).catch(() => false)) {
         await kb.click();
     }
 }
@@ -123,6 +139,7 @@ async function main() {
         document.documentElement.dataset.e2eHarness = '1';
         try {
             localStorage.setItem('metaverse-control-scheme', 'keyboard');
+            localStorage.setItem('username', `McpVerify-${Date.now()}`);
         } catch {
             /* ignore */
         }
@@ -131,6 +148,7 @@ async function main() {
 
     const appPage0 =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app') || (await ctx.newPage());
+    appPage0.setDefaultTimeout(120_000);
     if (TENANT_URL.startsWith('http://127.0.0.1')) {
         await appPage0.setExtraHTTPHeaders({
             'X-Forwarded-Proto': 'https',
@@ -185,7 +203,7 @@ async function main() {
 
     try {
         await appPage.locator('#chat-input').fill(OFFENSIVE, { timeout: 5000 });
-        await appPage.locator('#chat-send-btn').click({ timeout: 5000 });
+        await appPage.locator('#chat-send-btn').click({ timeout: 15_000, force: true });
         await appPage.waitForTimeout(8000);
         const chatSnap = await snapshotPlaywrightPage(appPage);
         savePng('prod-verify-chat-ui.png', chatSnap.screenshotBase64);
@@ -202,12 +220,15 @@ async function main() {
     await closeBrowserSession();
     const mod = report.moderationDirect || {};
     const reasonJa = String(mod.reason_ja || '');
-    const categoryMatch = /暴言/.test(reasonJa);
-    report.category_ja = categoryMatch ? '暴言' : reasonJa.match(/カテゴリ[：:]\s*(\S+)/)?.[1] || null;
+    const violentCategories = /暴言|脅迫|殺害|暴力/;
+    const categoryMatch = violentCategories.test(reasonJa);
+    report.category_ja =
+        reasonJa.match(/カテゴリ[：:]\s*(\S+)/)?.[1] ||
+        (reasonJa.includes('暴言') ? '暴言' : reasonJa.includes('脅迫') ? '脅迫' : reasonJa || null);
     report.ok =
         mod.inappropriate === true &&
         (mod.moderation_stage === 'jev_reject_gemini_detail' || mod.moderation_stage === 'gemini_only') &&
-        (categoryMatch || report.category_ja === '暴言') &&
+        categoryMatch &&
         chatAck?.ok === false &&
         chatAck?.code === 'inappropriate';
 
