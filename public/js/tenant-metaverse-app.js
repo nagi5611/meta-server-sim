@@ -277,6 +277,10 @@ class TenantMetaverseApp {
             return;
         }
 
+        if (isTenantE2EHarnessEnabled()) {
+            window.__tenantInitPhase = 'init-start';
+        }
+
         applyMetaverseI18nToDocument();
         ensureTenantControlSchemeDefault();
         if (isTenantE2EHarnessEnabled()) {
@@ -289,9 +293,15 @@ class TenantMetaverseApp {
             await ensureControlSchemeChosen();
         }
         await runTenantLoginGate();
+        if (isTenantE2EHarnessEnabled()) {
+            window.__tenantInitPhase = 'after-login-gate';
+        }
         ensureGuestUsername();
         await this._resolveUserRole();
         await loadTenantPluginClientModules();
+        if (isTenantE2EHarnessEnabled()) {
+            window.__tenantInitPhase = 'after-plugins';
+        }
 
         const titleEl = document.getElementById('tenant-title');
         if (titleEl) titleEl.textContent = tenantId;
@@ -402,8 +412,8 @@ class TenantMetaverseApp {
         });
 
         await this.networkManager.connect();
-
         if (isTenantE2EHarnessEnabled()) {
+            window.__tenantInitPhase = 'after-socket-connect';
             this._publishTenantE2EHarness();
         }
 

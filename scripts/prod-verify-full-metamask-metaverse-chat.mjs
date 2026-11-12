@@ -187,7 +187,26 @@ async function main() {
         metaverseReady: await appPage
             .evaluate(() => document.documentElement.dataset.tenantMetaverseReady === 'true')
             .catch(() => null),
+        initPhase: await appPage.evaluate(() => window.__tenantInitPhase || null).catch(() => null),
     });
+    for (let i = 0; i < 180; i++) {
+        const diag = await appPage
+            .evaluate(() => ({
+                initPhase: window.__tenantInitPhase || null,
+                hasE2E: Boolean(window.__tenantE2E),
+                socketConnected: Boolean(window.__tenantE2E?.getSocket?.()?.connected),
+                initError: document.getElementById('socket-status')?.textContent || null,
+            }))
+            .catch(() => null);
+        if (diag?.socketConnected) {
+            report.steps.push({ step: 'init_diagnostics', attempt: i, ...diag });
+            break;
+        }
+        if (i === 179) {
+            report.steps.push({ step: 'init_diagnostics', attempt: i, ...diag });
+        }
+        await appPage.waitForTimeout(1000);
+    }
     await waitMetaverseReady(appPage).catch((e) => {
         report.steps.push({
             step: 'metaverse_ready_warn',
