@@ -43,23 +43,27 @@ function savePng(name, b64) {
 }
 
 async function dismissGate(page) {
-    const enterOpen = page.locator('body.tenant-login-gate-open #tenant-login-enter-btn');
-    try {
-        await enterOpen.waitFor({ state: 'visible', timeout: 90_000 });
-        const name = `McpVerify-${Date.now()}`;
-        await page.locator('#tenant-login-display-name').fill(name, { timeout: 15_000 });
-        const avatarSelect = page.locator('#tenant-login-avatar-select');
-        if (!(await avatarSelect.isDisabled().catch(() => true))) {
-            const val = await avatarSelect.locator('option').first().getAttribute('value');
-            if (val) await avatarSelect.selectOption(val);
+    const deadline = Date.now() + 180_000;
+    while (Date.now() < deadline) {
+        const open = await page
+            .evaluate(() => document.body.classList.contains('tenant-login-gate-open'))
+            .catch(() => false);
+        if (open) {
+            const name = `McpVerify-${Date.now()}`;
+            await page.locator('#tenant-login-display-name').fill(name, { timeout: 15_000 });
+            const avatarSelect = page.locator('#tenant-login-avatar-select');
+            if (!(await avatarSelect.isDisabled().catch(() => true))) {
+                const val = await avatarSelect.locator('option').first().getAttribute('value');
+                if (val) await avatarSelect.selectOption(val);
+            }
+            await page.locator('#tenant-login-enter-btn').click({ timeout: 15_000 });
+            await page.waitForFunction(
+                () => !document.body.classList.contains('tenant-login-gate-open'),
+                { timeout: 60_000 },
+            );
+            break;
         }
-        await enterOpen.click({ timeout: 15_000 });
-        await page.waitForFunction(
-            () => !document.body.classList.contains('tenant-login-gate-open'),
-            { timeout: 60_000 },
-        );
-    } catch {
-        /* gate not shown (single avatar) */
+        await page.waitForTimeout(400);
     }
     const kb = page.locator('#control-scheme-keyboard-btn');
     if (await kb.isVisible({ timeout: 8000 }).catch(() => false)) {
@@ -151,16 +155,15 @@ async function main() {
             'X-Forwarded-Host': TENANT_PUBLIC_HOST,
         });
     }
-    const navPromise = appPage0.goto(TENANT_URL, {
+    await appPage0.goto(TENANT_URL, {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
         ignoreHTTPSErrors: true,
     });
-    const gatePromise = dismissGate(appPage0);
-    await Promise.all([navPromise, gatePromise]);
     const appPage =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
         ctx.pages()[0];
+    await dismissGate(appPage);
     await waitMetaverseReady(appPage).catch((e) => {
         report.steps.push({ step: 'metaverse_ready_warn', error: String(e) });
     });
