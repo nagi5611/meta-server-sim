@@ -91,9 +91,35 @@ npm run mcp:browser-metamask
 - **本 MCP**: Cursor から対話的にブラウザ + MetaMask を操作（人間の computer-use に近い）。
 - **Playwright E2E**（`npm run test:e2e:agent`）: CI 向けスクリプト。MetaMask を載せる場合は同じ `METAMASK_EXTENSION_PATH` パターンを E2E の `launchPersistentContext` に流用可能（本 README の lib: `lib/mcp-browser-metamask.js`）。
 
+## 本番（sim.mmh-virtual.jp）セットアップ
+
+本番ホスト `meta.mmh-virtual.jp`（MetaSim: **127.0.0.1:3004**）向けの手順です。
+
+```bash
+# 1) アンパック拡張（nagi ユーザー、sim-server 隣に配置）
+cd /home/nagi/sim-server/meta-server-sim
+node scripts/install-metamask-extension-unpacked.mjs /home/nagi/sim-server/metamask-chrome-unpacked
+
+# 2) 環境変数（例: /etc/mmh-virtual/mcp-metamask.env）
+METAMASK_EXTENSION_PATH=/home/nagi/sim-server/metamask-chrome-unpacked
+BROWSER_METAMASK_BASE_URL=http://127.0.0.1:3004
+BROWSER_METAMASK_USER_DATA_DIR=/home/nagi/sim-server/.data/mcp-metamask-profile
+BROWSER_METAMASK_CHANNEL=chrome
+# MCP_SMOKE_TENANT_URL=http://127.0.0.1:3004/P-01/
+
+# 3) スモーク（ヘッドレス Linux では xvfb 推奨）
+sudo apt-get install -y xvfb unzip  # 初回のみ
+set -a && . /etc/mmh-virtual/mcp-metamask.env && set +a
+xvfb-run -a node scripts/mcp-browser-metamask-smoke.mjs
+```
+
+成果物: `mcp-smoke-app-initial.png`, `mcp-smoke-metamask-connect.png`, `mcp-browser-metamask-smoke.json`
+
+`browser_session_start` は Cursor から `npm run mcp:browser-metamask` を登録し、上記 `env` を `mcp.json` に渡してください。
+
 ## 本番（sim.mmh-virtual.jp）について
 
-本番 HTTPS への接続も `browser_navigate` で可能ですが、**本番用 MetaMask ネットワーク・秘密鍵は MCP ログに載せない**こと。通常は **localhost dev** で検証してください。
+本番 HTTPS への接続も `browser_navigate` で可能ですが、**本番用 MetaMask ネットワーク・秘密鍵は MCP ログに載せない**こと。接続テストは `/mcp-wallet-smoke.html` を推奨します。
 
 ## トラブルシュート
 

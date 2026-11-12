@@ -15,6 +15,8 @@
         "build": "vite build && node scripts/patch-dist-admin-supplemental-css.mjs",
         "mcp:fleet": "node mcp/fleet-ops-mcp-server.js",
         "mcp:browser-metamask": "node mcp/browser-metamask-mcp-server.js",
+        "mcp:browser-metamask:smoke": "node scripts/mcp-browser-metamask-smoke.mjs",
+        "metamask:install-unpacked": "node scripts/install-metamask-extension-unpacked.mjs",
         "preview": "vite preview",
         "test:e2e": "playwright test",
         "test:e2e:tenant": "playwright test e2e/tenant-metaverse.spec.js",
