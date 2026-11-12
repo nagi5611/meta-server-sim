@@ -5,7 +5,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { io } from 'socket.io-client';
+import { moderateChatMessage } from '../lib/chat-moderation.js';
+import { getPlatformEnv } from '../lib/platform-env-config.js';
 import {
     classifyPageUrl,
     clickVisibleButton,
@@ -16,7 +17,12 @@ import {
 } from '../lib/mcp-browser-metamask.js';
 
 const TENANT = 'P-01';
-const TENANT_URL = process.env.MCP_VERIFY_TENANT_URL || `https://sim.mmh-virtual.jp/${TENANT}/`;
+/** 自宅サーバの hairpin 不可時は nginx 直叩き（docs: Host: sim.mmh-virtual.jp） */
+const TENANT_URL =
+    process.env.MCP_VERIFY_TENANT_URL ||
+    process.env.MCP_SMOKE_TENANT_URL ||
+    `https://127.0.0.1/${TENANT}/`;
+const TENANT_HOST_HEADER = process.env.MCP_VERIFY_TENANT_HOST || 'sim.mmh-virtual.jp';
 const OFFENSIVE = process.env.MCP_VERIFY_OFFENSIVE_MSG || 'てめえ殺すぞ';
 const artifactDir =
     process.env.MCP_VERIFY_ARTIFACT_DIR ||
@@ -54,38 +60,24 @@ async function waitMetaverseReady(page) {
 }
 
 /**
- * @returns {Promise<object>}
+ * @param {import('playwright').Page} page
+ * @param {string} message
  */
-function emitChatAck(baseUrl, message) {
-    const origin = baseUrl.replace(/\/$/, '');
-    const socket = io(origin, {
-        path: `/${TENANT}/socket.io`,
-        transports: ['websocket'],
-        reconnection: false,
-    });
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-            socket.disconnect();
-            reject(new Error('socket/chat ack timeout'));
-        }, 120_000);
-        socket.on('connect', async () => {
-            try {
-                socket.emit('join-world', 'school');
-            } catch {
-                /* ignore */
-            }
-            await new Promise((r) => setTimeout(r, 1500));
-            socket.emit('chat-message', message, (ack) => {
-                clearTimeout(timer);
-                socket.disconnect();
-                resolve(ack);
+async function emitChatAckViaBrowser(page, message) {
+    return page.evaluate(
+        async ({ text, timeout }) => {
+            const sock = window.__tenantE2E?.getSocket?.();
+            if (!sock?.connected) throw new Error('browser socket not connected');
+            return await new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error('chat ack timeout')), timeout);
+                sock.emit('chat-message', text, (ack) => {
+                    clearTimeout(timer);
+                    resolve(ack);
+                });
             });
-        });
-        socket.on('connect_error', (e) => {
-            clearTimeout(timer);
-            reject(e);
-        });
-    });
+        },
+        { text: message, timeout: 120_000 },
+    );
 }
 
 async function main() {
@@ -93,9 +85,27 @@ async function main() {
 
     report.steps.push({ step: 'browser_session_start', note: 'getOrLaunchBrowserSession' });
     const ctx = await getOrLaunchBrowserSession();
+    for (const p of ctx.pages()) {
+        await p.addInitScript(() => {
+            window.__TENANT_E2E_HARNESS__ = '1';
+            document.documentElement.dataset.e2eHarness = '1';
+            try {
+                localStorage.setItem('metaverse-control-scheme', 'keyboard');
+            } catch {
+                /* ignore */
+            }
+        });
+    }
     report.steps.push({ step: 'browser_session_started', pageCount: ctx.pages().length, ok: true });
 
-    await navigateApp(ctx, TENANT_URL);
+    const appPage0 =
+        ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app') || (await ctx.newPage());
+    await appPage0.setExtraHTTPHeaders({ Host: TENANT_HOST_HEADER });
+    await appPage0.goto(TENANT_URL, {
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+        ignoreHTTPSErrors: true,
+    });
     const appPage =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
         ctx.pages()[0];
@@ -113,7 +123,16 @@ async function main() {
         screenshot: 'prod-verify-metaverse.png',
     });
 
-    const chatAck = await emitChatAck(TENANT_URL.replace(/\/P-01\/?$/, ''), OFFENSIVE);
+    const moderationDirect = await moderateChatMessage({
+        apiKey: String(getPlatformEnv('GEMINI_API_KEY') || '').trim(),
+        model: getPlatformEnv('GEMINI_MODEL'),
+        historyTableText: '(検証用・履歴なし)',
+        pendingLine: `${new Date().toISOString()} | verify-script | ${OFFENSIVE}`,
+    });
+    report.moderationDirect = moderationDirect;
+    report.steps.push({ step: 'jev_gemini_pipeline_direct', moderation: moderationDirect });
+
+    const chatAck = await emitChatAckViaBrowser(appPage, OFFENSIVE);
     report.chatAck = chatAck;
     report.steps.push({ step: 'chat_message_ack', ack: chatAck });
 
