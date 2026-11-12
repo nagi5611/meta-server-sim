@@ -154,7 +154,10 @@ if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
     const simpleSharedJs = ['metaverse-i18n.js', 'prefab-glb-fetch-worker.js', 'mesh-bvh-worker.js'];
     for (const jsName of simpleSharedJs) {
         app.get(`/js/${jsName}`, (_req, res) => {
-            const abs = path.join(SIMPLE_PUBLIC_DIR, 'js', jsName);
+            const tenantOverride = path.join(STATIC_DIR, 'js', jsName);
+            const abs = fs.existsSync(tenantOverride)
+                ? tenantOverride
+                : path.join(SIMPLE_PUBLIC_DIR, 'js', jsName);
             if (!fs.existsSync(abs)) {
                 return res.status(404).type('text/plain').send('not found');
             }

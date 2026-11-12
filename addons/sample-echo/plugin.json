@@ -7,6 +7,7 @@
     },
     "scope": "platform",
     "client": {
-        "game": "client/game.js"
+        "game": "client/game.js",
+        "admin": "client/admin.js"
     }
 }

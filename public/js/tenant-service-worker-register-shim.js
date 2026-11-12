@@ -1,8 +1,20 @@
 // public/js/tenant-service-worker-register-shim.js — 管理画面では SW 未登録のため invalidate をブロックしない
-export {
-    encodeAssetPathToUrlPath,
-    registerMetaverseServiceWorker,
+import {
+    registerMetaverseServiceWorker as registerMetaverseServiceWorkerCore,
 } from '../../../metaverse-simple/public/js/service-worker-register.js';
+import { toTenantUrl } from './tenant-runtime-shim.js';
+
+export { registerMetaverseServiceWorkerCore as registerMetaverseServiceWorker };
+
+/**
+ * @param {string} assetPath
+ * @returns {string}
+ */
+export function encodeAssetPathToUrlPath(assetPath) {
+    const pathStr = assetPath.startsWith('/') ? assetPath.slice(1) : assetPath;
+    const encodedPath = pathStr.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+    return toTenantUrl(`/${encodedPath}`);
+}
 
 const SW_READY_TIMEOUT_MS = 1500;
 

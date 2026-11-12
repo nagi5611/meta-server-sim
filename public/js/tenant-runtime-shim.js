@@ -117,5 +117,27 @@ export function installTenantXhrShim() {
     };
 }
 
-installTenantFetchShim();
-installTenantXhrShim();
+if (typeof window !== 'undefined') {
+    installTenantFetchShim();
+    installTenantXhrShim();
+    installTenantWorkerFetchShim();
+}
+
+/**
+ * Prefab GLB fetch Worker へ渡す URL にテナントプレフィックスを付与
+ */
+export function installTenantWorkerFetchShim() {
+    if (typeof Worker === 'undefined' || window.__tenantWorkerFetchShimInstalled) return;
+    window.__tenantWorkerFetchShimInstalled = true;
+
+    const origPost = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function postMessageWithTenantUrl(message, transfer) {
+        if (message && typeof message === 'object' && typeof message.url === 'string') {
+            const nextUrl = toTenantUrl(message.url);
+            if (nextUrl !== message.url) {
+                message = { ...message, url: nextUrl };
+            }
+        }
+        return origPost.call(this, message, transfer);
+    };
+}
