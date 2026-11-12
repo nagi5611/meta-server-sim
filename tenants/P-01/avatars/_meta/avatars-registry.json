@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "registryVersion": 2,
+  "avatars": [
+    {
+      "id": "fe205875-7209-41ba-ae6e-bffc4a2aba08",
+      "glbFilename": "legacy-avatar.glb",
+      "isDefault": true,
+      "displayScale": 1,
+      "animationClips": [
+        { "index": 0, "name": "Long_Breathe_and_Look_Around", "label": "idle" },
+        { "index": 1, "name": "Regular_Jump", "label": "jump" },
+        { "index": 2, "name": "Running", "label": "run" },
+        { "index": 3, "name": "Walking", "label": "walk" }
+      ],
+      "animationMap": {
+        "idle": 0,
+        "walk": 3,
+        "jump": 1,
+        "run": 2
+      }
+    }
+  ]
+}
