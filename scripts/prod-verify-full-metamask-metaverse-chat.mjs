@@ -138,9 +138,10 @@ async function emitChatAckViaBrowser(page, message) {
 async function main() {
     const report = { steps: [], offensiveMessage: OFFENSIVE, tenantUrl: TENANT_URL };
 
+    report.browserProfile = process.env.MCP_VERIFY_PLAIN_CHROMIUM === '1' ? 'plain-chromium' : 'metamask';
     report.steps.push({
         step: 'browser_session_start',
-        note: 'getOrLaunchBrowserSession (MetaMask MCP 同等)',
+        note: `getOrLaunchBrowserSession (${report.browserProfile})`,
     });
     report.publicTenantUrl = TENANT_URL;
     const ctx = await getOrLaunchBrowserSession();
