@@ -151,9 +151,18 @@ registerTenantPluginShutdownHooks(httpServer);
 
 if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
     app.use('/metaverse-simple-static', express.static(SIMPLE_PUBLIC_DIR, { index: false }));
-    app.get('/js/metaverse-i18n.js', (_req, res) => {
-        res.sendFile(path.join(SIMPLE_PUBLIC_DIR, 'js', 'metaverse-i18n.js'));
-    });
+    const simpleSharedJs = ['metaverse-i18n.js', 'prefab-glb-fetch-worker.js', 'mesh-bvh-worker.js'];
+    for (const jsName of simpleSharedJs) {
+        app.get(`/js/${jsName}`, (_req, res) => {
+            const abs = path.join(SIMPLE_PUBLIC_DIR, 'js', jsName);
+            if (!fs.existsSync(abs)) {
+                return res.status(404).type('text/plain').send('not found');
+            }
+            res.type('application/javascript');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.sendFile(abs);
+        });
+    }
     app.get('/api/addons/matsuyama-flights/board', (_req, res) => {
         res.json({
             departures: [],
