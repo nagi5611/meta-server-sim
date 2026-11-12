@@ -159,6 +159,10 @@ async function main() {
     const appPage0 =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app') || (await ctx.newPage());
     appPage0.setDefaultTimeout(120_000);
+    /** @type {string[]} */
+    const browserConsole = [];
+    appPage0.on('console', (msg) => browserConsole.push(`[${msg.type()}] ${msg.text()}`));
+    appPage0.on('pageerror', (err) => browserConsole.push(`[pageerror] ${err.message}`));
     if (TENANT_URL.startsWith('http://127.0.0.1')) {
         await appPage0.setExtraHTTPHeaders({
             'X-Forwarded-Proto': 'https',
@@ -182,7 +186,11 @@ async function main() {
             .catch(() => null),
     });
     await waitMetaverseReady(appPage).catch((e) => {
-        report.steps.push({ step: 'metaverse_ready_warn', error: String(e) });
+        report.steps.push({
+            step: 'metaverse_ready_warn',
+            error: String(e),
+            consoleTail: browserConsole.slice(-40),
+        });
     });
     await appPage.keyboard.press('KeyW').catch(() => {});
     await waitForSocket(appPage).catch((e) => {

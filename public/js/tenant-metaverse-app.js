@@ -272,7 +272,18 @@ class TenantMetaverseApp {
 
         applyMetaverseI18nToDocument();
         ensureTenantControlSchemeDefault();
-        await ensureControlSchemeChosen();
+        const e2eHarnessEarly =
+            document.documentElement.dataset.e2eHarness === '1' ||
+            window.__TENANT_E2E_HARNESS__ === '1';
+        if (e2eHarnessEarly) {
+            try {
+                localStorage.setItem('metaverse-control-scheme', 'keyboard');
+            } catch {
+                /* ignore */
+            }
+        } else {
+            await ensureControlSchemeChosen();
+        }
         await runTenantLoginGate();
         ensureGuestUsername();
         await this._resolveUserRole();
