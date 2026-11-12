@@ -6,11 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+    classifyPageUrl,
     clickVisibleButton,
     closeBrowserSession,
     findMetamaskNotificationPage,
     getBrowserMetamaskConfig,
     getOrLaunchBrowserSession,
+    listContextPages,
     navigateApp,
     snapshotPlaywrightPage,
 } from '../lib/mcp-browser-metamask.js';
@@ -53,11 +55,38 @@ async function main() {
 
     const appPage = ctx.pages().find((p) => p.url().includes('mcp-wallet-smoke'));
     if (!appPage) throw new Error('smoke page not found');
+
+    const providerState = await appPage.evaluate(() => ({
+        ethereum: typeof window.ethereum !== 'undefined',
+        isMetaMask: window.ethereum?.isMetaMask === true,
+    }));
+    results.steps.push({ step: 'injected_provider', ...providerState });
+    if (!providerState.ethereum) {
+        throw new Error('window.ethereum not injected — MetaMask extension did not load');
+    }
+
     await clickVisibleButton(appPage, 'Connect Wallet');
     results.steps.push({ step: 'click_connect_wallet', ok: true });
 
-    const mmPage = await findMetamaskNotificationPage(ctx);
-    if (!mmPage) throw new Error('MetaMask notification not shown after connect');
+    let mmPage = null;
+    const waitUntil = Date.now() + 20_000;
+    while (Date.now() < waitUntil) {
+        mmPage = await findMetamaskNotificationPage(ctx);
+        if (mmPage) break;
+        const mmAny = ctx.pages().find((p) => classifyPageUrl(p.url()).startsWith('metamask'));
+        if (mmAny) {
+            mmPage = mmAny;
+            break;
+        }
+        await new Promise((r) => setTimeout(r, 400));
+    }
+    if (!mmPage) {
+        results.steps.push({
+            step: 'metamask_missing',
+            pages: (await listContextPages(ctx)).map((p) => ({ url: p.url, kind: p.kind })),
+        });
+        throw new Error('MetaMask notification not shown after connect');
+    }
     const mmSnap = await snapshotPlaywrightPage(mmPage);
     writePng('mcp-smoke-metamask-connect.png', mmSnap.screenshotBase64);
     results.steps.push({
