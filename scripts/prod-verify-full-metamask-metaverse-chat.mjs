@@ -43,30 +43,26 @@ function savePng(name, b64) {
 }
 
 async function dismissGate(page) {
-    const needsGate = await page
-        .evaluate(() => {
-            const gate = document.getElementById('tenant-login-gate');
-            return (
-                document.body.classList.contains('tenant-login-gate-open') ||
-                (gate && gate.hidden === false)
-            );
-        })
-        .catch(() => false);
-    if (needsGate) {
+    const enterOpen = page.locator('body.tenant-login-gate-open #tenant-login-enter-btn');
+    try {
+        await enterOpen.waitFor({ state: 'visible', timeout: 90_000 });
         const name = `McpVerify-${Date.now()}`;
         await page.locator('#tenant-login-display-name').fill(name, { timeout: 15_000 });
         const avatarSelect = page.locator('#tenant-login-avatar-select');
-        if (await avatarSelect.isVisible().catch(() => false)) {
-            await avatarSelect.selectOption({ index: 0 }).catch(() => {});
+        if (!(await avatarSelect.isDisabled().catch(() => true))) {
+            const val = await avatarSelect.locator('option').first().getAttribute('value');
+            if (val) await avatarSelect.selectOption(val);
         }
-        await page.locator('#tenant-login-enter-btn').click({ timeout: 15_000 });
+        await enterOpen.click({ timeout: 15_000 });
         await page.waitForFunction(
             () => !document.body.classList.contains('tenant-login-gate-open'),
             { timeout: 60_000 },
         );
+    } catch {
+        /* gate not shown (single avatar) */
     }
     const kb = page.locator('#control-scheme-keyboard-btn');
-    if (await kb.isVisible({ timeout: 5000 }).catch(() => false)) {
+    if (await kb.isVisible({ timeout: 8000 }).catch(() => false)) {
         await kb.click();
     }
 }
@@ -155,15 +151,16 @@ async function main() {
             'X-Forwarded-Host': TENANT_PUBLIC_HOST,
         });
     }
-    await appPage0.goto(TENANT_URL, {
+    const navPromise = appPage0.goto(TENANT_URL, {
         waitUntil: 'domcontentloaded',
         timeout: 120_000,
         ignoreHTTPSErrors: true,
     });
+    const gatePromise = dismissGate(appPage0);
+    await Promise.all([navPromise, gatePromise]);
     const appPage =
         ctx.pages().find((p) => classifyPageUrl(p.url()) === 'app' && p.url().includes(TENANT)) ||
         ctx.pages()[0];
-    await dismissGate(appPage);
     await waitMetaverseReady(appPage).catch((e) => {
         report.steps.push({ step: 'metaverse_ready_warn', error: String(e) });
     });
