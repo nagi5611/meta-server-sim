@@ -6,6 +6,9 @@ import path from 'node:path';
 import {
     defaultSingleClipAnimationMap,
     hasCompleteAnimationMap,
+    needsLegacyAvatarAnimationRepair,
+    applyLegacyAvatarAnimationRepair,
+    LEGACY_AVATAR_ANIMATION_MAP,
     writeAvatarRegistry,
     readAvatarRegistry,
     resolveAvatarId,
@@ -17,6 +20,31 @@ describe('tenant-avatar-registry', () => {
             animationClips: [{ index: 0, name: 'Animation' }],
             animationMap: defaultSingleClipAnimationMap(),
         };
+        assert.equal(hasCompleteAnimationMap(entry), true);
+    });
+
+    it('needsLegacyAvatarAnimationRepair detects all-zero map on legacy-avatar.glb', () => {
+        assert.equal(
+            needsLegacyAvatarAnimationRepair({
+                glbFilename: 'legacy-avatar.glb',
+                animationMap: defaultSingleClipAnimationMap(),
+            }),
+            true,
+        );
+        assert.equal(
+            needsLegacyAvatarAnimationRepair({
+                glbFilename: 'legacy-avatar.glb',
+                animationMap: LEGACY_AVATAR_ANIMATION_MAP,
+            }),
+            false,
+        );
+    });
+
+    it('applyLegacyAvatarAnimationRepair assigns walk/run/jump indices', () => {
+        const entry = { glbFilename: 'legacy-avatar.glb', animationMap: defaultSingleClipAnimationMap() };
+        applyLegacyAvatarAnimationRepair(entry);
+        assert.deepEqual(entry.animationMap, LEGACY_AVATAR_ANIMATION_MAP);
+        assert.equal(entry.animationClips.length, 4);
         assert.equal(hasCompleteAnimationMap(entry), true);
     });
 
