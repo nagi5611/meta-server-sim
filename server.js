@@ -226,6 +226,17 @@ app.get('/api/client-config', (req, res) => {
 
 
 
+if (isProductionBuild) {
+    app.use(
+        '/assets',
+        express.static(path.join(STATIC_DIR, 'assets'), {
+            index: false,
+            maxAge: '365d',
+            immutable: true,
+        }),
+    );
+}
+
 app.use(express.static(STATIC_DIR, { index: false }));
 
 const PUBLIC_DIR = path.join(__dirname, 'public');

@@ -13,10 +13,16 @@
             position: fixed;
             inset: 0;
             z-index: 2000;
-            display: flex;
             align-items: center;
             justify-content: center;
             background: rgba(0, 0, 0, 0.55);
+        }
+        .tenant-login-gate:not([hidden]) {
+            display: flex;
+        }
+        .tenant-login-gate[hidden] {
+            display: none !important;
+            pointer-events: none !important;
         }
         .tenant-login-gate-panel {
             background: #fff;

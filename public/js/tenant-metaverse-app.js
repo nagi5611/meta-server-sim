@@ -21,7 +21,6 @@ import MobileUIManager from '../../../metaverse-simple/public/js/mobile-ui-manag
 import MobileJoystickManager from '../../../metaverse-simple/public/js/mobile-joystick-manager.js';
 import { TenantTeleportManager } from './tenant-teleport-manager.js';
 import { getTenantIdFromPath, toTenantUrl } from './tenant-runtime-shim.js';
-import { renderMetaversePortalNav } from './metaverse-portal-nav.js';
 import { applyMetaverseI18nToDocument, t } from '../../../metaverse-simple/public/js/metaverse-i18n.js';
 import { resolveEnvAssetHref } from './tenant-asset-resolve.js';
 import {
@@ -34,7 +33,6 @@ import { TenantFdsSmokeManager } from './tenant-fds-smoke-manager.js';
 import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
 import { TenantFdsSmokeExposureMonitor } from './tenant-fds-smoke-exposure.js';
 import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
-import { TenantFdsSmokePanelManager } from './tenant-fds-smoke-panel-manager.js';
 import { fetchAdminMetaverseEntry } from '../../../metaverse-simple/public/js/admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
@@ -296,6 +294,7 @@ class TenantMetaverseApp {
         if (isTenantE2EHarnessEnabled()) {
             window.__tenantInitPhase = 'after-login-gate';
         }
+        await ensureFdsSmokeBulkConfig();
         ensureGuestUsername();
         await this._resolveUserRole();
         await loadTenantPluginClientModules();
@@ -306,12 +305,8 @@ class TenantMetaverseApp {
         const titleEl = document.getElementById('tenant-title');
         if (titleEl) titleEl.textContent = tenantId;
 
-        renderMetaversePortalNav(document.getElementById('metaverse-portal-links')).then(() => {
-            const nav = document.getElementById('metaverse-portal-nav');
-            if (nav?.querySelector('.portal-nav-links a')) {
-                nav.removeAttribute('hidden');
-            }
-        });
+        const portalNav = document.getElementById('metaverse-portal-nav');
+        if (portalNav) portalNav.setAttribute('hidden', '');
 
         this.setupPageVisibility();
         this.isMobileMode = isMobile();
@@ -320,6 +315,7 @@ class TenantMetaverseApp {
         this.sceneManager.init();
 
         this.fdsSmokeManager = new TenantFdsSmokeManager(this.sceneManager.getScene());
+        const { TenantFdsSmokePanelManager } = await import('./tenant-fds-smoke-panel-manager.js');
         this.fdsSmokePanelManager = new TenantFdsSmokePanelManager(
             this.sceneManager.getScene(),
             () => this.sceneManager.getCamera(),
@@ -344,7 +340,8 @@ class TenantMetaverseApp {
 
         this.uiManager = new UIManager();
         this.worldManager = new WorldManager(this.sceneManager);
-        await Promise.all([this.worldManager.init(), ensureFdsSmokeBulkConfig()]);
+        await ensureFdsSmokeBulkConfig();
+        await this.worldManager.init();
 
         this.worldManager.onWorldChange((world) => {
             void this.fdsSmokeManager.loadForWorld(world);
