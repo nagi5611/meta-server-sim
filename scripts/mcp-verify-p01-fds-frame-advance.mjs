@@ -35,7 +35,7 @@ async function main() {
         localStorage.setItem('metaverse-control-scheme', 'keyboard');
     });
 
-  page.on('console', (msg) => {
+    page.on('console', (msg) => {
         const text = msg.text();
         if (text.includes('[FDS smoke]') || text.includes('FdsSmokeExposure')) {
             console.log(`[browser] ${text}`);
