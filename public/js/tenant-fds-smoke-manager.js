@@ -243,8 +243,9 @@ export class TenantFdsSmokeManager {
 
                 this._applyFrame({ renderer: volumeRenderer, multipart }, playback.frameIndex);
 
+                const smokeId = config.id ?? config.manifest;
                 this._entries.push({
-                    id: config.id ?? config.manifest,
+                    id: smokeId,
                     renderer: volumeRenderer,
                     multipart,
                     playback,
@@ -252,6 +253,10 @@ export class TenantFdsSmokeManager {
                     placement,
                     volumeData: volumeData ?? null,
                 });
+                const maxFrame = Math.max(0, playback.frameCount - 1);
+                console.log(
+                    `[FDS smoke] ${smokeId} loaded frame ${playback.frameIndex}/${maxFrame} autoplay=${playback.playing ? 'yes' : 'no'} multipart=${multipart ? 'yes' : 'no'}`,
+                );
             } catch (error) {
                 console.warn(`[TenantFdsSmokeManager] failed to load ${config.manifest}:`, error);
             }
@@ -514,10 +519,21 @@ export class TenantFdsSmokeManager {
             );
         }
 
-        if (frameChanged || rendererTimeChanged || heartbeat || (reason !== 'tick' && reason !== 'apply')) {
-            const simTime = pb.times?.[frameIndex];
-            const msg = `[TenantFdsSmokeManager] playback ${entry.id} frame=${frameIndex}/${pb.frameCount - 1} rendererTime=${rendererTime.toFixed(3)}${simTime != null ? ` simT=${simTime.toFixed(2)}s` : ''}${partId ? ` part=${partId}@${partFrameStart} cached=${partLoaded} active=${activePartId}` : ''}${extra.targetFrame != null ? ` waiting→${extra.targetFrame}` : ''} [${reason}]`;
-            console.log(msg);
+        if (frameChanged || (reason !== 'tick' && reason !== 'apply')) {
+            const maxFrame = Math.max(0, pb.frameCount - 1);
+            console.log(
+                `[FDS smoke] ${entry.id} frame ${frameIndex}/${maxFrame} rendererFrame=${rendererTime.toFixed(1)} playing=${pb.playing ? 'yes' : 'no'}${partId ? ` part=${partId}` : ''}${extra.targetFrame != null ? ` waiting→${extra.targetFrame}` : ''}`,
+            );
+            this._playbackLogState.set(entry.id, {
+                frameIndex,
+                rendererTime,
+                logMs: now,
+            });
+        } else if (heartbeat && pb.playing) {
+            const maxFrame = Math.max(0, pb.frameCount - 1);
+            console.log(
+                `[FDS smoke] ${entry.id} frame ${frameIndex}/${maxFrame} rendererFrame=${rendererTime.toFixed(1)} (heartbeat)`,
+            );
             this._playbackLogState.set(entry.id, {
                 frameIndex,
                 rendererTime,

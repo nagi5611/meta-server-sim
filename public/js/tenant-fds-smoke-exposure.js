@@ -135,9 +135,6 @@ export class TenantFdsSmokeExposureMonitor {
 
         if (devMode) {
             this._updateHud(this._lastSample);
-            console.log(
-                `[FdsSmokeExposure] norm=${normalized.toFixed(4)} inSmoke=${sample.inSmoke} increasing=${this._smokeIncreasing} ∫norm≈${this._exposureNormalized.toFixed(4)} head=(${this._headWorld.x.toFixed(2)},${this._headWorld.y.toFixed(2)},${this._headWorld.z.toFixed(2)})`,
-            );
         } else if (this._hudEl) {
             this._hudEl.hidden = true;
         }
