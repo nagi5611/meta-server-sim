@@ -127,6 +127,8 @@ class TenantMetaverseApp {
         this.fdsSmokeManager = null;
         this.fdsSmokePanelManager = null;
         this.fdsSmokeExposureMonitor = null;
+        /** @type {string | null} */
+        this._pendingVcRoomId = null;
         this.menuManager = null;
         this.voiceChatManager = null;
         this.videoChatManager = null;
@@ -364,6 +366,7 @@ class TenantMetaverseApp {
             onLoadComplete: async () => {
                 this.networkManager?.setWorldViewDisplayReady(true);
                 await this.networkManager?.flushPendingRemotePlayers();
+                await this._flushPendingVcRoomChange();
             },
         });
 
@@ -727,6 +730,27 @@ class TenantMetaverseApp {
         };
     }
 
+    /**
+     * メディアソープ Device の二重 load を避けつつ VC/Video VC をルーム変更
+     * @param {import('../../../metaverse-simple/public/js/voice-chat-manager.js').default | null} manager
+     * @param {string} roomId
+     */
+    async _safeMediaRoomChange(manager, roomId) {
+        if (!manager || !roomId) return;
+        if (typeof manager.leaveRoom === 'function' && manager.isJoined) {
+            try {
+                await manager.leaveRoom();
+            } catch (e) {
+                console.warn('[VC] leaveRoom before change failed:', e);
+            }
+        }
+        if (typeof manager.joinRoom === 'function') {
+            await manager.joinRoom(roomId);
+        } else if (typeof manager.changeRoom === 'function') {
+            await manager.changeRoom(roomId);
+        }
+    }
+
     async onWorldChanged(world) {
         if (!world?.id) return;
         // init 中の初回 loadWorld は characterController より先に onWorldChange が走る
@@ -743,23 +767,32 @@ class TenantMetaverseApp {
         this.networkManager.changeWorld(world.id);
         this.updateTeleportZones();
 
-        const roomChangeTasks = [];
+        this._pendingVcRoomId = world.id;
+    }
+
+    async _flushPendingVcRoomChange() {
+        const roomId = this._pendingVcRoomId;
+        if (!roomId) return;
+        this._pendingVcRoomId = null;
+        if (!this.networkManager?.socket?.connected) return;
+
+        const tasks = [];
         if (this.voiceChatManager?.isJoined) {
-            roomChangeTasks.push(
-                this.voiceChatManager.changeRoom(world.id).catch((error) => {
+            tasks.push(
+                this._safeMediaRoomChange(this.voiceChatManager, roomId).catch((error) => {
                     console.error('[VC] Failed to change room:', error);
                 }),
             );
         }
         if (this.videoChatManager?.isJoined) {
-            roomChangeTasks.push(
-                this.videoChatManager.changeRoom(world.id).catch((error) => {
+            tasks.push(
+                this._safeMediaRoomChange(this.videoChatManager, roomId).catch((error) => {
                     console.error('[Video VC] Failed to change room:', error);
                 }),
             );
         }
-        if (roomChangeTasks.length) {
-            await Promise.all(roomChangeTasks);
+        if (tasks.length) {
+            await Promise.all(tasks);
         }
     }
 
@@ -790,14 +823,14 @@ class TenantMetaverseApp {
         const joinTasks = [];
         if (this.voiceChatManager && !this.voiceChatManager.isJoined) {
             joinTasks.push(
-                this.voiceChatManager.joinRoom(roomId).catch((error) => {
+                this._safeMediaRoomChange(this.voiceChatManager, roomId).catch((error) => {
                     console.error('[VC] Failed to auto-join:', error);
                 }),
             );
         }
         if (this.videoChatManager && !this.videoChatManager.isJoined) {
             joinTasks.push(
-                this.videoChatManager.joinRoom(roomId).catch((error) => {
+                this._safeMediaRoomChange(this.videoChatManager, roomId).catch((error) => {
                     console.error('[Video VC] Failed to auto-join:', error);
                 }),
             );

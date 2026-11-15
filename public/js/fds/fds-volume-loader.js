@@ -350,9 +350,8 @@ export function loadSmokePalette(palettePath = DEFAULT_PALETTE_PATH) {
                 () => tryLoad(rest),
             );
         };
-        const urls = fallbackUrl === tenantUrl
-            ? [fallbackUrl]
-            : [fallbackUrl, tenantUrl];
+        const urls =
+            tenantUrl !== fallbackUrl ? [tenantUrl, fallbackUrl] : [fallbackUrl];
         tryLoad(urls);
     });
 }
@@ -682,6 +681,32 @@ export class FdsMultipartSmokeController {
     }
 
     /**
+     * パートのバイナリのみ先読み（アトラス更新は行わない）
+     * @param {number} frameIndex
+     * @returns {Promise<boolean>}
+     */
+    async prefetchFrame(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part) return false;
+        await this.prefetchPart(part);
+        return true;
+    }
+
+    /**
+     * アトラス反映を次フレームへ逃がし、ワールド読込中のメインスレッド固まりを避ける
+     * @param {number} frameIndex
+     */
+    scheduleActivateForFrame(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part || this._disposed) return;
+        this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
+        requestAnimationFrame(() => {
+            if (this._disposed) return;
+            void this.activatePart(part);
+        });
+    }
+
+    /**
      * 現在フレームのパートをアトラスに載せ、次パートはバイナリのみプリフェッチする
      * @param {number} playbackTime フレームインデックス（小数可）
      */
@@ -813,13 +838,11 @@ export async function createFdsSmokeVolume(manifestPath, transform = {}, renderO
         const multipart = new FdsMultipartSmokeController(volumeRenderer, manifest, manifestPath);
 
         if (initialFrame !== null) {
-
-            await multipart.loadPartForFrame(initialFrame);
-
+            await multipart.prefetchFrame(initialFrame);
+            multipart.scheduleActivateForFrame(initialFrame);
         } else {
-
-            await multipart.loadInitialPart();
-
+            await multipart.prefetchPart(multipart.parts[0]);
+            multipart.scheduleActivateForFrame(multipart.parts[0].frameStart);
         }
 
 

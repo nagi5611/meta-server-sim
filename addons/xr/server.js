@@ -1,8 +1,13 @@
 // addons/xr/server.js — WebXR VR (ported from meta webxr-vr)
 import { HOOKS } from '../../lib/hook-registry.js';
+import { mountArxrNpmDeps } from '../arxr/server/npm-deps.js';
 
 /** @param {import('../../lib/tenant-plugin-loader.js').PluginRegisterContext} ctx */
 async function register(ctx) {
+    ctx.mountHttp((router) => {
+        mountArxrNpmDeps(router, '/deps');
+    });
+
     ctx.logger.info('xr (webxr-vr) tenant plugin registered');
 
     ctx.hooks.on(HOOKS.SOCKET_TENANT_CONNECT, (payload) => {

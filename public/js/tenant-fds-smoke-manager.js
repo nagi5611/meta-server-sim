@@ -13,6 +13,7 @@ import {
     sampleNormalizedSootAtWorld as sampleSootInVolumeData,
 } from './fds/fds-volume-sampler.js';
 import { FdsSmokeDepthPass } from './fds/fds-smoke-depth-pass.js';
+import { resolveFdsPlaybackIntervalSeconds } from './tenant-fds-smoke-playback.js';
 import * as THREE from 'three';
 
 /** 同時にロードする FDS 煙ボリューム数（バイナリ取得；manifest は事前並列） */
@@ -291,9 +292,11 @@ export class TenantFdsSmokeManager {
         }
 
         if (entry.multipart) {
+            await entry.multipart.prefetchFrame(pb.frameIndex);
             await entry.multipart.ensurePartForFrame(pb.frameIndex);
         }
 
+        this._syncMultipartActivePart(entry, pb.frameIndex);
         this._applyFrame(entry, pb.frameIndex);
         this._logPlaybackFrame(entry, pb.frameIndex, 'start');
         return true;
@@ -347,16 +350,23 @@ export class TenantFdsSmokeManager {
      * @param {number} deltaTime
      */
     update(deltaTime) {
+        const dt = Number(deltaTime);
+        const safeDelta = Number.isFinite(dt) && dt > 0 ? Math.min(dt, 0.25) : 0;
+
         for (const entry of this._entries) {
             const pb = entry.playback;
-            if (!pb.playing || pb.framesPerSecond <= 0 || pb.frameCount <= 0) {
+            if (!pb?.playing || pb.frameCount <= 0) {
                 continue;
             }
 
-            pb.frameAccumulator += deltaTime;
-            const interval = pb.secondsPerFrame ?? (1 / (pb.framesPerSecond || 1));
+            const interval = resolveFdsPlaybackIntervalSeconds(pb);
+            pb.frameAccumulator = Number(pb.frameAccumulator) || 0;
+            pb.frameAccumulator += safeDelta;
 
-            while (pb.frameAccumulator >= interval && pb.playing) {
+            const maxSteps = 8;
+            let steps = 0;
+            while (pb.frameAccumulator >= interval && pb.playing && steps < maxSteps) {
+                steps += 1;
                 pb.frameAccumulator -= interval;
                 const next = pb.frameIndex + 1;
 
@@ -365,6 +375,7 @@ export class TenantFdsSmokeManager {
                         if (!this._canShowFrame(entry, 0)) {
                             void entry.multipart?.ensurePartForFrame(0);
                             this._logPlaybackFrame(entry, pb.frameIndex, 'waiting-part', { targetFrame: 0 });
+                            pb.frameAccumulator = Math.min(pb.frameAccumulator, interval);
                             break;
                         }
                         pb.frameIndex = 0;
@@ -373,18 +384,36 @@ export class TenantFdsSmokeManager {
                         pb.playing = false;
                         break;
                     }
+                } else if (!this._canShowFrame(entry, next)) {
+                    void entry.multipart?.ensurePartForFrame(next);
+                    this._logPlaybackFrame(entry, pb.frameIndex, 'waiting-part', { targetFrame: next });
+                    pb.frameAccumulator = Math.min(pb.frameAccumulator, interval);
+                    break;
                 } else {
-                    if (!this._canShowFrame(entry, next)) {
-                        void entry.multipart?.ensurePartForFrame(next);
-                        this._logPlaybackFrame(entry, pb.frameIndex, 'waiting-part', { targetFrame: next });
-                        break;
-                    }
                     pb.frameIndex = next;
                 }
             }
 
+            this._syncMultipartActivePart(entry, pb.frameIndex);
             this._applyFrame(entry, pb.frameIndex);
         }
+    }
+
+    /**
+     * ダウンロード済みパートをアクティブ化（再生が waiting で止まらないようにする）
+     * @param {{ multipart: import('./fds/fds-volume-loader.js').FdsMultipartSmokeController | null, renderer: import('./fds/VolumeRenderer.js').default }} entry
+     * @param {number} frameIndex
+     */
+    _syncMultipartActivePart(entry, frameIndex) {
+        const multipart = entry.multipart;
+        if (!multipart) return;
+        const part = multipart._findPartForFrame(frameIndex);
+        if (!part || !multipart.isPartLoaded(part.id)) return;
+        if (multipart._activePartId === part.id) return;
+        const data = multipart._partDataCache.get(part.id);
+        if (!data) return;
+        applyFdsSmokePartToAtlas(entry.renderer, multipart.manifest, part, data);
+        multipart._activePartId = part.id;
     }
 
     /**
