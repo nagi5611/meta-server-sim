@@ -62,19 +62,24 @@ export function sampleNormalizedSootAtWorld(manifest, placement, volumeData, loc
     const vz = _mirroredScratch.y / vs.y;
     const vy = _mirroredScratch.z / vs.z;
 
-    if (vx < 0 || vy < 0 || vz < 0 || vx > nx - 1 || vy > ny - 1 || vz > nz - 1) {
+  // グリッド外は null。境界付近は描画（ボクセル補間）に合わせてクランプする
+    if (vx < -0.5 || vy < -0.5 || vz < -0.5 || vx > nx - 0.5 || vy > ny - 0.5 || vz > nz - 0.5) {
         return null;
     }
 
-    const x0 = Math.floor(vx);
-    const y0 = Math.floor(vy);
-    const z0 = Math.floor(vz);
+    const cx = Math.max(0, Math.min(nx - 1, vx));
+    const cy = Math.max(0, Math.min(ny - 1, vy));
+    const cz = Math.max(0, Math.min(nz - 1, vz));
+
+    const x0 = Math.floor(cx);
+    const y0 = Math.floor(cy);
+    const z0 = Math.floor(cz);
     const x1 = Math.min(x0 + 1, nx - 1);
     const y1 = Math.min(y0 + 1, ny - 1);
     const z1 = Math.min(z0 + 1, nz - 1);
-    const tx = vx - x0;
-    const ty = vy - y0;
-    const tz = vz - z0;
+    const tx = cx - x0;
+    const ty = cy - y0;
+    const tz = cz - z0;
 
     const frame = Math.max(0, Math.floor(localFrameIndex));
     const frameBase = frame * voxelsPerFrame;
@@ -85,7 +90,9 @@ export function sampleNormalizedSootAtWorld(manifest, placement, volumeData, loc
      * @param {number} zi
      */
     const readVoxel = (xi, yi, zi) => {
-        const index = frameBase + xi + zi * nx + yi * nx * ny;
+        // export / VolumeRenderer: index = xi + atlasZi*nx + atlasYi*nx*ny（atlasYi=nz, atlasZi=ny）
+        // ここでは yi=local.z→ny、zi=local.y→nz
+        const index = frameBase + xi + yi * nx + zi * nx * ny;
         return volumeData[index] / 255;
     };
 

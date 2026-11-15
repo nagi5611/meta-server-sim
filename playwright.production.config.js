@@ -19,8 +19,12 @@ export default defineConfig({
             password: adminPassword,
         },
     },
+    testMatch: /(production-|prod-).*\.spec\.js/,
     projects: [
-        { name: 'production', testMatch: /^(?!.*prod-vc-duplex).*$/ },
+        {
+            name: 'production',
+            testMatch: /^(?!.*prod-vc-duplex).*\.spec\.js$/,
+        },
         {
             name: 'production-vc-duplex',
             testMatch: /prod-vc-duplex\.spec\.js/,

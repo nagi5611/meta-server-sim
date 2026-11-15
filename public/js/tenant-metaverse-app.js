@@ -655,6 +655,23 @@ class TenantMetaverseApp {
                     }
                     await this.fdsSmokeManager.loadForWorld(world);
                 },
+                startFdsSmokePlayback: async (smokeId, options = {}) =>
+                    this.fdsSmokeManager?.startPlayback(smokeId, options) ?? false,
+                seekFdsSmokeFrame: async (smokeId, frameIndex) =>
+                    this.fdsSmokeManager?.seekToFrame(smokeId, frameIndex) ?? false,
+                probeFdsSmokeAt: (x, y, z) =>
+                    this.fdsSmokeManager?.sampleNormalizedSootAtWorld(
+                        new THREE.Vector3(x, y, z),
+                    ) ?? null,
+                getFdsSmokeExposureSample: () =>
+                    this.fdsSmokeExposureMonitor?.getLastSample?.() ?? null,
+                setLocalPosition: (x, y, z) => {
+                    this.characterController?.setPosition?.(x, y, z);
+                },
+                getFdsSmokePlaybackFrame: (smokeId) => {
+                    const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
+                    return entry?.playback?.frameIndex ?? null;
+                },
                 getLocalPosition: () => {
                     const pos = this.characterController?.getPosition?.();
                     if (!pos) return null;

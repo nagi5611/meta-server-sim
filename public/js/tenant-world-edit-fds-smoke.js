@@ -127,9 +127,17 @@ export class TenantWorldEditFdsSmokePreview {
         for (const child of editGroup.children) {
             if (!child.userData?.fdsSmokeConfig) continue;
             active.add(child);
+            const manifestPath = String(child.userData.fdsSmokeConfig?.manifest || '').trim();
+            const entry = this._entries.get(child);
+            if (entry?.loadFailed) {
+                if (entry.manifestPath === manifestPath) {
+                    continue;
+                }
+                this._entries.delete(child);
+            }
             if (!this._entries.has(child)) {
                 const loadId = ++this._loadSeq;
-                this._entries.set(child, { loading: true, loadId });
+                this._entries.set(child, { loading: true, loadId, manifestPath });
                 void this._loadVolume(child, scene, loadId);
             }
         }
@@ -233,8 +241,9 @@ export class TenantWorldEditFdsSmokePreview {
             });
         } catch (err) {
             console.warn('[TenantWorldEditFdsSmokePreview] load failed:', manifestPath, err);
-            if (this._entries.get(group)?.loadId === loadId) {
-                this._entries.delete(group);
+            const current = this._entries.get(group);
+            if (current?.loadId === loadId) {
+                this._entries.set(group, { loadFailed: true, manifestPath, loadId });
             }
         }
     }

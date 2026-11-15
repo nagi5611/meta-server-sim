@@ -73,6 +73,29 @@ export class TenantFdsSmokeManager {
     }
 
     /**
+     * CPU サンプリング用フレーム（マルチパートはアトラス表示中パートと time uniform に合わせる）
+     * @param {{ renderer: import('./fds/VolumeRenderer.js').default, multipart: import('./fds/fds-volume-loader.js').FdsMultipartSmokeController | null, playback?: object }} entry
+     * @returns {number}
+     */
+    _getSamplingFrameIndex(entry) {
+        const pb = entry.playback;
+        if (!entry.multipart) {
+            return Math.max(0, Math.floor(pb?.frameIndex ?? 0));
+        }
+        const activeId = entry.multipart._activePartId;
+        if (!activeId) {
+            return Math.max(0, Math.floor(pb?.frameIndex ?? 0));
+        }
+        const part = entry.multipart.parts.find((p) => p.id === activeId);
+        if (!part) {
+            return Math.max(0, Math.floor(pb?.frameIndex ?? 0));
+        }
+        const localTime = Math.floor(Number(entry.renderer?.uniforms?.time?.value ?? 0));
+        const clampedLocal = Math.max(0, Math.min(localTime, Math.max(0, part.frameCount - 1)));
+        return part.frameStart + clampedLocal;
+    }
+
+    /**
      * 頭位置などワールド座標での正規化 soot 密度（複数煙は最大値）
      * @param {THREE.Vector3} worldPos
      * @returns {{ normalized: number, inSmoke: boolean, perVolume: Array<{ id: string, normalized: number | null }> }}
@@ -81,7 +104,7 @@ export class TenantFdsSmokeManager {
         const perVolume = [];
         let normalized = 0;
         for (const entry of this._entries) {
-            const frameIndex = entry.playback?.frameIndex ?? 0;
+            const frameIndex = this._getSamplingFrameIndex(entry);
             let volumeSlice = null;
             let localFrame = frameIndex;
             if (entry.multipart) {
@@ -89,6 +112,13 @@ export class TenantFdsSmokeManager {
                 if (cached) {
                     volumeSlice = cached.data;
                     localFrame = cached.localFrameIndex;
+                } else if (entry.multipart._activePartId) {
+                    const part = entry.multipart.parts.find((p) => p.id === entry.multipart._activePartId);
+                    const data = entry.multipart._partDataCache.get(entry.multipart._activePartId);
+                    if (part && data) {
+                        volumeSlice = data;
+                        localFrame = Math.max(0, Math.min(frameIndex - part.frameStart, part.frameCount - 1));
+                    }
                 }
             } else if (entry.volumeData) {
                 volumeSlice = entry.volumeData;
@@ -279,6 +309,26 @@ export class TenantFdsSmokeManager {
         if (!entry) return false;
         entry.playback.playing = false;
         entry.playback.frameAccumulator = 0;
+        return true;
+    }
+
+    /**
+     * 指定フレームへシークして再生を止める（E2E・検証用）
+     * @param {string} smokeId
+     * @param {number} frameIndex
+     * @returns {Promise<boolean>}
+     */
+    async seekToFrame(smokeId, frameIndex) {
+        const entry = this._entries.find((e) => e.id === smokeId);
+        if (!entry) return false;
+        const pb = entry.playback;
+        pb.frameIndex = Math.max(0, Math.min(Math.floor(frameIndex), pb.frameCount - 1));
+        pb.playing = false;
+        pb.frameAccumulator = 0;
+        if (entry.multipart) {
+            await entry.multipart.ensurePartForFrame(pb.frameIndex);
+        }
+        this._applyFrame(entry, pb.frameIndex);
         return true;
     }
 

@@ -88,7 +88,27 @@ export class TenantFdsSmokeExposureMonitor {
         const dt = this._accumulator;
         this._accumulator = 0;
 
-        const sample = this.fdsSmokeManager.sampleNormalizedSootAtWorld(this._headWorld);
+        const samples = [
+            this.fdsSmokeManager.sampleNormalizedSootAtWorld(this._headWorld),
+            this.fdsSmokeManager.sampleNormalizedSootAtWorld(
+                this._headWorld.clone().set(
+                    this._headWorld.x,
+                    this._headWorld.y - 0.75,
+                    this._headWorld.z,
+                ),
+            ),
+            this.fdsSmokeManager.sampleNormalizedSootAtWorld(
+                this._headWorld.clone().set(
+                    this._headWorld.x,
+                    this._headWorld.y - 1.5,
+                    this._headWorld.z,
+                ),
+            ),
+        ];
+        const sample = samples.reduce(
+            (best, next) => (next.normalized > best.normalized ? next : best),
+            samples[0],
+        );
         const normalized = sample.normalized;
         this._inSmoke = sample.inSmoke;
         this._smokeIncreasing = normalized > this._lastNormalized + SMOKE_INCREASE_EPS;
