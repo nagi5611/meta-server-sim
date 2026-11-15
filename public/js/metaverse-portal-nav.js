@@ -29,9 +29,19 @@ function toReachablePortalHref(url) {
 /**
  * /api/client-config の portalLinks をナビに描画する
  * @param {HTMLElement | null} container
+ * @param {{ hideSeriesLinks?: boolean }} [options] テナントメタバース等で系列 URL 一覧だけ抑止
  */
-export async function renderMetaversePortalNav(container) {
+export async function renderMetaversePortalNav(container, options = {}) {
     if (!container) return;
+    const nav = container.closest('.portal-nav');
+    if (options.hideSeriesLinks) {
+        container.replaceChildren();
+        container.setAttribute('hidden', '');
+        nav?.querySelector('.portal-nav-label')?.setAttribute('hidden', '');
+        nav?.classList.add('portal-nav--no-series-links');
+        nav?.removeAttribute('hidden');
+        return;
+    }
     try {
         const data = await loadClientConfigOnce();
         if (!data || typeof data !== 'object') return;

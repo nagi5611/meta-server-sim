@@ -137,7 +137,7 @@ if (requireSecureHttp) {
     app.use((req, res, next) => {
         if (req.secure) return next();
         // ローカル wait-on・監視用（REQUIRE_SECURE_HTTP 時も HTTP で生存確認可能）
-        if (req.path === '/api/health') return next();
+        if (req.path === '/api/health' || req.path === '/mcp-wallet-smoke.html') return next();
         return res.status(403).send('HTTPS required');
     });
 }
@@ -151,9 +151,22 @@ registerTenantPluginShutdownHooks(httpServer);
 
 if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
     app.use('/metaverse-simple-static', express.static(SIMPLE_PUBLIC_DIR, { index: false }));
-    app.get('/js/metaverse-i18n.js', (_req, res) => {
-        res.sendFile(path.join(SIMPLE_PUBLIC_DIR, 'js', 'metaverse-i18n.js'));
-    });
+    const simpleSharedJs = ['metaverse-i18n.js', 'prefab-glb-fetch-worker.js', 'mesh-bvh-worker.js'];
+    const tenantSharedJsDir = path.join(__dirname, 'public', 'js');
+    for (const jsName of simpleSharedJs) {
+        app.get(`/js/${jsName}`, (_req, res) => {
+            const tenantOverride = path.join(tenantSharedJsDir, jsName);
+            const abs = fs.existsSync(tenantOverride)
+                ? tenantOverride
+                : path.join(SIMPLE_PUBLIC_DIR, 'js', jsName);
+            if (!fs.existsSync(abs)) {
+                return res.status(404).type('text/plain').send('not found');
+            }
+            res.type('application/javascript');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.sendFile(abs);
+        });
+    }
     app.get('/api/addons/matsuyama-flights/board', (_req, res) => {
         res.json({
             departures: [],
@@ -174,6 +187,14 @@ app.get('/api/health', (_req, res) => {
 
     res.json({ ok: true, service: 'metaverse-simulation-platform' });
 
+});
+
+app.get('/mcp-wallet-smoke.html', (_req, res) => {
+    const smokePath = path.join(__dirname, 'public', 'mcp-wallet-smoke.html');
+    if (!fs.existsSync(smokePath)) {
+        return res.status(404).type('text/plain').send('mcp-wallet-smoke.html not found');
+    }
+    res.sendFile(smokePath);
 });
 
 
@@ -217,6 +238,17 @@ app.get('/api/client-config', (req, res) => {
 });
 
 
+
+if (isProductionBuild) {
+    app.use(
+        '/assets',
+        express.static(path.join(STATIC_DIR, 'assets'), {
+            index: false,
+            maxAge: '365d',
+            immutable: true,
+        }),
+    );
+}
 
 app.use(express.static(STATIC_DIR, { index: false }));
 

@@ -1,6 +1,14 @@
 // addons/xr/client/game.js — tenant WebXR VR client module
-import './webxr-vr.css';
 import { registerClientInit, registerFrameUpdate } from './metaverse-registry-shim.js';
+
+function ensureWebXrStyles() {
+    if (document.querySelector('link[data-webxr-vr-css]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = new URL('./webxr-vr.css', import.meta.url).href;
+    link.dataset.webxrVrCss = '1';
+    document.head.appendChild(link);
+}
 import { initWebXrVrSubsystem } from './init.js';
 import { ThreeMeshUI } from './vr-quick-menu.js';
 import { resolveTenantAddonsEnabledUrl } from './tenant-paths.js';
@@ -38,6 +46,7 @@ async function isXrEnabled() {
 }
 
 export async function initTenantPlugin() {
+    ensureWebXrStyles();
     window.__tenantXrPluginLoaded = true;
 }
 

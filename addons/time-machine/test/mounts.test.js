@@ -10,9 +10,9 @@ describe('mounts', () => {
         assert.ok(parsed[0].path.endsWith('/mnt/a') || parsed[0].path.includes('mnt\\a'));
     });
 
-    it('buildSnapshotDir nests under metaverse-simple', () => {
+    it('buildSnapshotDir nests under meta-server-sim namespace', () => {
         const dir = buildSnapshotDir('/mnt/hdd', 'host1', 'hourly', '2026-07-06T12-00-00');
-        assert.ok(dir.includes('metaverse-simple'));
+        assert.ok(dir.includes('meta-server-sim'));
         assert.ok(dir.includes('hourly'));
         assert.ok(dir.endsWith('2026-07-06T12-00-00'));
     });

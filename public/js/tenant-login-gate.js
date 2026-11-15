@@ -68,6 +68,26 @@ export async function runTenantLoginGate() {
         return;
     }
 
+    const e2eHarnessEnabled =
+        document.documentElement.dataset.e2eHarness === '1' ||
+        window.__TENANT_E2E_HARNESS__ === '1';
+    if (e2eHarnessEnabled) {
+        const name =
+            String(nameInput?.value || '').trim() ||
+            localStorage.getItem(lsNameKey) ||
+            `E2E-${Date.now()}`;
+        localStorage.setItem(lsNameKey, name);
+        const avatarId =
+            String(avatarSelect?.value || '').trim() ||
+            avatars.find((a) => a.isDefault)?.id ||
+            avatars[0]?.id ||
+            '';
+        if (avatarId) localStorage.setItem(lsAvatarKey, avatarId);
+        gate.hidden = true;
+        document.body.classList.remove('tenant-login-gate-open');
+        return;
+    }
+
     gate.hidden = false;
     document.body.classList.add('tenant-login-gate-open');
 

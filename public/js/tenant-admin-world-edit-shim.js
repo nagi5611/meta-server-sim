@@ -15,11 +15,23 @@ export function installTenantAdminWorldEditShim() {
 
     const nativeFetch = window.fetch.bind(window);
     window.fetch = (input, init) => {
-        if (typeof input === 'string') {
-            const rewritten = rewriteTenantWorldEditApiUrl(input);
-            if (rewritten !== input) {
+        const original =
+            typeof input === 'string'
+                ? input
+                : input instanceof URL
+                  ? `${input.pathname}${input.search}`
+                  : input instanceof Request
+                    ? input.url
+                    : String(input);
+        const rewritten = rewriteTenantWorldEditApiUrl(original);
+        if (rewritten !== original) {
+            if (typeof input === 'string' || input instanceof URL) {
                 return nativeFetch(rewritten, init);
             }
+            if (input instanceof Request) {
+                return nativeFetch(new Request(rewritten, input), init);
+            }
+            return nativeFetch(rewritten, init);
         }
         return nativeFetch(input, init);
     };

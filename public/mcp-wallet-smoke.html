@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MCP MetaMask smoke</title>
+    <style>
+        body { font-family: system-ui, sans-serif; padding: 2rem; max-width: 40rem; }
+        button { font-size: 1rem; padding: 0.6rem 1.2rem; margin: 0.5rem 0.5rem 0.5rem 0; }
+        #log { margin-top: 1rem; white-space: pre-wrap; font-size: 0.9rem; background: #f4f4f4; padding: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>MetaMask MCP smoke</h1>
+    <p>Playwright / MCP から接続・署名プロンプトを誘発する最小ページです。</p>
+    <button type="button" id="btn-connect">Connect Wallet (eth_requestAccounts)</button>
+    <button type="button" id="btn-sign">Sign message (personal_sign)</button>
+    <div id="log" aria-live="polite"></div>
+    <script>
+        const logEl = document.getElementById('log');
+        function log(msg) {
+            logEl.textContent += msg + '\\n';
+        }
+        async function provider() {
+            if (!window.ethereum) {
+                throw new Error('No window.ethereum (MetaMask not injected)');
+            }
+            return window.ethereum;
+        }
+        document.getElementById('btn-connect').addEventListener('click', async () => {
+            try {
+                const eth = await provider();
+                const accounts = await eth.request({ method: 'eth_requestAccounts' });
+                log('accounts: ' + JSON.stringify(accounts));
+            } catch (e) {
+                log('connect error: ' + (e && e.message ? e.message : String(e)));
+            }
+        });
+        document.getElementById('btn-sign').addEventListener('click', async () => {
+            try {
+                const eth = await provider();
+                const accounts = await eth.request({ method: 'eth_requestAccounts' });
+                const from = accounts[0];
+                const msg = 'MetaMask MCP smoke @ ' + new Date().toISOString();
+                const sig = await eth.request({
+                    method: 'personal_sign',
+                    params: [msg, from],
+                });
+                log('signature ok len=' + (sig && sig.length));
+            } catch (e) {
+                log('sign error: ' + (e && e.message ? e.message : String(e)));
+            }
+        });
+    </script>
+</body>
+</html>

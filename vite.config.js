@@ -155,6 +155,14 @@ export default defineConfig({
                 adminTenant: path.join(projectRoot, 'public/admin-tenant.html'),
                 adminTenantWorldEdit: path.join(projectRoot, 'public/admin-tenant-world-edit.html'),
             },
+            output: {
+                manualChunks(id) {
+                    if (id.includes('node_modules/three')) return 'vendor-three';
+                    if (id.includes('node_modules/three-mesh-bvh')) return 'vendor-mesh-bvh';
+                    if (id.includes('node_modules/socket.io-client')) return 'vendor-socketio';
+                    if (id.includes('node_modules')) return 'vendor';
+                },
+            },
         },
     },
 });

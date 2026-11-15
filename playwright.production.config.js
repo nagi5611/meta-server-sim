@@ -19,5 +19,21 @@ export default defineConfig({
             password: adminPassword,
         },
     },
-    projects: [{ name: 'production', testMatch: /.*/ }],
+    projects: [
+        { name: 'production', testMatch: /^(?!.*prod-vc-duplex).*$/ },
+        {
+            name: 'production-vc-duplex',
+            testMatch: /prod-vc-duplex\.spec\.js/,
+            timeout: 420_000,
+            use: {
+                permissions: ['microphone', 'camera'],
+                launchOptions: {
+                    args: [
+                        '--use-fake-ui-for-media-stream',
+                        '--use-fake-device-for-media-stream',
+                    ],
+                },
+            },
+        },
+    ],
 });

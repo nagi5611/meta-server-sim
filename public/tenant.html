@@ -13,10 +13,16 @@
             position: fixed;
             inset: 0;
             z-index: 2000;
-            display: flex;
             align-items: center;
             justify-content: center;
             background: rgba(0, 0, 0, 0.55);
+        }
+        .tenant-login-gate:not([hidden]) {
+            display: flex;
+        }
+        .tenant-login-gate[hidden] {
+            display: none !important;
+            pointer-events: none !important;
         }
         .tenant-login-gate-panel {
             background: #fff;
@@ -82,6 +88,10 @@
         .fds-smoke-panel-crosshair--on-button::after {
             background: #7dffb8;
             box-shadow: 0 0 6px rgba(125, 255, 184, 0.75);
+        }
+        /* 左上の URL・ワールド名など常時表示のデバッグ HUD を非表示 */
+        #info {
+            display: none !important;
         }
         .fds-smoke-exposure-hud {
             position: fixed;

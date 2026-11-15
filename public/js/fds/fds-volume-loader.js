@@ -160,23 +160,61 @@ export const FDS_SMOKE_RENDER_DEFAULTS = {
 
  */
 
-export async function loadFdsSmokeManifestOnly(manifestPath) {
+/** @type {Map<string, Promise<FdsSmokeManifest>>} */
+const manifestLoadCache = new Map();
 
+/**
+ * セッション内キャッシュを破棄（ワールド切替時）
+ */
+export function clearFdsSmokeManifestCache() {
+    manifestLoadCache.clear();
+}
+
+/**
+ * 複数 manifest を並列取得（同一パスは 1 リクエストに集約）
+ * @param {string[]} manifestPaths
+ * @returns {Promise<void>}
+ */
+export async function prefetchFdsSmokeManifests(manifestPaths) {
+    const unique = [...new Set(manifestPaths.map((p) => String(p || '').trim()).filter(Boolean))];
+    if (unique.length === 0) return;
     await ensureFdsSmokeBulkConfig();
-    const manifestUrl = withFdsSmokeHttpAuth(
-        toTenantUrl(`/${manifestPath.replace(/^\/+/, '')}`),
-    );
+    await Promise.all(unique.map((p) => loadFdsSmokeManifestOnly(p)));
+}
 
-    const manifestResponse = await fetch(manifestUrl, { credentials: 'include' });
-
-    if (!manifestResponse.ok) {
-
-        throw new Error(`Failed to load manifest (${manifestResponse.status}): ${manifestUrl}`);
-
+export async function loadFdsSmokeManifestOnly(manifestPath) {
+    const key = String(manifestPath || '').trim().replace(/^\/+/, '');
+    if (!key) {
+        throw new Error('manifestPath is required');
     }
 
-    return manifestResponse.json();
+    const inflight = manifestLoadCache.get(key);
+    if (inflight) {
+        return inflight;
+    }
 
+    const loadPromise = (async () => {
+        await ensureFdsSmokeBulkConfig();
+        const manifestUrl = withFdsSmokeHttpAuth(
+            toTenantUrl(`/${key}`),
+        );
+
+        const manifestResponse = await fetch(manifestUrl, { credentials: 'include' });
+
+        if (!manifestResponse.ok) {
+            throw new Error(`Failed to load manifest (${manifestResponse.status}): ${manifestUrl}`);
+        }
+
+        return manifestResponse.json();
+    })();
+
+    manifestLoadCache.set(key, loadPromise);
+    try {
+        return await loadPromise;
+    } catch (err) {
+        manifestLoadCache.delete(key);
+        throw err;
+    }
 }
 
 
@@ -745,7 +783,7 @@ export class FdsMultipartSmokeController {
 
  * @param {FdsSmokeRenderOptions} [renderOptions]
 
- * @param {{ initialFrame?: number }} [loadOptions]
+ * @param {{ initialFrame?: number, manifest?: FdsSmokeManifest }} [loadOptions]
 
  * @returns {Promise<{ volumeRenderer: VolumeRenderer, multipart: FdsMultipartSmokeController | null, manifest: FdsSmokeManifest, volumeData: Uint8Array | null }>}
 
@@ -753,7 +791,10 @@ export class FdsMultipartSmokeController {
 
 export async function createFdsSmokeVolume(manifestPath, transform = {}, renderOptions = {}, loadOptions = {}) {
 
-    const manifest = await loadFdsSmokeManifestOnly(manifestPath);
+    const manifest =
+        loadOptions.manifest && typeof loadOptions.manifest === 'object'
+            ? loadOptions.manifest
+            : await loadFdsSmokeManifestOnly(manifestPath);
 
     const initialFrame = typeof loadOptions.initialFrame === 'number' ? loadOptions.initialFrame : null;
 

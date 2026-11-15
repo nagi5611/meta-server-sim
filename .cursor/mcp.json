@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "metasim-fleet": {
+      "command": "node",
+      "args": ["mcp/fleet-ops-mcp-server.js"],
+      "cwd": "/home/nagi/sim-server/meta-server-sim",
+      "env": {
+        "PLATFORM_FLEET_REGISTRY_PATH": "/home/nagi/sim-server/meta-server-sim/data/platform/fleet-registry.json"
+      }
+    },
+    "metasim-browser-metamask": {
+      "command": "npm",
+      "args": ["run", "mcp:browser-metamask"],
+      "cwd": "/home/nagi/sim-server/meta-server-sim",
+      "env": {
+        "METAMASK_EXTENSION_PATH": "/home/nagi/sim-server/metamask-chrome-unpacked",
+        "BROWSER_METAMASK_BASE_URL": "http://127.0.0.1:3004",
+        "BROWSER_METAMASK_USER_DATA_DIR": "/home/nagi/sim-server/.data/mcp-metamask-profile",
+        "BROWSER_METAMASK_CHANNEL": "",
+        "MCP_SMOKE_TENANT_URL": "https://sim.mmh-virtual.jp/P-01/"
+      }
+    }
+  }
+}

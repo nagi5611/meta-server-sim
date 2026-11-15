@@ -10,7 +10,7 @@ describe('retention', () => {
     it('pruneSnapshots keeps newest N', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-ret-'));
         const host = 'host';
-        const base = path.join(root, 'metaverse-simple', host, 'hourly');
+        const base = path.join(root, 'meta-server-sim', host, 'hourly');
         fs.mkdirSync(path.join(base, 'a'), { recursive: true });
         fs.mkdirSync(path.join(base, 'b'), { recursive: true });
         fs.mkdirSync(path.join(base, 'c'), { recursive: true });
