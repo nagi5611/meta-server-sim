@@ -675,6 +675,25 @@ class TenantMetaverseApp {
                     const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
                     return entry?.playback?.frameIndex ?? null;
                 },
+                getFdsSmokePlaybackState: (smokeId) => {
+                    const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
+                    const pb = entry?.playback;
+                    if (!pb) {
+                        return null;
+                    }
+                    const frameCount = Number(pb.frameCount) || 0;
+                    const frameIndex = Number(pb.frameIndex) || 0;
+                    const maxFrame = frameCount > 0 ? frameCount - 1 : 0;
+                    return {
+                        frameIndex,
+                        frameCount,
+                        maxFrame,
+                        playing: Boolean(pb.playing),
+                        loop: Boolean(pb.loop),
+                        secondsPerFrame: Number(pb.secondsPerFrame) || null,
+                        atEnd: frameCount > 0 && frameIndex >= maxFrame && !pb.playing,
+                    };
+                },
                 getLocalPosition: () => {
                     const pos = this.characterController?.getPosition?.();
                     if (!pos) return null;
