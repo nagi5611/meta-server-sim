@@ -415,7 +415,9 @@ export class TenantFdsSmokeManager {
         const part = multipart._findPartForFrame(frameIndex);
         if (!part || !multipart.isPartLoaded(part.id)) return;
         if (multipart._activePartId === part.id) return;
-        if (!multipart.isPartLoaded(part.id)) return;
+        if (multipart.activateCachedPartForFrame(frameIndex)) {
+            return;
+        }
         multipart.scheduleActivateForFrame(frameIndex);
     }
 

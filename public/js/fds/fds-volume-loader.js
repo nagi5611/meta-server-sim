@@ -700,10 +700,31 @@ export class FdsMultipartSmokeController {
      * アトラス反映を次フレームへ逃がし、ワールド読込中のメインスレッド固まりを避ける
      * @param {number} frameIndex
      */
+    /**
+     * キャッシュ済みパートを同期的にアトラスへ載せる（headless で rAF が遅延・スキップされても再生が進む）
+     * @param {number} frameIndex
+     * @returns {boolean}
+     */
+    activateCachedPartForFrame(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part || this._disposed) return false;
+        if (this._activePartId === part.id) return true;
+        const data = this._partDataCache.get(part.id);
+        if (!data) return false;
+        this._activateScheduledPartId = null;
+        this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
+        applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, data);
+        this._activePartId = part.id;
+        return true;
+    }
+
     scheduleActivateForFrame(frameIndex) {
         const part = this._findPartForFrame(frameIndex);
         if (!part || this._disposed) return;
         if (this._activePartId === part.id || this._activateScheduledPartId === part.id) {
+            return;
+        }
+        if (this.activateCachedPartForFrame(frameIndex)) {
             return;
         }
         this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
@@ -728,16 +749,7 @@ export class FdsMultipartSmokeController {
         const currentPart = this._findPartForFrame(frameIndex);
         if (!currentPart) return;
 
-        // 表示中パートのみアトラス反映（次パートの上書きを禁止）
-        if (this._activePartId !== currentPart.id && this._partDataCache.has(currentPart.id)) {
-            applyFdsSmokePartToAtlas(
-                this.volumeRenderer,
-                this.manifest,
-                currentPart,
-                this._partDataCache.get(currentPart.id),
-            );
-            this._activePartId = currentPart.id;
-        } else if (!this._partDataCache.has(currentPart.id)) {
+        if (!this._partDataCache.has(currentPart.id)) {
             void this.prefetchPart(currentPart);
         }
 

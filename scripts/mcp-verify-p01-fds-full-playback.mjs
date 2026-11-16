@@ -54,13 +54,30 @@ async function schoolWorldReady(page) {
     );
 }
 
+function writePlaybackArtifacts({
+    report,
+    timeline,
+    fdsLogLines,
+}) {
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'fds-full-playback-report.json'), JSON.stringify(report, null, 2));
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'fds-full-playback-timeline.json'), JSON.stringify(timeline, null, 2));
+    fs.writeFileSync(path.join(ARTIFACT_DIR, 'fds-full-playback-console.log'), fdsLogLines.join('\n'));
+}
+
 async function main() {
     fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
     const timeline = [];
     const fdsLogLines = [];
+    let pageCrashReason = null;
 
     const ctx = await getOrLaunchBrowserSession();
     const page = await ctx.newPage();
+    page.on('crash', () => {
+        pageCrashReason = 'renderer-crashed';
+    });
+    page.on('close', () => {
+        if (!pageCrashReason) pageCrashReason = 'page-closed';
+    });
     await installTenantE2EHarness(page);
     await enableDeveloperMode(page);
     await page.addInitScript(() => {
@@ -107,20 +124,34 @@ async function main() {
     let lastFrame = -1;
     let lastAdvanceMs = t0;
     let reachedEnd = false;
+    let loopError = null;
 
     while (Date.now() - t0 < MAX_WALL_MS) {
-        await page.evaluate(
-            (dt) => {
-                window.__tenantE2E.tickFdsSmokePlayback(dt);
-            },
-            TICK_DT,
-        );
-        await page.evaluate(async () => {
-            await new Promise((resolve) => {
-                requestAnimationFrame(() => requestAnimationFrame(resolve));
+        try {
+            await page.evaluate(
+                (dt) => {
+                    window.__tenantE2E.tickFdsSmokePlayback(dt);
+                },
+                TICK_DT,
+            );
+            await page.evaluate(async () => {
+                await new Promise((resolve) => {
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                });
             });
-        });
-        const state = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
+        } catch (err) {
+            loopError = err;
+            pageCrashReason = pageCrashReason || String(err?.message || err);
+            break;
+        }
+        let state;
+        try {
+            state = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
+        } catch (err) {
+            loopError = err;
+            pageCrashReason = pageCrashReason || String(err?.message || err);
+            break;
+        }
         const elapsed = Date.now() - t0;
         timeline.push({ elapsedMs: elapsed, ...state });
 
@@ -147,8 +178,17 @@ async function main() {
         await page.waitForTimeout(POLL_MS);
     }
 
-    const finalState = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
-    await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png') });
+    let finalState = timeline.length ? timeline[timeline.length - 1] : null;
+    try {
+        finalState = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
+    } catch {
+        /* page may have crashed */
+    }
+    try {
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png') });
+    } catch {
+        /* optional if tab died */
+    }
 
     const report = {
         smokeId: SMOKE_ID,
@@ -161,6 +201,8 @@ async function main() {
         maxFrame: finalState?.maxFrame,
         frameCount: finalState?.frameCount,
         playing: finalState?.playing,
+        pageCrashReason,
+        loopError: loopError ? String(loopError?.message || loopError) : null,
         success:
             reachedEnd &&
             finalState != null &&
@@ -171,12 +213,7 @@ async function main() {
         fdsLogTail: fdsLogLines.slice(-15),
     };
 
-    fs.writeFileSync(path.join(ARTIFACT_DIR, 'fds-full-playback-report.json'), JSON.stringify(report, null, 2));
-    fs.writeFileSync(path.join(ARTIFACT_DIR, 'fds-full-playback-timeline.json'), JSON.stringify(timeline, null, 2));
-    fs.writeFileSync(
-        path.join(ARTIFACT_DIR, 'fds-full-playback-console.log'),
-        fdsLogLines.join('\n'),
-    );
+    writePlaybackArtifacts({ report, timeline, fdsLogLines });
     console.log(JSON.stringify(report, null, 2));
 
     await closeBrowserSession();
