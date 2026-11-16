@@ -6,7 +6,7 @@ export const FDS_SMOKE_BYTES_PER_SECOND_MIN = 2_000_000;
 export const FDS_SMOKE_BYTES_PER_SECOND_MAX = 12_000_000;
 export const FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK = 8;
 /** 再生開始・パート切替時に同期的に載せるチャンク数 */
-export const FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS = 2;
+export const FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS = 3;
 /** パート終端前に次パートの先頭アトラスを Worker で構築し始めるローカルフレーム数 */
 export const FDS_SMOKE_PART_ATLAS_HEAD_LEAD_FRAMES =
     FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK * FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS + 8;

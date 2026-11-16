@@ -698,10 +698,22 @@ class TenantMetaverseApp {
                         } catch {
                             failed.push(part.id);
                         }
+                        if (loaded % 2 === 0 || loaded === multipart.parts.length) {
+                            console.log(
+                                `[FDS smoke warm] parts cached ${loaded}/${multipart.parts.length}`,
+                            );
+                        }
                     }
+                    let heads = 0;
                     for (const part of multipart.parts) {
                         if (multipart.isPartLoaded(part.id)) {
                             await multipart.prefetchAtlasHeadForPart(part).catch(() => {});
+                            heads += 1;
+                            if (heads % 2 === 0 || heads === multipart.parts.length) {
+                                console.log(
+                                    `[FDS smoke warm] atlas heads ${heads}/${multipart.parts.length}`,
+                                );
+                            }
                         }
                     }
                     return { parts: multipart.parts.length, loaded, failed };
