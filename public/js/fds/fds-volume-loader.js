@@ -577,6 +577,8 @@ export class FdsMultipartSmokeController {
         this._fetchingParts = new Map();
         /** 現在アトラスに載っているパート ID */
         this._activePartId = null;
+        /** rAF でアクティブ化予約中のパート ID */
+        this._activateScheduledPartId = null;
         this._disposed = false;
         /** VolumeRenderer.uniforms.time 用の直近有効ローカル時刻 */
         this._lastRendererTime = 0;
@@ -699,9 +701,16 @@ export class FdsMultipartSmokeController {
     scheduleActivateForFrame(frameIndex) {
         const part = this._findPartForFrame(frameIndex);
         if (!part || this._disposed) return;
+        if (this._activePartId === part.id || this._activateScheduledPartId === part.id) {
+            return;
+        }
         this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
+        this._activateScheduledPartId = part.id;
         requestAnimationFrame(() => {
             if (this._disposed) return;
+            const scheduledId = this._activateScheduledPartId;
+            this._activateScheduledPartId = null;
+            if (scheduledId !== part.id) return;
             void this.activatePart(part);
         });
     }

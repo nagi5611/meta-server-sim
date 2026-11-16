@@ -457,13 +457,11 @@ export class TenantFdsSmokeManager {
             // 現在フレームのパートだけアトラスに載せる（次パートのプリフェッチ上書きを防ぐ）
             if (part && multipart.isPartLoaded(part.id)) {
                 if (multipart._activePartId !== part.id) {
-                    const data = multipart._partDataCache.get(part.id);
-                    if (data) {
-                        applyFdsSmokePartToAtlas(renderer, multipart.manifest, part, data);
-                        multipart._activePartId = part.id;
-                    }
+                    multipart.scheduleActivateForFrame(frameIndex);
                 }
-                renderer.uniforms.time.value = multipart.toRendererTime(frameIndex);
+                if (multipart._activePartId === part.id) {
+                    renderer.uniforms.time.value = multipart.toRendererTime(frameIndex);
+                }
             }
             multipart.tick(frameIndex);
         } else {
