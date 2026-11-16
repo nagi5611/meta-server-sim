@@ -1,6 +1,5 @@
 // public/js/hub.js — プラットフォーム hub（tenant 一覧）
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { renderMetaversePortalNav } from './metaverse-portal-nav.js';
 
 const statusEl = document.getElementById('hub-status');
 const listEl = document.getElementById('tenant-list');
@@ -16,13 +15,6 @@ function setHubStatus(kind, text) {
     if (kind === 'error') statusEl.classList.add('is-error');
     if (kind === 'empty') statusEl.classList.add('is-empty');
 }
-
-renderMetaversePortalNav(document.getElementById('metaverse-portal-links')).then(() => {
-    const nav = document.getElementById('metaverse-portal-nav');
-    if (nav?.querySelector('.portal-nav-links a')) {
-        nav.removeAttribute('hidden');
-    }
-});
 
 try {
     const res = await fetch('/api/tenants');
