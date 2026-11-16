@@ -22,8 +22,9 @@ const TENANT_URL = process.env.BROWSER_METAMASK_BASE_URL || 'https://sim.mmh-vir
 const SMOKE_ID = process.env.MCP_VERIFY_SMOKE_ID || 'fugaku-prod01-smoke';
 const WORLD_ID = 'school';
 const SECONDS_PER_FRAME = Number(process.env.MCP_VERIFY_SECONDS_PER_FRAME || 0.08);
-const POLL_MS = 2000;
-const STALL_MS = 45_000;
+const POLL_MS = 250;
+const STALL_MS = 60_000;
+const TICK_DT = Number(process.env.MCP_VERIFY_TICK_DT || 0.12);
 const MAX_WALL_MS = Number(process.env.MCP_VERIFY_MAX_WALL_MS || 900_000);
 
 async function schoolWorldReady(page) {
@@ -108,18 +109,15 @@ async function main() {
     let reachedEnd = false;
 
     while (Date.now() - t0 < MAX_WALL_MS) {
+        await page.evaluate(
+            (dt) => {
+                window.__tenantE2E.tickFdsSmokePlayback(dt);
+            },
+            TICK_DT,
+        );
         await page.evaluate(async () => {
             await new Promise((resolve) => {
-                let ticks = 0;
-                const step = () => {
-                    ticks += 1;
-                    if (ticks >= 8) {
-                        resolve(null);
-                        return;
-                    }
-                    requestAnimationFrame(step);
-                };
-                requestAnimationFrame(step);
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
             });
         });
         const state = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
@@ -156,6 +154,7 @@ async function main() {
         smokeId: SMOKE_ID,
         multipartWarm: warm,
         secondsPerFrame: SECONDS_PER_FRAME,
+        tickDt: TICK_DT,
         wallMs: Date.now() - t0,
         reachedEnd,
         finalFrame: finalState?.frameIndex,
