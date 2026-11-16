@@ -4,7 +4,9 @@ export const FDS_SMOKE_FETCH_MAX_CONCURRENT = 1;
 export const FDS_SMOKE_TARGET_PART_SECONDS = 15;
 export const FDS_SMOKE_BYTES_PER_SECOND_MIN = 2_000_000;
 export const FDS_SMOKE_BYTES_PER_SECOND_MAX = 12_000_000;
-export const FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK = 4;
+export const FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK = 8;
+/** 再生開始・パート切替時に同期的に載せるチャンク数 */
+export const FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS = 2;
 
 /**
  * @param {number} bytesPerSecond

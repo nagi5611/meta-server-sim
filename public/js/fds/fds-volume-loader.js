@@ -20,7 +20,10 @@ import {
 } from './fds-smoke-fetch-client.js';
 import { enqueueFdsSmokePartFetch } from './fds-smoke-part-fetch-queue.js';
 import { buildPartAtlasInWorker } from './fds-smoke-atlas-client.js';
-import { FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK } from './fds-smoke-transfer-policy.js';
+import {
+    FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK,
+    FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS,
+} from './fds-smoke-transfer-policy.js';
 
 export {
     applyVolumePlacementToRenderer,
@@ -762,12 +765,14 @@ export class FdsMultipartSmokeController {
             }
         };
 
+        const initialSyncFrames =
+            FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK * FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS;
         const throughBefore = this._atlasReadyLocalThrough.get(part.id) ?? -1;
-        if (throughBefore < FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK - 1) {
+        if (throughBefore < initialSyncFrames - 1) {
             await applyFdsSmokePartToAtlasAsync(this.volumeRenderer, this.manifest, part, partData, {
                 signal,
                 onChunk,
-                maxChunks: 1,
+                maxChunks: FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS,
             });
             if (this._disposed || signal.aborted) return false;
         }
@@ -781,7 +786,7 @@ export class FdsMultipartSmokeController {
                 {
                     signal,
                     onChunk,
-                    timeStart: FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK,
+                    timeStart: initialSyncFrames,
                     skipBeginEnd: true,
                 },
             )
@@ -971,7 +976,7 @@ export class FdsMultipartSmokeController {
         if (progressInPart >= currentPart.frameCount - prefetchThreshold) {
             const nextPart = this.parts[currentPartIndex + 1];
             if (nextPart) {
-                void this.prefetchPart(nextPart, 'medium');
+                void this.prefetchPart(nextPart, 'high');
             }
         }
     }
