@@ -7,6 +7,10 @@ import {
     FDS_SMOKE_BYTES_PER_SECOND_MAX,
     FDS_SMOKE_BYTES_PER_SECOND_MIN,
     summarizePartTransferRates,
+    FDS_SMOKE_PLAYBACK_STALL_MS,
+    FDS_SMOKE_PART_ATLAS_HEAD_LEAD_FRAMES,
+    FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK,
+    FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS,
 } from '../public/js/fds/fds-smoke-transfer-policy.js';
 
 describe('fds-smoke-transfer-policy', () => {
@@ -27,5 +31,13 @@ describe('fds-smoke-transfer-policy', () => {
         const s = summarizePartTransferRates([100, 200, 300]);
         assert.equal(s.medianPartBytes, 200);
         assert.ok(s.defaultBytesPerSecond >= FDS_SMOKE_BYTES_PER_SECOND_MIN);
+    });
+
+    it('playback stall and atlas head lead match harness defaults', () => {
+        assert.equal(FDS_SMOKE_PLAYBACK_STALL_MS, 180_000);
+        assert.equal(
+            FDS_SMOKE_PART_ATLAS_HEAD_LEAD_FRAMES,
+            FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK * FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS + 8,
+        );
     });
 });

@@ -16,6 +16,7 @@ import {
     installTenantE2EHarness,
     enableDeveloperMode,
 } from '../e2e/helpers/tenant-metaverse.mjs';
+import { FDS_SMOKE_PLAYBACK_STALL_MS } from '../public/js/fds/fds-smoke-transfer-policy.js';
 
 const ARTIFACT_DIR = process.env.MCP_VERIFY_ARTIFACT_DIR || '/opt/cursor/artifacts';
 const TENANT_URL = process.env.BROWSER_METAMASK_BASE_URL || 'https://sim.mmh-virtual.jp/P-01/';
@@ -23,7 +24,7 @@ const SMOKE_ID = process.env.MCP_VERIFY_SMOKE_ID || 'fugaku-prod01-smoke';
 const WORLD_ID = 'school';
 const SECONDS_PER_FRAME = Number(process.env.MCP_VERIFY_SECONDS_PER_FRAME || 0.08);
 const POLL_MS = 250;
-const STALL_MS = Number(process.env.MCP_VERIFY_STALL_MS || 180_000);
+const STALL_MS = Number(process.env.MCP_VERIFY_STALL_MS || FDS_SMOKE_PLAYBACK_STALL_MS);
 const TICK_DT = Number(process.env.MCP_VERIFY_TICK_DT || 0.12);
 const TICKS_PER_POLL = Number(process.env.MCP_VERIFY_TICKS_PER_POLL || 24);
 const MAX_WALL_MS = Number(process.env.MCP_VERIFY_MAX_WALL_MS || 900_000);

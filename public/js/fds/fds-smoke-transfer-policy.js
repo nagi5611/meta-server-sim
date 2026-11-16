@@ -7,6 +7,11 @@ export const FDS_SMOKE_BYTES_PER_SECOND_MAX = 12_000_000;
 export const FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK = 8;
 /** 再生開始・パート切替時に同期的に載せるチャンク数 */
 export const FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS = 2;
+/** パート終端前に次パートの先頭アトラスを Worker で構築し始めるローカルフレーム数 */
+export const FDS_SMOKE_PART_ATLAS_HEAD_LEAD_FRAMES =
+    FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK * FDS_SMOKE_ATLAS_INITIAL_SYNC_CHUNKS + 8;
+/** FDS 再生ハーネス・MCP 検証で「フレーム未進行」とみなす既定時間（ms） */
+export const FDS_SMOKE_PLAYBACK_STALL_MS = 180_000;
 
 /**
  * @param {number} bytesPerSecond

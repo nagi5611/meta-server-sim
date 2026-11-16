@@ -32,6 +32,7 @@ import { runFrameUpdates } from '../../../metaverse-simple/lib/client-addon-regi
 import { DEFAULT_HDR_PATH } from '../../../metaverse-simple/public/js/ibl-setup.js';
 import { TenantFdsSmokeManager } from './tenant-fds-smoke-manager.js';
 import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
+import { FDS_SMOKE_PLAYBACK_STALL_MS } from './fds/fds-smoke-transfer-policy.js';
 import { TenantFdsSmokeExposureMonitor } from './tenant-fds-smoke-exposure.js';
 import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
 import { fetchAdminMetaverseEntry } from './tenant-admin-metaverse-auth.js';
@@ -698,6 +699,11 @@ class TenantMetaverseApp {
                             failed.push(part.id);
                         }
                     }
+                    for (const part of multipart.parts) {
+                        if (multipart.isPartLoaded(part.id)) {
+                            await multipart.prefetchAtlasHeadForPart(part).catch(() => {});
+                        }
+                    }
                     return { parts: multipart.parts.length, loaded, failed };
                 },
                 getFdsSmokePlaybackState: (smokeId) => {
@@ -723,7 +729,7 @@ class TenantMetaverseApp {
                     const secondsPerFrame = Number(options.secondsPerFrame ?? 0.08);
                     const tickDt = Number(options.tickDt ?? 0.12);
                     const ticksPerBatch = Math.max(1, Number(options.ticksPerBatch ?? 24));
-                    const stallMs = Number(options.stallMs ?? 60_000);
+                    const stallMs = Number(options.stallMs ?? FDS_SMOKE_PLAYBACK_STALL_MS);
                     const maxWallMs = Number(options.maxWallMs ?? 900_000);
                     const sampleEveryMs = Number(options.sampleEveryMs ?? 500);
                     const warmMultipart = options.warmMultipart !== false;
