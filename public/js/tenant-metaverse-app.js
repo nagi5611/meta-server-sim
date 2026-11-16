@@ -687,11 +687,18 @@ class TenantMetaverseApp {
                         return { parts: 0, loaded: 0 };
                     }
                     let loaded = 0;
+                    /** @type {string[]} */
+                    const failed = [];
                     for (const part of multipart.parts) {
-                        const data = await multipart.prefetchPart(part);
-                        if (data) loaded += 1;
+                        try {
+                            const data = await multipart.prefetchPart(part);
+                            if (data) loaded += 1;
+                            else failed.push(part.id);
+                        } catch {
+                            failed.push(part.id);
+                        }
                     }
-                    return { parts: multipart.parts.length, loaded };
+                    return { parts: multipart.parts.length, loaded, failed };
                 },
                 getFdsSmokePlaybackState: (smokeId) => {
                     const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);

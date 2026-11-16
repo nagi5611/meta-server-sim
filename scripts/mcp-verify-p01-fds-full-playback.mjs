@@ -103,11 +103,19 @@ async function main() {
         throw new Error(`smoke not loaded: ${JSON.stringify(before)}`);
     }
 
-    const warm = await page.evaluate(
-        async (id) => window.__tenantE2E.warmFdsSmokeMultipartCache(id),
-        SMOKE_ID,
-    );
-    console.log('multipart cache warm:', JSON.stringify(warm));
+    /** @type {{ parts: number, loaded: number, failed?: string[] }} */
+    let warm = { parts: 0, loaded: 0, failed: [] };
+    for (let attempt = 1; attempt <= 4; attempt++) {
+        warm = await page.evaluate(async (id) => window.__tenantE2E.warmFdsSmokeMultipartCache(id), SMOKE_ID);
+        console.log(`multipart cache warm attempt ${attempt}:`, JSON.stringify(warm));
+        if (warm.parts > 0 && warm.loaded === warm.parts) {
+            break;
+        }
+        await page.waitForTimeout(3000);
+    }
+    if (warm.parts > 0 && warm.loaded !== warm.parts) {
+        throw new Error(`multipart warm incomplete: ${JSON.stringify(warm)}`);
+    }
 
     await page.evaluate(
         async ({ smokeId, spf }) => {
