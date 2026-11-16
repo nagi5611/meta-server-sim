@@ -415,10 +415,8 @@ export class TenantFdsSmokeManager {
         const part = multipart._findPartForFrame(frameIndex);
         if (!part || !multipart.isPartLoaded(part.id)) return;
         if (multipart._activePartId === part.id) return;
-        const data = multipart._partDataCache.get(part.id);
-        if (!data) return;
-        applyFdsSmokePartToAtlas(entry.renderer, multipart.manifest, part, data);
-        multipart._activePartId = part.id;
+        if (!multipart.isPartLoaded(part.id)) return;
+        multipart.scheduleActivateForFrame(frameIndex);
     }
 
     /**

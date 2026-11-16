@@ -85,6 +85,12 @@ async function main() {
         throw new Error(`smoke not loaded: ${JSON.stringify(before)}`);
     }
 
+    const warm = await page.evaluate(
+        async (id) => window.__tenantE2E.warmFdsSmokeMultipartCache(id),
+        SMOKE_ID,
+    );
+    console.log('multipart cache warm:', JSON.stringify(warm));
+
     await page.evaluate(
         async ({ smokeId, spf }) => {
             await window.__tenantE2E.startFdsSmokePlayback(smokeId, {
@@ -134,6 +140,7 @@ async function main() {
 
     const report = {
         smokeId: SMOKE_ID,
+        multipartWarm: warm,
         secondsPerFrame: SECONDS_PER_FRAME,
         wallMs: Date.now() - t0,
         reachedEnd,

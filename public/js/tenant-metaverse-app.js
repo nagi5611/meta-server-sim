@@ -675,6 +675,19 @@ class TenantMetaverseApp {
                     const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
                     return entry?.playback?.frameIndex ?? null;
                 },
+                warmFdsSmokeMultipartCache: async (smokeId) => {
+                    const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
+                    const multipart = entry?.multipart;
+                    if (!multipart?.parts?.length) {
+                        return { parts: 0, loaded: 0 };
+                    }
+                    let loaded = 0;
+                    for (const part of multipart.parts) {
+                        const data = await multipart.prefetchPart(part);
+                        if (data) loaded += 1;
+                    }
+                    return { parts: multipart.parts.length, loaded };
+                },
                 getFdsSmokePlaybackState: (smokeId) => {
                     const entry = this.fdsSmokeManager?._entries?.find((e) => e.id === smokeId);
                     const pb = entry?.playback;
