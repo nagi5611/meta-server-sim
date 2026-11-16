@@ -108,6 +108,20 @@ async function main() {
     let reachedEnd = false;
 
     while (Date.now() - t0 < MAX_WALL_MS) {
+        await page.evaluate(async () => {
+            await new Promise((resolve) => {
+                let ticks = 0;
+                const step = () => {
+                    ticks += 1;
+                    if (ticks >= 8) {
+                        resolve(null);
+                        return;
+                    }
+                    requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            });
+        });
         const state = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
         const elapsed = Date.now() - t0;
         timeline.push({ elapsedMs: elapsed, ...state });

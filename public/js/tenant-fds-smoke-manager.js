@@ -368,7 +368,7 @@ export class TenantFdsSmokeManager {
             pb.frameAccumulator = Number(pb.frameAccumulator) || 0;
             pb.frameAccumulator += safeDelta;
 
-            const maxSteps = 8;
+            const maxSteps = 48;
             let steps = 0;
             while (pb.frameAccumulator >= interval && pb.playing && steps < maxSteps) {
                 steps += 1;
