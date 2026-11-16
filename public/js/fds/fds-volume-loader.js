@@ -677,9 +677,11 @@ export class FdsMultipartSmokeController {
     async ensurePartForFrame(frameIndex) {
         const part = this._findPartForFrame(frameIndex);
         if (!part) return false;
-        await this.activatePart(part);
+        await this.prefetchPart(part);
+        if (this._disposed) return false;
+        this.scheduleActivateForFrame(frameIndex);
         this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
-        return true;
+        return this.isPartLoaded(part.id);
     }
 
     /**
