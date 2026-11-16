@@ -99,7 +99,11 @@ async function main() {
 
     await schoolWorldReady(page);
     try {
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-school-ready.png'), timeout: 15_000 });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, 'fds-full-school-ready.png'),
+            timeout: 120_000,
+            animations: 'disabled',
+        });
     } catch (e) {
         console.warn('school ready screenshot skipped:', e instanceof Error ? e.message : e);
     }
@@ -176,7 +180,11 @@ async function main() {
     reachedEnd = Boolean(harnessResult?.reachedEnd);
     const finalState = harnessResult?.finalState ?? (timeline.length ? timeline[timeline.length - 1] : null);
     try {
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png'), timeout: 15_000 });
+        await page.screenshot({
+            path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png'),
+            timeout: 120_000,
+            animations: 'disabled',
+        });
     } catch (e) {
         console.warn('playback end screenshot skipped:', e instanceof Error ? e.message : e);
     }
