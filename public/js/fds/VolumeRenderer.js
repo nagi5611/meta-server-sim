@@ -726,12 +726,14 @@ export default class VolumeRenderer extends THREE.Mesh {
         const textureSizeY = volumeResolutionY * atlasResolutionY;
         const textureSizeZ = volumeResolutionZ * atlasResolutionZ;
 
-       // Track min/max value
+        // Track min/max value
         let minValue = Number.POSITIVE_INFINITY;
         let maxValue = Number.NEGATIVE_INFINITY;
 
-        // Force texture update
-        this.uniforms.volumeAtlas.value.needsUpdate = true;
+        const batch = this._atlasUpdateDepth > 0;
+        if (!batch) {
+            this.uniforms.volumeAtlas.value.needsUpdate = true;
+        }
 
         const voxels = this.uniforms.volumeAtlas.data;
 
@@ -774,5 +776,32 @@ export default class VolumeRenderer extends THREE.Mesh {
             minValue,
             maxValue,
         };
+    }
+
+    /** @type {number} */
+    _atlasUpdateDepth = 0;
+
+    beginAtlasUpdate() {
+        this._atlasUpdateDepth += 1;
+    }
+
+    endAtlasUpdate() {
+        this._atlasUpdateDepth = Math.max(0, this._atlasUpdateDepth - 1);
+        if (this._atlasUpdateDepth === 0 && this.uniforms.volumeAtlas.value) {
+            this.uniforms.volumeAtlas.value.needsUpdate = true;
+        }
+    }
+
+    /**
+     * @param {Uint32Array} indices
+     * @param {Uint16Array} values
+     */
+    patchAtlasIndices(indices, values) {
+        const voxels = this.uniforms.volumeAtlas.data;
+        if (!voxels || !indices || !values) return;
+        const n = Math.min(indices.length, values.length);
+        for (let k = 0; k < n; k++) {
+            voxels[indices[k]] = values[k];
+        }
     }
 }

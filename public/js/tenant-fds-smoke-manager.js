@@ -297,8 +297,10 @@ export class TenantFdsSmokeManager {
         }
 
         if (entry.multipart) {
-            await entry.multipart.prefetchFrame(pb.frameIndex);
-            await entry.multipart.ensurePartForFrame(pb.frameIndex);
+            const part = entry.multipart._findPartForFrame(pb.frameIndex);
+            if (part) {
+                await entry.multipart.activatePart(part, 'high');
+            }
         }
 
         this._syncMultipartActivePart(entry, pb.frameIndex);
@@ -334,7 +336,10 @@ export class TenantFdsSmokeManager {
         pb.playing = false;
         pb.frameAccumulator = 0;
         if (entry.multipart) {
-            await entry.multipart.ensurePartForFrame(pb.frameIndex);
+            const part = entry.multipart._findPartForFrame(pb.frameIndex);
+            if (part) {
+                await entry.multipart.activatePart(part, 'high');
+            }
         }
         this._applyFrame(entry, pb.frameIndex);
         return true;
@@ -443,8 +448,7 @@ export class TenantFdsSmokeManager {
      */
     _canShowFrame(entry, frameIndex) {
         if (!entry.multipart) return true;
-        const part = entry.multipart._findPartForFrame(frameIndex);
-        return part ? entry.multipart.isPartLoaded(part.id) : false;
+        return entry.multipart.isFrameAtlasReady(frameIndex);
     }
 
     /**
@@ -458,10 +462,10 @@ export class TenantFdsSmokeManager {
             const part = multipart._findPartForFrame(frameIndex);
             // 現在フレームのパートだけアトラスに載せる（次パートのプリフェッチ上書きを防ぐ）
             if (part && multipart.isPartLoaded(part.id)) {
-                if (multipart._activePartId !== part.id) {
+                if (multipart._activePartId !== part.id || !multipart.isFrameAtlasReady(frameIndex)) {
                     multipart.scheduleActivateForFrame(frameIndex);
                 }
-                if (multipart._activePartId === part.id) {
+                if (multipart.isFrameAtlasReady(frameIndex)) {
                     renderer.uniforms.time.value = multipart.toRendererTime(frameIndex);
                 }
             }
