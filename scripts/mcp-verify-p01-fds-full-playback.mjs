@@ -25,7 +25,9 @@ const SECONDS_PER_FRAME = Number(process.env.MCP_VERIFY_SECONDS_PER_FRAME || 0.0
 const POLL_MS = 250;
 const STALL_MS = 60_000;
 const TICK_DT = Number(process.env.MCP_VERIFY_TICK_DT || 0.12);
+const TICKS_PER_POLL = Number(process.env.MCP_VERIFY_TICKS_PER_POLL || 24);
 const MAX_WALL_MS = Number(process.env.MCP_VERIFY_MAX_WALL_MS || 900_000);
+const SKIP_MULTIPART_WARM = process.env.MCP_VERIFY_SKIP_MULTIPART_WARM === '1';
 
 async function schoolWorldReady(page) {
     await page.goto(TENANT_URL, { waitUntil: 'domcontentloaded', timeout: 120_000 });
@@ -96,106 +98,87 @@ async function main() {
     });
 
     await schoolWorldReady(page);
-    await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-school-ready.png') });
+    try {
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-school-ready.png'), timeout: 15_000 });
+    } catch (e) {
+        console.warn('school ready screenshot skipped:', e instanceof Error ? e.message : e);
+    }
 
     const before = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
     if (!before?.frameCount) {
         throw new Error(`smoke not loaded: ${JSON.stringify(before)}`);
     }
 
-    /** @type {{ parts: number, loaded: number, failed?: string[] }} */
-    let warm = { parts: 0, loaded: 0, failed: [] };
-    for (let attempt = 1; attempt <= 4; attempt++) {
-        warm = await page.evaluate(async (id) => window.__tenantE2E.warmFdsSmokeMultipartCache(id), SMOKE_ID);
-        console.log(`multipart cache warm attempt ${attempt}:`, JSON.stringify(warm));
-        if (warm.parts > 0 && warm.loaded === warm.parts) {
-            break;
-        }
-        await page.waitForTimeout(3000);
-    }
-    if (warm.parts > 0 && warm.loaded !== warm.parts) {
-        throw new Error(`multipart warm incomplete: ${JSON.stringify(warm)}`);
-    }
-
-    await page.evaluate(
-        async ({ smokeId, spf }) => {
-            await window.__tenantE2E.startFdsSmokePlayback(smokeId, {
-                fromFrame: 0,
-                loop: false,
-                secondsPerFrame: spf,
-            });
-        },
-        { smokeId: SMOKE_ID, spf: SECONDS_PER_FRAME },
-    );
-
     const t0 = Date.now();
-    let lastFrame = -1;
-    let lastAdvanceMs = t0;
     let reachedEnd = false;
     let loopError = null;
+    let harnessResult = null;
+  let warm = { parts: 0, loaded: 0, skipped: SKIP_MULTIPART_WARM };
 
-    while (Date.now() - t0 < MAX_WALL_MS) {
-        try {
-            await page.evaluate(
-                (dt) => {
-                    window.__tenantE2E.tickFdsSmokePlayback(dt);
-                },
-                TICK_DT,
-            );
-            await page.evaluate(async () => {
-                await new Promise((resolve) => {
-                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+    try {
+        harnessResult = await page.evaluate(
+            async (opts) => {
+                const runner = window.__tenantE2E?.runFdsSmokePlaybackUntilEnd;
+                if (typeof runner !== 'function') {
+                    return { __missingHarness: true };
+                }
+                return runner(opts.smokeId, {
+                    secondsPerFrame: opts.secondsPerFrame,
+                    tickDt: opts.tickDt,
+                    ticksPerBatch: opts.ticksPerPoll,
+                    stallMs: opts.stallMs,
+                    maxWallMs: opts.maxWallMs,
+                    warmMultipart: opts.warmMultipart,
                 });
+            },
+            {
+                smokeId: SMOKE_ID,
+                secondsPerFrame: SECONDS_PER_FRAME,
+                tickDt: TICK_DT,
+                ticksPerPoll: TICKS_PER_POLL,
+                stallMs: STALL_MS,
+                maxWallMs: MAX_WALL_MS,
+                warmMultipart: !SKIP_MULTIPART_WARM,
+            },
+            { timeout: MAX_WALL_MS + 180_000 },
+        );
+    } catch (err) {
+        loopError = err;
+        pageCrashReason = pageCrashReason || String(err?.message || err);
+    }
+
+    if (harnessResult?.__missingHarness) {
+        throw new Error(
+            'runFdsSmokePlaybackUntilEnd missing on production bundle; deploy latest main and retry',
+        );
+    }
+
+    if (harnessResult?.timeline?.length) {
+        for (const sample of harnessResult.timeline) {
+            timeline.push({
+                elapsedMs: sample.elapsedMs,
+                frameIndex: sample.frameIndex,
+                frameCount: sample.frameCount,
+                maxFrame: sample.maxFrame,
+                playing: sample.playing,
+                atEnd: sample.atEnd,
             });
-        } catch (err) {
-            loopError = err;
-            pageCrashReason = pageCrashReason || String(err?.message || err);
-            break;
         }
-        let state;
-        try {
-            state = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
-        } catch (err) {
-            loopError = err;
-            pageCrashReason = pageCrashReason || String(err?.message || err);
-            break;
-        }
-        const elapsed = Date.now() - t0;
-        timeline.push({ elapsedMs: elapsed, ...state });
-
-        if (state?.frameIndex != null && state.frameIndex > lastFrame) {
-            lastFrame = state.frameIndex;
-            lastAdvanceMs = Date.now();
-        }
-
-        if (state?.atEnd || (state?.maxFrame != null && state.frameIndex >= state.maxFrame && !state.playing)) {
-            reachedEnd = true;
-            break;
-        }
-
-        if (!state?.playing && state?.frameIndex > 0 && state.frameIndex < state.maxFrame) {
-            throw new Error(`playback stopped early at frame ${state.frameIndex}/${state.maxFrame}`);
-        }
-
-        if (Date.now() - lastAdvanceMs >= STALL_MS) {
-            throw new Error(
-                `stalled at frame ${state?.frameIndex}/${state?.maxFrame} for ${STALL_MS}ms`,
-            );
-        }
-
-        await page.waitForTimeout(POLL_MS);
     }
 
-    let finalState = timeline.length ? timeline[timeline.length - 1] : null;
-    try {
-        finalState = await page.evaluate((id) => window.__tenantE2E.getFdsSmokePlaybackState(id), SMOKE_ID);
-    } catch {
-        /* page may have crashed */
+    if (harnessResult?.multipartWarm) {
+        warm = harnessResult.multipartWarm;
     }
+    if (harnessResult?.error) {
+        loopError = loopError || new Error(harnessResult.error);
+    }
+
+    reachedEnd = Boolean(harnessResult?.reachedEnd);
+    const finalState = harnessResult?.finalState ?? (timeline.length ? timeline[timeline.length - 1] : null);
     try {
-        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png') });
-    } catch {
-        /* optional if tab died */
+        await page.screenshot({ path: path.join(ARTIFACT_DIR, 'fds-full-playback-end.png'), timeout: 15_000 });
+    } catch (e) {
+        console.warn('playback end screenshot skipped:', e instanceof Error ? e.message : e);
     }
 
     const report = {
@@ -203,7 +186,8 @@ async function main() {
         multipartWarm: warm,
         secondsPerFrame: SECONDS_PER_FRAME,
         tickDt: TICK_DT,
-        wallMs: Date.now() - t0,
+        ticksPerPoll: TICKS_PER_POLL,
+        wallMs: harnessResult?.wallMs ?? Date.now() - t0,
         reachedEnd,
         finalFrame: finalState?.frameIndex,
         maxFrame: finalState?.maxFrame,
@@ -211,11 +195,13 @@ async function main() {
         playing: finalState?.playing,
         pageCrashReason,
         loopError: loopError ? String(loopError?.message || loopError) : null,
-        success:
-            reachedEnd &&
+        harnessError: harnessResult?.error ?? null,
+        success: Boolean(
+            harnessResult?.success &&
             finalState != null &&
             finalState.frameIndex >= finalState.maxFrame &&
             !finalState.playing,
+        ),
         timelineSamples: timeline.length,
         lastTimeline: timeline.slice(-5),
         fdsLogTail: fdsLogLines.slice(-15),

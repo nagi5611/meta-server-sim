@@ -719,6 +719,103 @@ class TenantMetaverseApp {
                         atEnd: frameCount > 0 && frameIndex >= maxFrame && !pb.playing,
                     };
                 },
+                runFdsSmokePlaybackUntilEnd: async (smokeId, options = {}) => {
+                    const secondsPerFrame = Number(options.secondsPerFrame ?? 0.08);
+                    const tickDt = Number(options.tickDt ?? 0.12);
+                    const ticksPerBatch = Math.max(1, Number(options.ticksPerBatch ?? 24));
+                    const stallMs = Number(options.stallMs ?? 60_000);
+                    const maxWallMs = Number(options.maxWallMs ?? 900_000);
+                    const sampleEveryMs = Number(options.sampleEveryMs ?? 500);
+                    const warmMultipart = options.warmMultipart !== false;
+
+                    const readState = () =>
+                        window.__tenantE2E.getFdsSmokePlaybackState(smokeId);
+
+                    let multipartWarm = { parts: 0, loaded: 0, skipped: true };
+                    if (warmMultipart) {
+                        multipartWarm = await window.__tenantE2E.warmFdsSmokeMultipartCache(smokeId);
+                    }
+
+                    await window.__tenantE2E.startFdsSmokePlayback(smokeId, {
+                        fromFrame: 0,
+                        loop: false,
+                        secondsPerFrame,
+                    });
+
+                    const timeline = [];
+                    const t0 = performance.now();
+                    let lastFrame = -1;
+                    let lastAdvanceMs = t0;
+                    let reachedEnd = false;
+
+                    while (performance.now() - t0 < maxWallMs) {
+                        for (let i = 0; i < ticksPerBatch; i += 1) {
+                            window.__tenantE2E.tickFdsSmokePlayback(tickDt);
+                        }
+                        await new Promise((resolve) => {
+                            requestAnimationFrame(() => requestAnimationFrame(resolve));
+                        });
+
+                        const state = readState();
+                        const elapsedMs = performance.now() - t0;
+                        if (!timeline.length || elapsedMs - timeline[timeline.length - 1].elapsedMs >= sampleEveryMs) {
+                            timeline.push({ elapsedMs, ...state });
+                        }
+
+                        if (state?.frameIndex != null && state.frameIndex > lastFrame) {
+                            lastFrame = state.frameIndex;
+                            lastAdvanceMs = performance.now();
+                        }
+
+                        if (
+                            state?.atEnd ||
+                            (state?.maxFrame != null && state.frameIndex >= state.maxFrame && !state.playing)
+                        ) {
+                            reachedEnd = true;
+                            break;
+                        }
+
+                        if (
+                            !state?.playing &&
+                            state?.frameIndex > 0 &&
+                            state?.frameIndex < state?.maxFrame
+                        ) {
+                            return {
+                                reachedEnd: false,
+                                error: `playback stopped early at frame ${state.frameIndex}/${state.maxFrame}`,
+                                finalState: state,
+                                wallMs: elapsedMs,
+                                timeline,
+                                multipartWarm,
+                            };
+                        }
+
+                        if (performance.now() - lastAdvanceMs >= stallMs) {
+                            return {
+                                reachedEnd: false,
+                                error: `stalled at frame ${state?.frameIndex}/${state?.maxFrame} for ${stallMs}ms`,
+                                finalState: state,
+                                wallMs: elapsedMs,
+                                timeline,
+                                multipartWarm,
+                            };
+                        }
+                    }
+
+                    const finalState = readState();
+                    return {
+                        reachedEnd,
+                        finalState,
+                        wallMs: performance.now() - t0,
+                        timeline,
+                        multipartWarm,
+                        success:
+                            reachedEnd &&
+                            finalState != null &&
+                            finalState.frameIndex >= finalState.maxFrame &&
+                            !finalState.playing,
+                    };
+                },
                 getLocalPosition: () => {
                     const pos = this.characterController?.getPosition?.();
                     if (!pos) return null;
