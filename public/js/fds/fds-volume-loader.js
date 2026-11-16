@@ -18,6 +18,9 @@ import {
     fetchFdsSmokeBinary,
     withFdsSmokeHttpAuth,
 } from './fds-smoke-fetch-client.js';
+import { enqueueFdsSmokePartFetch } from './fds-smoke-part-fetch-queue.js';
+import { buildPartAtlasInWorker } from './fds-smoke-atlas-client.js';
+import { FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK } from './fds-smoke-transfer-policy.js';
 
 export {
     applyVolumePlacementToRenderer,
@@ -271,12 +274,21 @@ async function loadFdsSmokeBinary(manifestPath, manifest) {
 
  */
 
-export async function loadFdsSmokePart(manifestPath, part) {
+/**
+ * @typedef {'high' | 'medium' | 'low'} FdsPartFetchPriority
+ */
 
+/**
+ * @param {string} manifestPath
+ * @param {FdsSmokePart} part
+ * @param {{ priority?: FdsPartFetchPriority }} [options]
+ * @returns {Promise<Uint8Array>}
+ */
+export async function loadFdsSmokePart(manifestPath, part, options = {}) {
     const dataDir = getManifestDataDir(manifestPath);
-
-    return fetchFdsSmokeBinary(`${dataDir}${part.dataFile}`);
-
+    const assetPath = `${dataDir}${part.dataFile}`;
+    const priority = options.priority ?? 'medium';
+    return enqueueFdsSmokePartFetch(assetPath, priority, () => fetchFdsSmokeBinary(assetPath));
 }
 
 
@@ -453,6 +465,64 @@ async function applyFdsVolumeRenderOptions(volumeRenderer, renderOptions = {}) {
 
  */
 
+/**
+ * Worker で段階的にアトラスへ載せる（メインスレッドは patch のみ）
+ * @param {VolumeRenderer} volumeRenderer
+ * @param {FdsSmokeManifest} manifest
+ * @param {FdsSmokePart} part
+ * @param {Uint8Array} partData
+ * @param {{ framesPerChunk?: number, signal?: AbortSignal, onChunk?: (timeStart: number, timeCount: number) => void, maxChunks?: number, timeStart?: number }} [options]
+ * @returns {Promise<void>}
+ */
+export async function applyFdsSmokePartToAtlasAsync(
+    volumeRenderer,
+    manifest,
+    part,
+    partData,
+    options = {},
+) {
+    const framesPerChunk = options.framesPerChunk ?? FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK;
+    const rangeStart = Math.max(0, options.timeStart ?? 0);
+    const wrapAtlas = !options.skipBeginEnd;
+    if (wrapAtlas) {
+        volumeRenderer.beginAtlasUpdate();
+        if (rangeStart === 0) {
+            volumeRenderer.uniforms.timeCount.value = part.frameCount;
+        }
+    }
+    try {
+        await buildPartAtlasInWorker(
+            manifest,
+            part,
+            partData,
+            (chunk) => {
+                volumeRenderer.patchAtlasIndices(chunk.indices, chunk.values);
+                options.onChunk?.(chunk.timeStart, chunk.timeCount);
+            },
+            {
+                framesPerChunk,
+                signal: options.signal,
+                timeStart: rangeStart,
+                maxChunks: options.maxChunks,
+            },
+        );
+    } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+            return;
+        }
+        if (rangeStart > 0) {
+            throw error;
+        }
+        console.warn('[FDS smoke] atlas worker failed, falling back to sync:', error);
+        applyFdsSmokePartToAtlas(volumeRenderer, manifest, part, partData);
+        options.onChunk?.(0, part.frameCount);
+    } finally {
+        if (wrapAtlas) {
+            volumeRenderer.endAtlasUpdate();
+        }
+    }
+}
+
 export function applyFdsSmokePartToAtlas(volumeRenderer, manifest, part, partData) {
 
     const [nx, ny, nz] = manifest.dims;
@@ -579,6 +649,12 @@ export class FdsMultipartSmokeController {
         this._activePartId = null;
         /** rAF でアクティブ化予約中のパート ID */
         this._activateScheduledPartId = null;
+        /** @type {Map<string, number>} パート内ローカルフレームでアトラス反映済みの最大 index */
+        this._atlasReadyLocalThrough = new Map();
+        /** @type {Set<string>} */
+        this._atlasFullPartIds = new Set();
+        /** @type {AbortController | null} */
+        this._atlasActivationAbort = null;
         this._disposed = false;
         /** VolumeRenderer.uniforms.time 用の直近有効ローカル時刻 */
         this._lastRendererTime = 0;
@@ -598,7 +674,12 @@ export class FdsMultipartSmokeController {
      * @param {FdsSmokePart} part
      * @returns {Promise<Uint8Array | null>}
      */
-    async prefetchPart(part) {
+    /**
+     * @param {FdsSmokePart} part
+     * @param {FdsPartFetchPriority} [priority]
+     * @returns {Promise<Uint8Array | null>}
+     */
+    async prefetchPart(part, priority = 'medium') {
         if (this._disposed) return null;
         const cached = this._partDataCache.get(part.id);
         if (cached) return cached;
@@ -607,7 +688,7 @@ export class FdsMultipartSmokeController {
         if (existing) return existing;
 
         const fetchPromise = (async () => {
-            const partData = await loadFdsSmokePart(this.manifestPath, part);
+            const partData = await loadFdsSmokePart(this.manifestPath, part, { priority });
             if (this._disposed) return partData;
             this._partDataCache.set(part.id, partData);
             return partData;
@@ -626,16 +707,78 @@ export class FdsMultipartSmokeController {
      * @param {FdsSmokePart} part
      * @returns {Promise<boolean>}
      */
-    async activatePart(part) {
+    /**
+     * @param {FdsSmokePart} part
+     * @param {FdsPartFetchPriority} [priority]
+     * @returns {Promise<boolean>}
+     */
+    async activatePart(part, priority = 'high') {
         if (this._disposed) return false;
-        if (this._activePartId === part.id) return true;
+        if (this._activePartId === part.id && this._atlasFullPartIds.has(part.id)) return true;
 
-        const partData = await this.prefetchPart(part);
+        this._atlasActivationAbort?.abort();
+        this._atlasActivationAbort = new AbortController();
+        const signal = this._atlasActivationAbort.signal;
+
+        const partData = await this.prefetchPart(part, priority);
         if (this._disposed || !partData) return false;
 
-        applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, partData);
+        if (this._atlasFullPartIds.has(part.id)) {
+            applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, partData);
+            this._activePartId = part.id;
+            return true;
+        }
+
+        const onChunk = (timeStart, timeCount) => {
+            const through = timeStart + timeCount - 1;
+            this._atlasReadyLocalThrough.set(
+                part.id,
+                Math.max(this._atlasReadyLocalThrough.get(part.id) ?? -1, through),
+            );
+            if (timeStart === 0 && !this._disposed) {
+                this._activePartId = part.id;
+            }
+        };
+
+        await applyFdsSmokePartToAtlasAsync(this.volumeRenderer, this.manifest, part, partData, {
+            signal,
+            onChunk,
+            maxChunks: 1,
+        });
+
+        if (this._disposed || signal.aborted) return false;
+
+        void applyFdsSmokePartToAtlasAsync(this.volumeRenderer, this.manifest, part, partData, {
+            signal,
+            onChunk,
+            timeStart: FDS_SMOKE_ATLAS_FRAMES_PER_CHUNK,
+            skipBeginEnd: true,
+        })
+            .then(() => {
+                if (this._disposed) return;
+                this._atlasFullPartIds.add(part.id);
+                this._atlasReadyLocalThrough.set(part.id, part.frameCount - 1);
+            })
+            .catch(() => {});
+
         this._activePartId = part.id;
         return true;
+    }
+
+    /**
+     * @param {number} frameIndex
+     * @returns {boolean}
+     */
+    isFrameAtlasReady(frameIndex) {
+        const part = this._findPartForFrame(frameIndex);
+        if (!part) return false;
+        if (!this.isPartLoaded(part.id)) return false;
+        if (this._atlasFullPartIds.has(part.id)) return true;
+        const local = Math.max(0, frameIndex - part.frameStart);
+        const through = this._atlasReadyLocalThrough.get(part.id) ?? -1;
+        if (through < 0) return false;
+        if (this._activePartId !== part.id) return false;
+        return local <= through;
     }
 
     /**
@@ -677,11 +820,13 @@ export class FdsMultipartSmokeController {
     async ensurePartForFrame(frameIndex) {
         const part = this._findPartForFrame(frameIndex);
         if (!part) return false;
-        await this.prefetchPart(part);
+        await this.prefetchPart(part, 'high');
         if (this._disposed) return false;
-        this.scheduleActivateForFrame(frameIndex);
+        if (!this.isFrameAtlasReady(frameIndex)) {
+            await this.activatePart(part, 'high');
+        }
         this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
-        return this.isPartLoaded(part.id);
+        return this.isFrameAtlasReady(frameIndex);
     }
 
     /**
@@ -708,9 +853,12 @@ export class FdsMultipartSmokeController {
     activateCachedPartForFrame(frameIndex) {
         const part = this._findPartForFrame(frameIndex);
         if (!part || this._disposed) return false;
-        if (this._activePartId === part.id) return true;
+        if (this._activePartId === part.id && this.isFrameAtlasReady(frameIndex)) return true;
         const data = this._partDataCache.get(part.id);
         if (!data) return false;
+        if (!this._atlasFullPartIds.has(part.id)) {
+            return false;
+        }
         this._activateScheduledPartId = null;
         this._lastRendererTime = Math.max(0, frameIndex - part.frameStart);
         applyFdsSmokePartToAtlas(this.volumeRenderer, this.manifest, part, data);
@@ -734,7 +882,7 @@ export class FdsMultipartSmokeController {
             const scheduledId = this._activateScheduledPartId;
             this._activateScheduledPartId = null;
             if (scheduledId !== part.id) return;
-            void this.activatePart(part);
+            void this.activatePart(part, 'high');
         });
     }
 
@@ -750,7 +898,7 @@ export class FdsMultipartSmokeController {
         if (!currentPart) return;
 
         if (!this._partDataCache.has(currentPart.id)) {
-            void this.prefetchPart(currentPart);
+            void this.prefetchPart(currentPart, 'high');
         }
 
         const currentPartIndex = this.parts.indexOf(currentPart);
@@ -760,8 +908,7 @@ export class FdsMultipartSmokeController {
         if (progressInPart >= currentPart.frameCount - prefetchThreshold) {
             const nextPart = this.parts[currentPartIndex + 1];
             if (nextPart) {
-                // 次パートはキャッシュのみ。アトラスには載せない
-                void this.prefetchPart(nextPart);
+                void this.prefetchPart(nextPart, 'medium');
             }
         }
     }
@@ -813,9 +960,13 @@ export class FdsMultipartSmokeController {
 
     dispose() {
         this._disposed = true;
+        this._atlasActivationAbort?.abort();
+        this._atlasActivationAbort = null;
         this._fetchingParts.clear();
         this._partDataCache.clear();
         this._activePartId = null;
+        this._atlasReadyLocalThrough.clear();
+        this._atlasFullPartIds.clear();
     }
 }
 
@@ -862,10 +1013,10 @@ export async function createFdsSmokeVolume(manifestPath, transform = {}, renderO
 
         if (initialFrame !== null) {
             await multipart.prefetchFrame(initialFrame);
-            multipart.scheduleActivateForFrame(initialFrame);
+            void multipart.activatePart(multipart._findPartForFrame(initialFrame), 'high');
         } else {
-            await multipart.prefetchPart(multipart.parts[0]);
-            multipart.scheduleActivateForFrame(multipart.parts[0].frameStart);
+            await multipart.prefetchPart(multipart.parts[0], 'high');
+            void multipart.activatePart(multipart.parts[0], 'high');
         }
 
 

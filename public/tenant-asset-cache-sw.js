@@ -1,7 +1,7 @@
-// public/tenant-asset-cache-sw.js — GLB / 大型バイナリの cache-first（同一オリジン tenant 配下）
+// public/tenant-asset-cache-sw.js — GLB / FDS パート等の cache-first（同一オリジン tenant 配下）
 'use strict';
 
-const CACHE_NAME = 'tenant-glb-v2';
+const CACHE_NAME = 'tenant-glb-v3';
 
 /**
  * @param {URL} url
@@ -16,6 +16,23 @@ function isGlbCacheTarget(url) {
         p.includes('/images/') ||
         p.includes('/env/')
     );
+}
+
+/**
+ * @param {URL} url
+ */
+function isFdsSimulationBinaryTarget(url) {
+    if (url.origin !== self.location.origin) return false;
+    const p = url.pathname.toLowerCase();
+    if (!p.includes('/simulations/')) return false;
+    return p.endsWith('.uint8.bin') || p.endsWith('.bin');
+}
+
+/**
+ * @param {URL} url
+ */
+function isTenantAssetCacheTarget(url) {
+    return isGlbCacheTarget(url) || isFdsSimulationBinaryTarget(url);
 }
 
 self.addEventListener('install', (event) => {
@@ -37,7 +54,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
-    if (!isGlbCacheTarget(url)) return;
+    if (!isTenantAssetCacheTarget(url)) return;
 
     event.respondWith(
         (async () => {

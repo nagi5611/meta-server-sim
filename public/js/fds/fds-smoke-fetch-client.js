@@ -4,6 +4,7 @@ import FdsSmokeFetchWorker from './fds-smoke-fetch.worker.js?worker';
 import { fdsSmokeBulkOriginMatchesPage } from '../../../lib/fds-smoke-origin-match.js';
 import { toTenantUrl } from '../tenant-runtime-shim.js';
 import { loadClientConfigOnce } from '../tenant-client-config.js';
+import { getConfiguredBytesPerSecond } from './fds-smoke-transfer-defaults.js';
 
 /** @see lib/tenant-metaverse-http-auth.js TENANT_SOCKET_AUTH_QUERY */
 const HTTP_AUTH_QUERY = 'mvsauth';
@@ -16,6 +17,7 @@ let httpAuthToken = null;
 let workerInstance = null;
 let workerDisabled = false;
 let nextRequestId = 1;
+let workerConfigSent = false;
 
 /**
  * バルク配信オリジンを設定する
@@ -101,6 +103,15 @@ export function resolveFdsSmokeBinaryUrl(assetPath) {
 /**
  * @returns {Worker | null}
  */
+function syncWorkerTransferConfig(worker) {
+    if (workerConfigSent) return;
+    worker.postMessage({
+        type: 'config',
+        bytesPerSecond: getConfiguredBytesPerSecond(),
+    });
+    workerConfigSent = true;
+}
+
 function getFetchWorker() {
     if (workerDisabled) {
         return null;
@@ -111,6 +122,7 @@ function getFetchWorker() {
             workerInstance.onerror = () => {
                 workerDisabled = true;
             };
+            syncWorkerTransferConfig(workerInstance);
         } catch {
             workerDisabled = true;
             return null;
@@ -158,7 +170,13 @@ function fetchFdsSmokeBinaryViaWorker(worker, fetchUrl) {
         };
 
         worker.addEventListener('message', onMessage);
-        worker.postMessage({ type: 'fetch', id: requestId, url: authedUrl });
+        syncWorkerTransferConfig(worker);
+        worker.postMessage({
+            type: 'fetch',
+            id: requestId,
+            url: authedUrl,
+            bytesPerSecond: getConfiguredBytesPerSecond(),
+        });
     });
 }
 
