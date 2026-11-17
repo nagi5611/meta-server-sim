@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
  * P-01 新校舎: FDS 煙を最終フレームまで再生できるか本番検証
+ *
+ * 本番 (sim.mmh-virtual.jp) では ADMIN_PASSWORD（+ 任意で ADMIN_USERNAME）を渡し、
+ * Playwright httpCredentials で nginx 保護下のアセットを取得できるようにする。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,14 +11,8 @@ import {
     closeBrowserSession,
     getOrLaunchBrowserSession,
 } from '../lib/mcp-browser-metamask.js';
-import {
-    dismissBlockingModals,
-    unlockGameplayPhysics,
-} from '../e2e/helpers/tenant-metaverse-agent.mjs';
-import {
-    installTenantE2EHarness,
-    enableDeveloperMode,
-} from '../e2e/helpers/tenant-metaverse.mjs';
+import { dismissBlockingModals } from '../e2e/helpers/tenant-metaverse-agent.mjs';
+import { installTenantE2EHarness } from '../e2e/helpers/tenant-metaverse.mjs';
 import { FDS_SMOKE_PLAYBACK_STALL_MS } from '../public/js/fds/fds-smoke-transfer-policy.js';
 
 const ARTIFACT_DIR = process.env.MCP_VERIFY_ARTIFACT_DIR || '/opt/cursor/artifacts';
@@ -30,6 +27,14 @@ const TICKS_PER_POLL = Number(process.env.MCP_VERIFY_TICKS_PER_POLL || 24);
 const MAX_WALL_MS = Number(process.env.MCP_VERIFY_MAX_WALL_MS || 900_000);
 const SKIP_MULTIPART_WARM = process.env.MCP_VERIFY_SKIP_MULTIPART_WARM === '1';
 
+/** メニュー解除後に canvas をフォーカス（Node 単体実行用・expect 非依存） */
+async function unlockGameplayPhysicsForVerify(page) {
+    const canvas = page.locator('#canvas');
+    await canvas.waitFor({ state: 'visible', timeout: 30_000 });
+    await canvas.click({ position: { x: 320, y: 240 }, force: true });
+    await page.waitForTimeout(150);
+}
+
 async function schoolWorldReady(page) {
     await page.goto(TENANT_URL, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     await page.waitForFunction(
@@ -38,22 +43,33 @@ async function schoolWorldReady(page) {
         { timeout: 300_000 },
     );
     await dismissBlockingModals(page);
-    await unlockGameplayPhysics(page);
+    await unlockGameplayPhysicsForVerify(page);
     await page.waitForFunction(
         () => Boolean(window.__tenantE2E?.getSocket?.()?.connected),
         null,
         { timeout: 120_000 },
     );
-    await page.evaluate(async (wid) => window.__tenantE2E.switchToWorld(wid), WORLD_ID);
+    await page.evaluate((wid) => {
+        void window.__tenantE2E.switchToWorld(wid).catch((err) => {
+            console.error('[mcp-verify] switchToWorld rejected:', err?.message || err);
+        });
+    }, WORLD_ID);
     await page.waitForFunction(
         () => window.__tenantE2E?.getCurrentWorldId?.() === 'school',
         null,
-        { timeout: 300_000 },
+        { timeout: 600_000 },
+    );
+    await page.evaluate(
+        async (wid) => {
+            await window.__tenantE2E.loadFdsSmokeFromWorld(wid);
+        },
+        WORLD_ID,
+        { timeout: 600_000 },
     );
     await page.waitForFunction(
         () => Boolean(window.__tenantE2E?.fdsSmokeHasEntries?.()),
         null,
-        { timeout: 300_000 },
+        { timeout: 120_000 },
     );
 }
 
@@ -82,7 +98,6 @@ async function main() {
         if (!pageCrashReason) pageCrashReason = 'page-closed';
     });
     await installTenantE2EHarness(page);
-    await enableDeveloperMode(page);
     await page.addInitScript(() => {
         localStorage.setItem('username', `McpFdsFull-${Date.now()}`);
         localStorage.setItem('metaverse-control-scheme', 'keyboard');
@@ -90,7 +105,7 @@ async function main() {
 
     page.on('console', (msg) => {
         const text = msg.text();
-        if (text.includes('[FDS smoke]')) {
+        if (text.includes('[FDS smoke]') || text.includes('[FDS smoke warm]')) {
             fdsLogLines.push(text);
             if (fdsLogLines.length <= 30 || fdsLogLines.length % 50 === 0) {
                 console.log(`[browser] ${text}`);
