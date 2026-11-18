@@ -58,6 +58,10 @@ jobs:
             echo "::notice::CLOUDFLARE_API_TOKEN is not set in repository secrets; skipping deploy."
             exit 0
           fi
+          if [ -z "${LOBBY_PRESENCE_SECRET:-}" ] || [ -z "${LOBBY_WORKER_SYNC_SECRET:-}" ]; then
+            echo "::error::Repository secrets LOBBY_PRESENCE_SECRET and LOBBY_WORKER_SYNC_SECRET are required (same values as sim .env). Add them under Settings → Secrets and variables → Actions, then re-run this workflow."
+            exit 1
+          fi
           chmod +x scripts/lobby-provision-cloudflare.sh
           bash scripts/lobby-provision-cloudflare.sh
       - name: Upload lobby-secrets.env
