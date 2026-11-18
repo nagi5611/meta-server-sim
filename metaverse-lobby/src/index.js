@@ -130,7 +130,7 @@ export default {
         if (request.method === 'GET' && new URL(request.url).pathname === '/api/health') {
             return json({ ok: true, service: 'metaverse-lobby' });
         }
-        return env.ASSETS.fetch(request);
+        return new Response('Not Found', { status: 404 });
     },
     async scheduled(event, env, ctx) {
         ctx.waitUntil(pollStatus(env));

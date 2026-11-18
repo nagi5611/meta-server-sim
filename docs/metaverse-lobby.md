@@ -7,7 +7,8 @@
 | 層 | 役割 |
 |----|------|
 | **Pages（静的）** | ロビー UI。10 秒ごとに `GET /api/metaverses` をポーリング |
-| **Worker** | カタログ配信、管理同期、**1 分 Cron** で各 `statusUrl` を確認 |
+| **Worker（API のみ）** | `/api/*` — カタログ配信、管理同期、**1 分 Cron** で各 `statusUrl` を確認 |
+| **カスタムドメイン** | 既定 `lobby.mmh-virtual.jp`（Pages）。`/api/*` は `_redirects` で Worker にプロキシ |
 | **Durable Object `LobbyPoller`** | **10 秒**ごとに各 `presenceUrl` を叩き、オンライン人数を KV に集約 |
 | **各メタバースサーバー** | `GET /api/lobby/status`（状態）、`GET /api/lobby/presence`（人数・要 `LOBBY_PRESENCE_SECRET`） |
 | **管理 API** | `GET/PUT /admin/lobby-catalog`、tenant 作成・削除時に自動 upsert + Worker へ push |
@@ -21,7 +22,7 @@
 | 変数 | 用途 |
 |------|------|
 | `LOBBY_PRESENCE_SECRET` | Worker が presence API を叩くときの Bearer トークン |
-| `LOBBY_WORKER_SYNC_URL` | 例: `https://lobby.example.workers.dev/api/admin/sync` |
+| `LOBBY_WORKER_SYNC_URL` | 例: `https://metaverse-lobby.<account>.workers.dev/api/admin/sync`（sync は Worker 直 URL 推奨） |
 | `LOBBY_WORKER_SYNC_SECRET` | sync POST の Bearer（Worker 側 `LOBBY_WORKER_SYNC_SECRET` と同一） |
 | `LOBBY_MAINTENANCE=1` | ロビー向けにメンテ表示を強制 |
 
@@ -48,8 +49,11 @@ cd metaverse-lobby
 npm install
 wrangler secret put LOBBY_WORKER_SYNC_SECRET
 wrangler secret put LOBBY_PRESENCE_SECRET
-npm run deploy
+npm run deploy:worker
+npm run deploy:pages
 ```
+
+**DNS（Xserver）** — `lobby.mmh-virtual.jp` を Cloudflare Pages のプロジェクト `metaverse-lobby` に CNAME 連携（Deploy ログまたは Dashboard に表示されるターゲット）。権威 DNS は ns1〜5.xserver.jp。Worker は workers.dev のまま、ブラウザ向け API は Pages 経由で同一オリジンになります。
 
 ## 本番 sim への反映
 
