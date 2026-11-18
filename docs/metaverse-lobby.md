@@ -29,16 +29,40 @@
 
 ## Worker デプロイ
 
+**自動（推奨）** — リポジトリルートで:
+
+```bash
+export CLOUDFLARE_API_TOKEN=…   # Workers Scripts Edit + KV Edit
+export CLOUDFLARE_ACCOUNT_ID=…    # 任意
+bash scripts/lobby-provision-cloudflare.sh
+```
+
+生成された `LOBBY_*` はリポジトリ直下の `lobby-secrets.env`（または `LOBBY_SECRETS_OUTPUT`）に出力されます。sim 本番 `.env` にその3行を追記してください。
+
+**GitHub Actions** — リポジトリ Secrets に `CLOUDFLARE_API_TOKEN`（必須）、`CLOUDFLARE_ACCOUNT_ID`、固定したい場合は `LOBBY_PRESENCE_SECRET` / `LOBBY_WORKER_SYNC_SECRET` を登録し、workflow **Deploy metaverse-lobby Worker** を実行（`main` の `metaverse-lobby/` 変更でも自動）。
+
+**手動**
+
 ```bash
 cd metaverse-lobby
 npm install
-# wrangler.toml の kv_namespaces.id を本番 ID に差し替え
 wrangler secret put LOBBY_WORKER_SYNC_SECRET
 wrangler secret put LOBBY_PRESENCE_SECRET
 npm run deploy
 ```
 
-初回は管理画面から tenant を保存するか、`PUT /admin/lobby-catalog` でカタログを登録後、`POST /admin/lobby-catalog/sync` で Worker に反映します。
+## 本番 sim への反映
+
+`cursor` SSH では `nagi` の home にアクセスできないため、**自宅サーバー上で root / nagi** が次を実行します:
+
+```bash
+# lobby-secrets.env をサーバーに安全にコピーしたうえで:
+sudo LOBBY_ENV_FILE=/path/to/lobby-secrets.env bash /home/nagi/sim-server/meta-server-sim/scripts/lobby-production-apply.sh
+```
+
+または従来どおり `sudo /usr/local/bin/metasim-production-git-sync.sh` のあと、`.env` に `LOBBY_*` を追記して `sudo systemctl restart metasim-server`。
+
+初回は管理画面から tenant を保存するか、`PUT /admin/lobby-catalog` でカタログを登録後、`POST /admin/lobby-catalog/sync`（設定 → ネットワーク）で Worker に反映します。
 
 ## 管理画面との連携
 
