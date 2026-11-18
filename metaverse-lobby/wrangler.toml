@@ -1,0 +1,25 @@
+name = "metaverse-lobby"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "LOBBY_KV"
+id = "00000000000000000000000000000000"
+
+[[durable_objects.bindings]]
+name = "LOBBY_POLLER"
+class_name = "LobbyPoller"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["LobbyPoller"]
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+LOBBY_PUBLIC_POLL_MS = "10000"

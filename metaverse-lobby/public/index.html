@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>松山南高校 みんなでメタ</title>
+  <link rel="icon" href="/assets/icon-192.png">
+  <link rel="stylesheet" href="/colors_and_type.css">
+  <link rel="stylesheet" href="/lobby.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="site-title">
+        <img src="/assets/icon-192.png" width="32" height="32" alt="">
+        <span>みんなでメタ</span>
+        <span class="sub">松山南高校 ばーちゃるず</span>
+      </div>
+    </div>
+  </header>
+  <main>
+    <section class="panel" aria-labelledby="lobby-title">
+      <div class="panel-head">
+        <h2 id="lobby-title">メタバース一覧</h2>
+        <span id="refresh-hint" class="num">同期中…</span>
+      </div>
+      <div id="world-grid" class="grid" role="list"></div>
+      <div class="other">
+        <div>
+          <strong>その他のメタバース</strong>
+          <div style="font-size:11px;color:var(--color-text-faint)">参加コードで入室</div>
+        </div>
+        <input id="join-code" type="text" maxlength="12" placeholder="参加コード" autocomplete="off" aria-label="参加コード">
+        <button type="button" class="btn primary" id="join-code-btn">参加</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="join-scrim" class="scrim" role="dialog" aria-modal="true" aria-labelledby="join-title" hidden>
+    <div class="dlg">
+      <h3 id="join-title">メタバースに参加</h3>
+      <p id="join-world-name" style="margin:0;color:var(--color-text-muted);font-size:13px"></p>
+      <label for="display-name">参加時の表示名</label>
+      <input id="display-name" type="text" maxlength="16" placeholder="16文字以内" autocomplete="nickname">
+      <div class="dlg-actions">
+        <button type="button" class="btn" id="join-cancel">キャンセル</button>
+        <button type="button" class="btn primary" id="join-go">参加</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

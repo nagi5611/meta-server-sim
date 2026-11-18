@@ -1,0 +1,33 @@
+{
+  "metaverses": [
+    {
+      "id": "tenant-p-01",
+      "name": "P-01 メタバース（sim）",
+      "entryUrl": "https://sim.mmh-virtual.jp/P-01/",
+      "joinCode": "P01",
+      "statusUrl": "https://sim.mmh-virtual.jp/api/lobby/status",
+      "presenceUrl": "https://sim.mmh-virtual.jp/api/lobby/presence",
+      "description": "メタバースシミュレーション プラットフォーム（新校舎など）",
+      "maintenance": false,
+      "capacity": 5000,
+      "sortOrder": 0,
+      "enabled": true,
+      "tenantId": "P-01"
+    },
+    {
+      "id": "tenant-p-99",
+      "name": "Test",
+      "entryUrl": "https://sim.example/P-99/",
+      "joinCode": "P99",
+      "statusUrl": "https://sim.example/api/lobby/status",
+      "presenceUrl": "https://sim.example/api/lobby/presence",
+      "description": "",
+      "maintenance": false,
+      "capacity": 5000,
+      "sortOrder": 1,
+      "enabled": true,
+      "tenantId": "P-99"
+    }
+  ],
+  "updatedAt": "2026-11-18T00:53:15.790Z"
+}
