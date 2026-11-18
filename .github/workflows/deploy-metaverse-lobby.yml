@@ -10,8 +10,28 @@ on:
       - 'scripts/lobby-provision-cloudflare.sh'
       - '.github/workflows/deploy-metaverse-lobby.yml'
 
+permissions:
+  contents: read
+
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: metaverse-lobby/package-lock.json
+      - name: Wrangler dry-run
+        working-directory: metaverse-lobby
+        run: |
+          npm ci
+          npx wrangler deploy --dry-run
+
   deploy:
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +46,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           LOBBY_KV_NAMESPACE_ID: ${{ vars.LOBBY_KV_NAMESPACE_ID }}
+          LOBBY_WORKERS_DEV_SUBDOMAIN: ${{ secrets.LOBBY_WORKERS_DEV_SUBDOMAIN }}
           LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
           LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
         run: |
@@ -36,10 +57,17 @@ jobs:
           chmod +x scripts/lobby-provision-cloudflare.sh
           bash scripts/lobby-provision-cloudflare.sh
       - name: Upload lobby-secrets.env
-        if: ${{ success() && hashFiles('lobby-secrets.env') != '' }}
+        if: success() && hashFiles('lobby-secrets.env') != ''
         uses: actions/upload-artifact@v4
         with:
           name: lobby-secrets
           path: lobby-secrets.env
           retention-days: 3
+          if-no-files-found: ignore
+      - name: Upload deploy log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lobby-deploy-log
+          path: /tmp/lobby-wrangler-deploy.log
           if-no-files-found: ignore
