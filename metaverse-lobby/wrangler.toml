@@ -2,10 +2,7 @@ name = "metaverse-lobby"
 main = "src/index.js"
 compatibility_date = "2024-11-01"
 workers_dev = true
-
-[assets]
-directory = "./public"
-binding = "ASSETS"
+# 静的 UI は Cloudflare Pages（public/）。API のみ Worker。
 
 [[kv_namespaces]]
 binding = "LOBBY_KV"

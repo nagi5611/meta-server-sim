@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy:worker": "wrangler deploy",
+    "deploy:pages": "wrangler pages deploy public --project-name=metaverse-lobby --commit-dirty=true",
+    "deploy": "npm run deploy:worker && npm run deploy:pages",
     "tail": "wrangler tail"
   },
   "devDependencies": {

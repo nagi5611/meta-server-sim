@@ -1,4 +1,4 @@
-name: Deploy metaverse-lobby Worker
+name: Deploy metaverse-lobby (Worker + Pages)
 
 on:
   workflow_dispatch:
@@ -29,6 +29,9 @@ jobs:
         run: |
           npm ci
           npx wrangler deploy --dry-run
+      - name: Check Pages static paths
+        working-directory: metaverse-lobby
+        run: test -f public/_redirects && test -f public/index.html
 
   deploy:
     needs: validate
@@ -49,6 +52,7 @@ jobs:
           LOBBY_WORKERS_DEV_SUBDOMAIN: ${{ secrets.LOBBY_WORKERS_DEV_SUBDOMAIN }}
           LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
           LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
+          LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
             echo "::notice::CLOUDFLARE_API_TOKEN is not set in repository secrets; skipping deploy."
