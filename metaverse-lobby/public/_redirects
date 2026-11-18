@@ -1,2 +1,0 @@
-# デプロイ時に scripts/lobby-provision-cloudflare.sh が Worker URL で上書きします。
-/api/* https://metaverse-lobby.harumacci94.workers.dev/api/:splat 200

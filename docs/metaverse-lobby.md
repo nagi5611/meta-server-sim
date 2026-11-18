@@ -8,7 +8,7 @@
 |----|------|
 | **Pages（静的）** | ロビー UI。10 秒ごとに `GET /api/metaverses` をポーリング |
 | **Worker（API のみ）** | `/api/*` — カタログ配信、管理同期、**1 分 Cron** で各 `statusUrl` を確認 |
-| **カスタムドメイン** | 既定 `m.mmh-virtual.jp`（Pages）。`/api/*` は `_redirects` で Worker にプロキシ |
+| **カスタムドメイン** | 既定 `m.mmh-virtual.jp`（Pages）。`/api/*` は **Pages Functions** で Worker にプロキシ |
 | **Durable Object `LobbyPoller`** | **10 秒**ごとに各 `presenceUrl` を叩き、オンライン人数を KV に集約 |
 | **各メタバースサーバー** | `GET /api/lobby/status`（状態）、`GET /api/lobby/presence`（人数・要 `LOBBY_PRESENCE_SECRET`） |
 | **管理 API** | `GET/PUT /admin/lobby-catalog`、tenant 作成・削除時に自動 upsert + Worker へ push |
