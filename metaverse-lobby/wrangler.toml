@@ -18,7 +18,7 @@ class_name = "LobbyPoller"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["LobbyPoller"]
+new_sqlite_classes = ["LobbyPoller"]
 
 [triggers]
 crons = ["* * * * *"]
