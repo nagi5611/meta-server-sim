@@ -41,6 +41,7 @@ import { isValidTenantId } from './lib/tenant-id.js';
 
 import { registerPlatformAdmin } from './lib/platform-admin.js';
 import { registerPlatformLobbyRoutes } from './lib/platform-lobby-routes.js';
+import { ensureLobbyCatalogSeeded } from './lib/platform-lobby-bootstrap.js';
 
 import { initPlatformRuntime } from './lib/platform-runtime.js';
 import { ensureTenantMediasoupWorkers } from './lib/tenant-socket-features.js';
@@ -102,7 +103,13 @@ const {
 
 const { loaded: tenants, skipped } = loadTenantRegistry();
 
-
+void ensureLobbyCatalogSeeded({ syncToWorker: true }).then((result) => {
+    if (result.seeded) {
+        console.log(
+            `[lobby] catalog seeded from ${tenants.length} tenant(s); workerSync=${JSON.stringify(result.workerSync)}`,
+        );
+    }
+});
 
 const app = express();
 
