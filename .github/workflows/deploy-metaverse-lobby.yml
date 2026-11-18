@@ -52,7 +52,7 @@ jobs:
           LOBBY_WORKERS_DEV_SUBDOMAIN: ${{ secrets.LOBBY_WORKERS_DEV_SUBDOMAIN }}
           LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
           LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
-          LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME }}
+          LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME || 'm.mmh-virtual.jp' }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
             echo "::notice::CLOUDFLARE_API_TOKEN is not set in repository secrets; skipping deploy."

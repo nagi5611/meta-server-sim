@@ -12,7 +12,7 @@ WRANGLER_TOML="${LOBBY_DIR}/wrangler.toml"
 DEPLOY_LOG="${LOBBY_DEPLOY_LOG:-/tmp/lobby-wrangler-deploy.log}"
 PAGES_DEPLOY_LOG="${LOBBY_PAGES_DEPLOY_LOG:-/tmp/lobby-wrangler-pages-deploy.log}"
 PAGES_PROJECT="${LOBBY_PAGES_PROJECT_NAME:-metaverse-lobby}"
-CUSTOM_HOST="${LOBBY_CUSTOM_HOSTNAME:-lobby.mmh-virtual.jp}"
+CUSTOM_HOST="${LOBBY_CUSTOM_HOSTNAME:-m.mmh-virtual.jp}"
 REDIRECTS_FILE="${LOBBY_DIR}/public/_redirects"
 
 log() { printf '[lobby-cf] %s\n' "$*"; }
