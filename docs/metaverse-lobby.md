@@ -32,7 +32,7 @@
 **自動（推奨）** — リポジトリルートで:
 
 ```bash
-export CLOUDFLARE_API_TOKEN=…   # Workers Scripts Edit + KV Edit
+export CLOUDFLARE_API_TOKEN=…   # Account: Workers Scripts Edit + Workers KV Storage Edit + Account Settings Read
 export CLOUDFLARE_ACCOUNT_ID=…    # 任意
 bash scripts/lobby-provision-cloudflare.sh
 ```
