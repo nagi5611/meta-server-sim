@@ -1,0 +1,32 @@
+name: Deploy metaverse-lobby Worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'metaverse-lobby/**'
+      - 'scripts/lobby-provision-cloudflare.sh'
+      - '.github/workflows/deploy-metaverse-lobby.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: metaverse-lobby/package-lock.json
+      - name: Deploy lobby Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
+          LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
+        run: |
+          chmod +x scripts/lobby-provision-cloudflare.sh
+          bash scripts/lobby-provision-cloudflare.sh

@@ -28,6 +28,8 @@ ehthumbs.db
 
 # Playwright profile for Browser+MetaMask MCP
 .data/mcp-metamask-profile/
+.data/mcp-verify-plain-profile/
+metaverse-lobby/.wrangler/
 
 # Runtime bridge for metaverse-simple lib imports (captions)
 data/platform/metaverse-simple-bridge/
@@ -55,6 +57,7 @@ data/platform/*
 !data/platform/network-config.example.json
 !data/platform/fleet-registry.json
 !data/platform/lobby-catalog.example.json
+lobby-secrets.env
 
 # Test / coverage
 test-results/
