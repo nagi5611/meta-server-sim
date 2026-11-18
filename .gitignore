@@ -54,6 +54,7 @@ data/*
 data/platform/*
 !data/platform/network-config.example.json
 !data/platform/fleet-registry.json
+!data/platform/lobby-catalog.example.json
 
 # Test / coverage
 test-results/
@@ -88,3 +89,4 @@ tenants/**/data/images/
 # Admin 作成 tenant（fixture: P-01..P-03。P-04 以降はローカル専用）
 tenants/P-0[5-9]/
 tenants/P-[1-9][0-9]/
+metaverse-lobby/node_modules

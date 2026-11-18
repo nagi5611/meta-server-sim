@@ -40,6 +40,7 @@ import {
 import { isValidTenantId } from './lib/tenant-id.js';
 
 import { registerPlatformAdmin } from './lib/platform-admin.js';
+import { registerPlatformLobbyRoutes } from './lib/platform-lobby-routes.js';
 
 import { initPlatformRuntime } from './lib/platform-runtime.js';
 import { ensureTenantMediasoupWorkers } from './lib/tenant-socket-features.js';
@@ -182,6 +183,8 @@ if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
 initPlatformRuntime(httpServer, { corsOrigins: socketCorsOrigins });
 
 
+
+registerPlatformLobbyRoutes(app);
 
 app.get('/api/health', (_req, res) => {
 

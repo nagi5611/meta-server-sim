@@ -227,6 +227,18 @@
                     </button>
                 </div>
 
+                <h3 class="network-config-subtitle">メタバースロビー（Cloudflare Pages）</h3>
+                <p class="hint hint-compact">
+                    Tenant 作成・削除時に <code>lobby-catalog.json</code> を更新します。
+                    Worker へ即時反映するには同期を実行（<code>LOBBY_WORKER_SYNC_*</code> 要設定）。
+                </p>
+                <div class="network-config-actions-row">
+                    <button type="button" class="btn btn-secondary btn-sm" id="lobby-catalog-sync-btn">
+                        ロビー Worker に同期
+                    </button>
+                    <span id="lobby-catalog-status" class="hint"></span>
+                </div>
+
                 <p id="network-config-error" class="form-error" hidden></p>
             </section>
             </div>

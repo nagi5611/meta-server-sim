@@ -1382,6 +1382,39 @@ function initNetworkConfigPanel() {
     void loadNetworkConfig();
 }
 
+function initLobbyCatalogSync() {
+    const btn = document.getElementById('lobby-catalog-sync-btn');
+    const statusEl = document.getElementById('lobby-catalog-status');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        if (statusEl) statusEl.textContent = '同期中…';
+        try {
+            const res = await adminFetch('/admin/lobby-catalog/sync', {
+                method: 'POST',
+                credentials: 'include',
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.message || data.error || `HTTP ${res.status}`);
+            }
+            if (data.workerSync?.skipped) {
+                if (statusEl) {
+                    statusEl.textContent = 'カタログのみ（LOBBY_WORKER_SYNC_URL 未設定）';
+                }
+            } else if (statusEl) {
+                statusEl.textContent = 'Worker に反映しました';
+            }
+        } catch (e) {
+            if (statusEl) {
+                statusEl.textContent = `失敗: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
 async function loadNetworkConfig() {
     const statusEl = document.getElementById('network-config-status');
     const warningsEl = document.getElementById('network-config-warnings');
@@ -1639,6 +1672,7 @@ async function bootstrapAdminSim() {
     initEnvConfigPanel();
     initCodeConfigPanel();
     initNetworkConfigPanel();
+    initLobbyCatalogSync();
     wirePlatformOpsButtons({
         onReloadSuccess: async () => {
             await loadEnvConfig();
