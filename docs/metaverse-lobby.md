@@ -39,7 +39,7 @@ bash scripts/lobby-provision-cloudflare.sh
 
 生成された `LOBBY_*` はリポジトリ直下の `lobby-secrets.env`（または `LOBBY_SECRETS_OUTPUT`）に出力されます。sim 本番 `.env` にその3行を追記してください。
 
-**GitHub Actions** — [リポジトリ Settings → Secrets → Actions](https://github.com/nagi5611/meta-server-sim/settings/secrets/actions) に `CLOUDFLARE_API_TOKEN`（必須）、`CLOUDFLARE_ACCOUNT_ID` を登録（Cursor の `metaverse-lobby` アプリ Secret とは別枠で、**同じ値を複製**する必要があります）。任意で `LOBBY_PRESENCE_SECRET` / `LOBBY_WORKER_SYNC_SECRET`。Secret 未設定時は workflow はスキップされ、`main` への push で赤くなりません。
+**GitHub Actions** — **Repository secrets**（Settings → Secrets and variables → Actions → **Repository secrets**）に `CLOUDFLARE_API_TOKEN`（必須）、`CLOUDFLARE_ACCOUNT_ID` を登録。**Environment secrets** は本 workflow では未使用（`environment:` 未指定のため）。Cursor アプリ Secret と同じ値を複製する。任意で `LOBBY_*`。成功時 **Artifacts** に `lobby-secrets.env`（3 日保存）。トークン未設定時はデプロイ step が notice を出してスキップ（緑）。
 
 **手動**
 
