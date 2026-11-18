@@ -8,7 +8,7 @@
 |----|------|
 | **Pages（静的）** | ロビー UI。10 秒ごとに `GET /api/metaverses` をポーリング |
 | **Worker（API のみ）** | `/api/*` — カタログ配信、管理同期、**1 分 Cron** で各 `statusUrl` を確認 |
-| **カスタムドメイン** | 既定 `lobby.mmh-virtual.jp`（Pages）。`/api/*` は `_redirects` で Worker にプロキシ |
+| **カスタムドメイン** | 既定 `m.mmh-virtual.jp`（Pages）。`/api/*` は `_redirects` で Worker にプロキシ |
 | **Durable Object `LobbyPoller`** | **10 秒**ごとに各 `presenceUrl` を叩き、オンライン人数を KV に集約 |
 | **各メタバースサーバー** | `GET /api/lobby/status`（状態）、`GET /api/lobby/presence`（人数・要 `LOBBY_PRESENCE_SECRET`） |
 | **管理 API** | `GET/PUT /admin/lobby-catalog`、tenant 作成・削除時に自動 upsert + Worker へ push |
@@ -53,7 +53,7 @@ npm run deploy:worker
 npm run deploy:pages
 ```
 
-**DNS（Xserver）** — `lobby.mmh-virtual.jp` を Cloudflare Pages のプロジェクト `metaverse-lobby` に CNAME 連携（Deploy ログまたは Dashboard に表示されるターゲット）。権威 DNS は ns1〜5.xserver.jp。Worker は workers.dev のまま、ブラウザ向け API は Pages 経由で同一オリジンになります。
+**DNS（Xserver）** — `m.mmh-virtual.jp` を Cloudflare Pages のプロジェクト `metaverse-lobby` に CNAME 連携（Deploy ログまたは Dashboard に表示されるターゲット）。別ホストにしたい場合は `LOBBY_CUSTOM_HOSTNAME` を指定。権威 DNS は ns1〜5.xserver.jp。Worker は workers.dev のまま、ブラウザ向け API は Pages 経由で同一オリジンになります。
 
 ## 本番 sim への反映
 
