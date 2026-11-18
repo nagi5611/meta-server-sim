@@ -1,6 +1,7 @@
 name = "metaverse-lobby"
 main = "src/index.js"
 compatibility_date = "2024-11-01"
+workers_dev = true
 
 [assets]
 directory = "./public"
@@ -8,7 +9,8 @@ binding = "ASSETS"
 
 [[kv_namespaces]]
 binding = "LOBBY_KV"
-id = "00000000000000000000000000000000"
+# 初回 CI で上書き可。固定 ID: Actions variable LOBBY_KV_NAMESPACE_ID
+id = "cbe06bdf1bf04ab7a6a0c647027dad48"
 
 [[durable_objects.bindings]]
 name = "LOBBY_POLLER"
