@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cloudflare 上に metaverse-lobby Worker を初回または更新デプロイする。
-# 必要: CLOUDFLARE_API_TOKEN（Workers Scripts Edit + Workers KV Storage Edit + Account Read）
+# 必要: CLOUDFLARE_API_TOKEN（Workers Scripts Edit + Workers KV Storage Edit + Account Read + Cloudflare Pages Edit）
 # 任意: CLOUDFLARE_ACCOUNT_ID, LOBBY_KV_NAMESPACE_ID, LOBBY_WORKERS_DEV_SUBDOMAIN,
 #       LOBBY_PRESENCE_SECRET, LOBBY_WORKER_SYNC_SECRET, LOBBY_CUSTOM_HOSTNAME,
 #       LOBBY_PAGES_PROJECT_NAME
@@ -31,8 +31,21 @@ generate_secret() {
   openssl rand -hex 32
 }
 
-PRESENCE_SECRET="${LOBBY_PRESENCE_SECRET:-$(generate_secret)}"
-SYNC_SECRET="${LOBBY_WORKER_SYNC_SECRET:-$(generate_secret)}"
+if [[ -n "${LOBBY_PRESENCE_SECRET:-}" ]]; then
+  PRESENCE_SECRET="$LOBBY_PRESENCE_SECRET"
+elif [[ "${LOBBY_ALLOW_SECRET_GENERATE:-0}" == "1" ]]; then
+  PRESENCE_SECRET="$(generate_secret)"
+else
+  die "set LOBBY_PRESENCE_SECRET or LOBBY_ALLOW_SECRET_GENERATE=1"
+fi
+
+if [[ -n "${LOBBY_WORKER_SYNC_SECRET:-}" ]]; then
+  SYNC_SECRET="$LOBBY_WORKER_SYNC_SECRET"
+elif [[ "${LOBBY_ALLOW_SECRET_GENERATE:-0}" == "1" ]]; then
+  SYNC_SECRET="$(generate_secret)"
+else
+  die "set LOBBY_WORKER_SYNC_SECRET or LOBBY_ALLOW_SECRET_GENERATE=1"
+fi
 
 cd "$LOBBY_DIR"
 npm install --no-audit --no-fund
@@ -188,6 +201,17 @@ write_pages_api_redirects() {
 EOF
 }
 
+ensure_pages_project() {
+  log "ensuring Pages project ${PAGES_PROJECT} …"
+  if npx wrangler pages project list 2>/dev/null | grep -qF "${PAGES_PROJECT}"; then
+    log "pages project ${PAGES_PROJECT} exists"
+    return 0
+  fi
+  npx wrangler pages project create "${PAGES_PROJECT}" --production-branch=main 2>&1 || {
+    log "pages project create returned non-zero (may already exist)"
+  }
+}
+
 run_pages_deploy() {
   set +e
   npx wrangler pages deploy public --project-name="$PAGES_PROJECT" --commit-dirty=true 2>&1 | tee "$PAGES_DEPLOY_LOG"
@@ -260,6 +284,7 @@ if [[ -z "$WORKER_URL" ]]; then
 fi
 
 write_pages_api_redirects "$WORKER_URL"
+ensure_pages_project
 log "deploying pages (static UI) …"
 run_pages_deploy
 ensure_pages_custom_domain "$ACCOUNT_ID" "$CUSTOM_HOST"
