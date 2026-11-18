@@ -22,12 +22,23 @@ jobs:
           cache: npm
           cache-dependency-path: metaverse-lobby/package-lock.json
       - name: Deploy lobby Worker
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
           LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
         run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN is not set in repository secrets; skipping deploy."
+            exit 0
+          fi
           chmod +x scripts/lobby-provision-cloudflare.sh
           bash scripts/lobby-provision-cloudflare.sh
+      - name: Upload lobby-secrets.env
+        if: ${{ success() && hashFiles('lobby-secrets.env') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lobby-secrets
+          path: lobby-secrets.env
+          retention-days: 3
+          if-no-files-found: ignore
