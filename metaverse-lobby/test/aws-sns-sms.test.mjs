@@ -13,7 +13,10 @@ test('normalizeJapanPhoneE164 domestic and international', () => {
     assert.equal(normalizeJapanPhoneE164('090-1234-5678'), '+819012345678');
     assert.equal(normalizeJapanPhoneE164('+81 90-1234-5678'), '+819012345678');
     assert.equal(normalizeJapanPhoneE164('819012345678'), '+819012345678');
+    assert.equal(normalizeJapanPhoneE164('070-7037-9203'), '+817070379203');
     assert.equal(normalizeJapanPhoneE164('invalid'), null);
+    assert.equal(normalizeJapanPhoneE164('+81107037920331'), null);
+    assert.equal(normalizeJapanPhoneE164('070703792031'), null);
 });
 
 test('maskAdminPhone hides middle digits', () => {

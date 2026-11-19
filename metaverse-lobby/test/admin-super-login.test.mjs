@@ -120,6 +120,29 @@ test('super-admin login with ADMIN_PHONE sends SMS OTP', async () => {
     assert.equal(verifyRes?.status, 200);
 });
 
+test('super-admin login with invalid ADMIN_PHONE returns admin_phone_invalid', async () => {
+    const kv = createMemoryKv();
+    const db = createSuperAdminAuditDb();
+    const env = {
+        LOBBY_ADMIN_USER: 'admin',
+        LOBBY_ADMIN_PASSWORD: 'static-secret',
+        LOBBY_ADMIN_SESSION_SECRET: SECRET,
+        ADMIN_PHONE: '+81107037920331',
+        AWS_ACCESS_KEY_ID: 'AKIATEST',
+        AWS_SECRET_ACCESS_KEY: 'secret',
+        LOBBY_DB: db,
+    };
+    const req = new Request('http://lobby.test/api/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'static-secret' }),
+    });
+    const res = await handleAdminLogin(req, env, kv);
+    assert.equal(res?.status, 503);
+    const data = await res.json();
+    assert.equal(data.error, 'admin_phone_invalid');
+});
+
 test('super-admin login with ADMIN_EMAIL requires OTP (email fallback)', async () => {
     const kv = createMemoryKv();
     const db = createSuperAdminAuditDb();

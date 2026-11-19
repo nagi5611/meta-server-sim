@@ -429,6 +429,15 @@ if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
 fi
 if [[ -n "${ADMIN_PHONE:-}" ]]; then
+  if ! ADMIN_PHONE="$ADMIN_PHONE" node --input-type=module -e "
+    import { normalizeJapanPhoneE164 } from './src/aws-sns-sms.js';
+    if (!normalizeJapanPhoneE164(process.env.ADMIN_PHONE || '')) {
+      console.error('[lobby-cf] ADMIN_PHONE is not a valid Japan number (use 070…/090… or +81…, 11–13 digits after country code)');
+      process.exit(1);
+    }
+  "; then
+    die "ADMIN_PHONE failed E.164 validation — fix GitHub secret / env before deploy"
+  fi
   printf '%s' "$ADMIN_PHONE" | npx wrangler secret put ADMIN_PHONE
 fi
 if [[ -n "${ADMIN_EMAIL:-}" ]]; then
