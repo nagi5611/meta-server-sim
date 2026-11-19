@@ -1,7 +1,10 @@
 // server.js — metaverse-simulation プラットフォームコア
 
 import 'dotenv/config';
+import { warnIfEnvFileInsecure } from './lib/env-file-permissions.js';
 import './lib/discord-console-webhook-install.js';
+
+warnIfEnvFileInsecure();
 
 import express from 'express';
 
