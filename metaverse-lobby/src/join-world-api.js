@@ -3,6 +3,7 @@ import { resolveLobbySessionBan } from './lobby-ban-guard.js';
 import { findRegistryEntryByJoinCode, normalizeJoinCode } from './join-by-code-api.js';
 import { insertJoinEvent } from './db-ops.js';
 import { moderateLobbyDisplayName } from './display-name-moderator.js';
+import { fetchSim } from './sim-client.js';
 
 const LIVE_KEY = 'live';
 
@@ -117,5 +118,23 @@ export async function handleJoinWorldRequest(request, env) {
         });
     }
 
-    return json({ ok: true, world, entryUrl: world.entryUrl, userRef: session?.sub || null });
+    let socketJoinToken = null;
+    const tenantId = hit.tenantId != null ? String(hit.tenantId).trim() : '';
+    if (tenantId) {
+        const simRes = await fetchSim(env, '/service/lobby/socket-join-token', {
+            method: 'POST',
+            body: { tenantId },
+        });
+        if (simRes.ok && simRes.data?.joinToken) {
+            socketJoinToken = String(simRes.data.joinToken);
+        }
+    }
+
+    return json({
+        ok: true,
+        world,
+        entryUrl: world.entryUrl,
+        userRef: session?.sub || null,
+        socketJoinToken,
+    });
 }

@@ -7,14 +7,20 @@ import {
     getEffectiveTenantSocketSecret,
     getSocketJoinTokenFromHandshake,
     isTenantSocketJoinAuthorized,
+    isTenantSocketJoinEnforced,
 } from '../lib/tenant-socket-auth.js';
+import { mintTenantSocketJoinToken } from '../lib/tenant-socket-join-token.js';
 
 /** @type {string | undefined} */
 let prevEnvSecret;
+/** @type {string | undefined} */
+let prevEnforce;
 
 beforeEach(() => {
     prevEnvSecret = process.env.TENANT_SOCKET_SECRET;
+    prevEnforce = process.env.TENANT_SOCKET_JOIN_ENFORCE;
     delete process.env.TENANT_SOCKET_SECRET;
+    delete process.env.TENANT_SOCKET_JOIN_ENFORCE;
 });
 
 afterEach(() => {
@@ -22,6 +28,11 @@ afterEach(() => {
         delete process.env.TENANT_SOCKET_SECRET;
     } else {
         process.env.TENANT_SOCKET_SECRET = prevEnvSecret;
+    }
+    if (prevEnforce === undefined) {
+        delete process.env.TENANT_SOCKET_JOIN_ENFORCE;
+    } else {
+        process.env.TENANT_SOCKET_JOIN_ENFORCE = prevEnforce;
     }
 });
 
@@ -96,6 +107,27 @@ describe('tenant-socket-auth', () => {
                 tenantBase,
                 { auth: { adminToken: token } },
                 '10.0.0.5'
+            ),
+            true
+        );
+    });
+
+    it('TENANT_SOCKET_JOIN_ENFORCE=0 keeps connections open with secret set', () => {
+        process.env.TENANT_SOCKET_SECRET = 'room-key';
+        process.env.TENANT_SOCKET_JOIN_ENFORCE = '0';
+        assert.equal(isTenantSocketJoinEnforced(tenantBase), false);
+        assert.equal(isTenantSocketJoinAuthorized(tenantBase, { auth: {} }, '127.0.0.1'), true);
+    });
+
+    it('accepts lobby-minted short-lived join token', () => {
+        process.env.TENANT_SOCKET_SECRET = 'room-key';
+        const minted = mintTenantSocketJoinToken(tenantBase);
+        assert.ok(minted?.joinToken);
+        assert.equal(
+            isTenantSocketJoinAuthorized(
+                tenantBase,
+                { auth: { joinToken: minted.joinToken } },
+                '127.0.0.1'
             ),
             true
         );

@@ -603,6 +603,10 @@ async function navigateToWorld(world, displayName) {
     const base = String(target || '/');
     const url = new URL(base, window.location.href);
     url.searchParams.set('displayName', displayName);
+    const socketJoin = data?.socketJoinToken;
+    if (socketJoin) {
+        url.searchParams.set('join', String(socketJoin));
+    }
     localStorage.setItem('mnm.name', displayName);
     localStorage.setItem('lobbyDisplayName', displayName);
     window.location.href = url.toString();

@@ -46,7 +46,19 @@ TENANT_SOCKET_SECRET=your-long-random-string
 
 ## サーバー拒否時
 
-ミドルウェアで不一致の場合、Socket.io は `connect_error`（メッセージ `socket_join_forbidden`）で切断されます。
+`registerTenantSocketServer` の `io.use` で `assertTenantSocketJoinAuthorized` が検証します。不一致の場合、Socket.io は `connect_error`（メッセージ `socket_join_forbidden`）で切断されます。
+
+## ロビー経由入場
+
+ロビーの `POST /api/join-world` は sim の `POST /service/lobby/socket-join-token` で短期 join トークン（`tsj1.<tenantId>.<exp>.<hmac>`）を取得し、`entryUrl` 遷移時に `?join=` として付与します（`tenant-socket-io-shim.js` が `handshake.auth.joinToken` に載せる）。
+
+`TENANT_SOCKET_SECRET` 未設定時はトークンは発行されず、Socket も従来どおり制限なしです。
+
+## 段階導入
+
+| 変数 | 意味 |
+|------|------|
+| `TENANT_SOCKET_JOIN_ENFORCE` | デフォルト `1`。`TENANT_SOCKET_SECRET` 設定済みでも `0` なら接続は拒否しない（ログ警告のみ） |
 
 ## E2E / 自動テスト
 
