@@ -93,3 +93,4 @@ tenants/**/data/images/
 tenants/P-0[5-9]/
 tenants/P-[1-9][0-9]/
 metaverse-lobby/node_modules
+metaverse-lobby/.dev.vars
