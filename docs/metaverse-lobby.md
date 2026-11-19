@@ -56,7 +56,7 @@ Worker 静的アカウント `LOBBY_ADMIN_USER` / `LOBBY_ADMIN_PASSWORD` は JWT
 
 | 保存先 | 名前 | 用途 |
 |--------|------|------|
-| **GitHub Actions** secrets | `ADMIN_PHONE` | **推奨。** スーパー管理者 OTP の SMS 送信先（`09012345678` / `07070379203` または `+819012345678` 形式。**`+811070…` のように国番号直後に余分な桁があるとデプロイまたは送信時に失敗**）。`ADMIN_PHONE` 設定時はメールより SMS が優先 |
+| **GitHub Actions** secrets | `ADMIN_PHONE` | **推奨。** スーパー管理者 OTP の SMS 送信先（国内 `0707037920331` / `090…` または E.164 `+81707037920331`）。UI には末尾 **6 桁**をマスク表示。誤記 `+811070…`（81 の直後に余分な `1`）は Worker が `+817070…` に補正を試みる。`ADMIN_PHONE` 設定時はメールより SMS が優先 |
 | **GitHub Actions** secrets | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SNS_REGION` | SNS `Publish` 用（リージョン未設定時 Worker は `ap-northeast-1`）。SMS タイプは Transactional |
 | **GitHub Actions** secrets | `ADMIN_EMAIL` | OTP 送信先（`ADMIN_PHONE` 未設定時のメールフォールバック） |
 | **GitHub Actions** secrets | `ADMIN_OTP_SECRET` | 任意。OTP HMAC 用（未設定時は `LOBBY_ADMIN_SESSION_SECRET`） |

@@ -143,7 +143,7 @@
     "admin.gateOtpSent": "{mask} に送った 6 桁のコードを入力してください。",
     "admin.gateOtpSubmit": "コードを確認",
     "admin.gateOtpInvalid": "確認コードが違うか、期限切れです。",
-    "admin.gatePhoneInvalid": "ADMIN_PHONE の形式が正しくありません（例: 07070379203 または +817070379203）。GitHub Secrets を修正してロビーを再デプロイしてください。",
+    "admin.gatePhoneInvalid": "ADMIN_PHONE の形式が正しくありません（例: 0707037920331 または +81707037920331）。GitHub Secrets を修正してロビーを再デプロイしてください。",
     "admin.gateOtpSmsFail": "確認コード SMS を送信できません。Worker の ADMIN_PHONE / AWS SNS 設定を確認してください。",
     "admin.gateOtpMailFail": "確認コードメールを送信できません。Worker の Resend 設定を確認してください。",
     "admin.gateAttemptAudit": "試行を記録しました — IP {ip} · {at} (JST)",

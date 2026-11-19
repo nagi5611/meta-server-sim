@@ -14,14 +14,17 @@ test('normalizeJapanPhoneE164 domestic and international', () => {
     assert.equal(normalizeJapanPhoneE164('+81 90-1234-5678'), '+819012345678');
     assert.equal(normalizeJapanPhoneE164('819012345678'), '+819012345678');
     assert.equal(normalizeJapanPhoneE164('070-7037-9203'), '+817070379203');
+    assert.equal(normalizeJapanPhoneE164('0707037920331'), '+81707037920331');
+    assert.equal(normalizeJapanPhoneE164('+81707037920331'), '+81707037920331');
+    assert.equal(normalizeJapanPhoneE164('+81107037920331'), '+81707037920331');
     assert.equal(normalizeJapanPhoneE164('invalid'), null);
-    assert.equal(normalizeJapanPhoneE164('+81107037920331'), null);
-    assert.equal(normalizeJapanPhoneE164('070703792031'), null);
+    assert.equal(normalizeJapanPhoneE164('070703792031'), '+8170703792031');
 });
 
 test('maskAdminPhone hides middle digits', () => {
     assert.match(maskAdminPhone('+819012345678'), /\*\*\*/);
-    assert.ok(maskAdminPhone('+819012345678').endsWith('5678'));
+    assert.ok(maskAdminPhone('+819012345678').endsWith('345678'));
+    assert.equal(maskAdminPhone('+81707037920331'), '+8170***920331');
 });
 
 test('buildOtpSmsMessage includes code and JST', () => {
