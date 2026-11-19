@@ -59,6 +59,60 @@ set_wrangler_kv_id() {
   log "wrangler.toml KV id -> ${new_id}"
 }
 
+D1_PLACEHOLDER='00000000000000000000000000000001'
+
+set_wrangler_d1_id() {
+  local new_id="$1"
+  sed -i "s/^database_id = \"[^\"]*\"/database_id = \"${new_id}\"/" "$WRANGLER_TOML"
+  log "wrangler.toml D1 lobby-ops id -> ${new_id}"
+}
+
+ensure_lobby_d1_database() {
+  local account_id="$1"
+  local current_d1
+  current_d1="$(grep -E '^database_id = ' "$WRANGLER_TOML" | head -1 | sed 's/.*"\(.*\)".*/\1/' || true)"
+  if [[ -n "$current_d1" && "$current_d1" != "$D1_PLACEHOLDER" ]]; then
+    log "using D1 id from wrangler.toml: ${current_d1}"
+    return
+  fi
+
+  log "looking up D1 database lobby-ops …"
+  local list_json
+  list_json="$(cf_curl GET "/accounts/${account_id}/d1/database")"
+  if cf_api_ok "$list_json"; then
+    local existing_id
+    existing_id="$(echo "$list_json" | python3 -c "
+import json,sys
+j=json.load(sys.stdin)
+for row in j.get('result', []) or []:
+    if row.get('name') == 'lobby-ops':
+        print(row.get('uuid',''))
+        break
+" 2>/dev/null || true)"
+    if [[ -n "$existing_id" ]]; then
+      log "reusing D1 lobby-ops id ${existing_id}"
+      set_wrangler_d1_id "$existing_id"
+      return
+    fi
+  else
+    log "D1 list failed:"
+    echo "$list_json"
+    die "token needs D1 Read/Write"
+  fi
+
+  log "creating D1 database lobby-ops …"
+  local create_json
+  create_json="$(cf_curl POST "/accounts/${account_id}/d1/database" '{"name":"lobby-ops"}')"
+  if ! cf_api_ok "$create_json"; then
+    echo "$create_json"
+    die "could not create D1 database lobby-ops"
+  fi
+  local new_id
+  new_id="$(echo "$create_json" | python3 -c "import json,sys; j=json.load(sys.stdin); print((j.get('result') or {}).get('uuid',''))" 2>/dev/null || true)"
+  [[ -n "$new_id" ]] || die "could not parse D1 database id"
+  set_wrangler_d1_id "$new_id"
+}
+
 cf_curl() {
   local method="$1"
   local path="$2"
@@ -288,6 +342,7 @@ export CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID"
 log "account id ${ACCOUNT_ID}"
 
 ensure_kv_namespace "$ACCOUNT_ID"
+ensure_lobby_d1_database "$ACCOUNT_ID"
 ensure_workers_dev_subdomain "$ACCOUNT_ID"
 
 log "deploying worker (API only) …"

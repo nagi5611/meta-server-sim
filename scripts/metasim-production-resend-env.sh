@@ -7,10 +7,12 @@ FROM="${RESEND_FROM_EMAIL:-$FROM_DEFAULT}"
 touch "$ENV_FILE"
 upsert() {
   local key="$1" val="$2"
+  local quoted
+  quoted=$(printf '%q' "$val")
   if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
-    sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+    sed -i "s|^${key}=.*|${key}=${quoted}|" "$ENV_FILE"
   else
-    printf '%s=%s\n' "$key" "$val" >>"$ENV_FILE"
+    printf '%s=%s\n' "$key" "$quoted" >>"$ENV_FILE"
   fi
 }
 upsert RESEND_FROM_EMAIL "$FROM"
