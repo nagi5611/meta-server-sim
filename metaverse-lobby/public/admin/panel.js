@@ -12,6 +12,7 @@
     view: "worlds", q: "", filter: "all",
     range: "24h", focus: null,
     viewer: "guest", editing: null, isNew: false,
+    annEditing: null, isNewAnn: false,
     user: "u1"
   };
 
@@ -66,8 +67,22 @@
     const t = e.target.closest("[data-nav]");
     if (!t) return;
     e.preventDefault();
-    state.view = t.dataset.nav; state.editing = null;
-    render(); window.scrollTo(0, 0);
+    state.view = t.dataset.nav; state.editing = null; state.annEditing = null;
+    if (t.dataset.nav === "announcements") {
+      state._annLoading = true;
+      render();
+      store.refreshAnnouncements().then(() => {
+        state._annLoading = false;
+        render();
+      }).catch(() => {
+        state._annLoading = false;
+        toast(tr("admin.announcementsLoadFail"));
+        render();
+      });
+    } else {
+      render();
+    }
+    window.scrollTo(0, 0);
   });
   $(".side-mark").addEventListener("click", (e) => {
     e.preventDefault();
@@ -473,6 +488,44 @@
   window.addEventListener("resize", closeDD);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDD(); });
 
+  /* ================= お知らせ ================= */
+  function viewAnnouncements() {
+    const rows = store.announcements || [];
+    const list = rows.length
+      ? rows.map((a) => `<tr class="row" data-ann="${esc(a.id)}">
+          <td class="num dim" style="width:150px">${fmtDateTime(a.updatedAt)}</td>
+          <td><b>${esc(a.title)}</b>${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</td>
+          <td class="dim">${esc(String(a.body || "").slice(0, 80))}${String(a.body || "").length > 80 ? "…" : ""}</td>
+          <td class="r"><button type="button" class="btn btn-quiet btn-sm" data-ann-del="${esc(a.id)}">${esc(tr("admin.announcementsDelete"))}</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="4" class="dim" style="padding:24px;text-align:center">${esc(tr("admin.announcementsEmpty"))}</td></tr>`;
+  return head(tr("admin.announcementsTitle"), `<button class="btn btn-primary" data-act="ann-new">${esc(tr("admin.announcementsAdd"))}</button>`, null, `${rows.length}${tr("admin.announcementsCountSuffix")}`) +
+      `<div class="sheet"><table>
+        <thead><tr><th style="width:150px">${esc(tr("admin.announcementsUpdated"))}</th><th>${esc(tr("admin.announcementsColTitle"))}</th><th>${esc(tr("admin.announcementsColBody"))}</th><th class="r" style="width:100px"></th></tr></thead>
+        <tbody>${list}</tbody></table></div>`;
+  }
+
+  function viewAnnEditor() {
+    const a = state.annEditing;
+    if (!a) return "";
+    return head(
+      state.isNewAnn ? tr("admin.announcementsAdd") : tr("admin.announcementsEdit"),
+      `<button class="btn btn-primary" data-act="ann-save">${esc(tr("admin.save"))}</button>`,
+      tr("admin.announcementsTitle"),
+    ) + `<div class="sheet form">
+      <form id="annForm" class="form-grid" onsubmit="return false">
+        <label class="fld full"><span>${esc(tr("admin.announcementsColTitle"))}</span>
+          <input id="fAnnTitle" class="inp" type="text" maxlength="120" value="${esc(a.title)}" required></label>
+        <label class="fld full"><span>${esc(tr("admin.announcementsColBody"))}</span>
+          <textarea id="fAnnBody" class="inp" rows="6" maxlength="4000">${esc(a.body)}</textarea></label>
+        <label class="fld chk"><input id="fAnnPub" type="checkbox" ${a.published ? "checked" : ""}> ${esc(tr("admin.announcementsPublished"))}</label>
+        <label class="fld"><span>${esc(tr("admin.announcementsSort"))}</span>
+          <input id="fAnnSort" class="inp num" type="number" value="${Number(a.sortOrder) || 0}"></label>
+        <p class="msg" id="annErr" role="alert"></p>
+      </form>
+    </div>`;
+  }
+
   /* ================= 参加履歴 ================= */
   function viewLogs() {
     const logs = state.joinLogs || [];
@@ -500,19 +553,27 @@
 
   /* ================= render ================= */
   function render() {
-    const active = state.view === "editor" ? "worlds" : state.view;
+    const active = state.view === "editor" ? "worlds" : state.view === "annEditor" ? "announcements" : state.view;
     $$(".snav").forEach((t) => t.classList.toggle("on", t.dataset.nav === active));
     $("#cw").textContent = store.worlds.length;
     $("#cu").textContent = store.users.length;
+    const ca = $("#ca");
+    if (ca) ca.textContent = (store.announcements || []).length;
     const v = state.view;
     if (v === "logs" && !state.joinLogs) {
       store.joinLogs(1).then((data) => { state.joinLogs = data.logs || []; render(); });
       $("#main").innerHTML = head("参加履歴", "", null, "読み込み中…");
       return;
     }
+    if (v === "announcements" && state._annLoading) {
+      $("#main").innerHTML = head(tr("admin.announcementsTitle"), "", null, tr("common.syncing"));
+      return;
+    }
     $("#main").innerHTML =
+      v === "annEditor" && state.annEditing ? viewAnnEditor() :
       v === "editor" && state.editing ? viewEditor() :
-      v === "users" ? viewUsers() : v === "logs" ? viewLogs() : v === "settings" ? viewSettings() : viewWorlds();
+      v === "users" ? viewUsers() : v === "announcements" ? viewAnnouncements() :
+      v === "logs" ? viewLogs() : v === "settings" ? viewSettings() : viewWorlds();
     if (v === "worlds") drawChart();
   }
 
@@ -525,10 +586,26 @@
       e.preventDefault(); e.stopPropagation();
       const id = a.dataset.id, act = a.dataset.act;
       if (act === "new") return startNew();
-      if (act === "back") { state.view = "worlds"; state.editing = null; return render(); }
+      if (act === "back") {
+        if (state.view === "annEditor") {
+          state.view = "announcements";
+          state.annEditing = null;
+        } else {
+          state.view = "worlds";
+          state.editing = null;
+        }
+        return render();
+      }
       if (act === "save") return save();
       if (act === "delete") return askDelete(id);
       if (act === "preview") return openPreview(id);
+      if (act === "ann-new") return startNewAnn();
+      if (act === "ann-save") return saveAnn();
+    }
+    const annDel = t.closest("[data-ann-del]");
+    if (annDel) {
+      e.preventDefault();
+      return askDeleteAnn(annDel.dataset.annDel);
     }
     const fo = t.closest("[data-focus]");
     if (fo) { e.preventDefault(); const id = fo.dataset.focus; state.focus = state.focus === id || !id ? null : id; return render(); }
@@ -540,6 +617,8 @@
     if (vw) { state.viewer = vw.dataset.viewer; $$("[data-viewer]").forEach((b) => b.classList.toggle("on", b === vw)); return refreshPv(); }
     const dd = t.closest("[data-dd]");
     if (dd) { e.preventDefault(); e.stopPropagation(); return openDD(dd); }
+    const annRow = t.closest("tr.row[data-ann]");
+    if (annRow && !t.closest("[data-ann-del]")) return startEditAnn(annRow.dataset.ann);
     const row = t.closest("tr.row[data-id]");
     if (row) return startEdit(row.dataset.id);
     const ur = t.closest("tr.row[data-user]");
@@ -597,6 +676,59 @@
       render(); toast(msg);
     }).catch(() => toast("保存に失敗しました"));
   }
+  function startNewAnn() {
+    state.annEditing = { id: "", title: "", body: "", published: true, sortOrder: 0 };
+    state.isNewAnn = true;
+    state.view = "annEditor";
+    render();
+    setTimeout(() => $("#fAnnTitle") && $("#fAnnTitle").focus(), 30);
+  }
+  function startEditAnn(id) {
+    const a = (store.announcements || []).find((x) => x.id === id);
+    if (!a) return;
+    state.annEditing = JSON.parse(JSON.stringify(a));
+    state.isNewAnn = false;
+    state.view = "annEditor";
+    render();
+  }
+  function saveAnn() {
+    const a = state.annEditing;
+    if (!a) return;
+    const title = ($("#fAnnTitle")?.value || "").trim();
+    const body = ($("#fAnnBody")?.value || "").trim();
+    const published = Boolean($("#fAnnPub")?.checked);
+    const sortOrder = Number($("#fAnnSort")?.value) || 0;
+    const err = $("#annErr");
+    if (!title || !body) {
+      if (err) err.textContent = tr("admin.announcementsValidation");
+      return;
+    }
+    if (err) err.textContent = "";
+    const payload = { title, body, published, sortOrder };
+    const p = state.isNewAnn
+      ? store.createAnnouncement(payload)
+      : store.updateAnnouncement(a.id, payload);
+    p.then(() => {
+      state.view = "announcements";
+      state.annEditing = null;
+      state.isNewAnn = false;
+      render();
+      toast(tr("admin.announcementsSaved"));
+    }).catch(() => {
+      if (err) err.textContent = tr("admin.announcementsSaveFail");
+    });
+  }
+  function askDeleteAnn(id) {
+    const a = (store.announcements || []).find((x) => x.id === id);
+    if (!a) return;
+    confirm(a.title, tr("admin.announcementsDeleteBody"), tr("admin.announcementsDelete"), () => {
+      store.removeAnnouncement(id).then(() => {
+        render();
+        toast(tr("admin.announcementsDeleted"));
+      }).catch(() => toast(tr("admin.announcementsSaveFail")));
+    });
+  }
+
   function askDelete(id) {
     const w = store.world(id); if (!w) return;
     confirm(`「${w.name}」を削除しますか？`, "公開ページの一覧からも消えます。参加履歴は残ります。", "削除", () => {

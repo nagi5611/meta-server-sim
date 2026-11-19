@@ -48,5 +48,11 @@
     sendPasswordReset: (id) =>
       request(`/users/${encodeURIComponent(id)}/password-reset`, { method: "POST", body: {} }),
     joinLogs: (page) => request(`/join-logs?page=${page || 1}`),
+    listAnnouncements: () => request('/announcements'),
+    createAnnouncement: (body) => request('/announcements', { method: 'POST', body }),
+    updateAnnouncement: (id, body) =>
+      request(`/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+    deleteAnnouncement: (id) =>
+      request(`/announcements/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
   };
 })();

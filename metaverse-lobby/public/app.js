@@ -7,6 +7,11 @@ await window.LobbyI18n?.ready;
 
 const grid = $('#world-grid');
 const hint = $('#refresh-hint');
+const annPanel = $('#announcements-panel');
+const annList = $('#announcement-list');
+const annEmpty = $('#announcement-empty');
+/** @type {Array<{ id: string, title: string, body: string }>} */
+let announcements = [];
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
@@ -300,13 +305,44 @@ function paintRefreshHint(at = lastListUpdatedAt) {
     hint.textContent = `${t('common.updatePrefix')}${formatLobbyLocalTime(at)}`;
 }
 
+function renderAnnouncements() {
+    if (!annPanel || !annList) return;
+    const items = announcements.filter((a) => a.title && a.body);
+    if (!items.length) {
+        annPanel.hidden = true;
+        if (annEmpty) annEmpty.hidden = true;
+        annList.innerHTML = '';
+        return;
+    }
+    annPanel.hidden = false;
+    if (annEmpty) annEmpty.hidden = true;
+    annList.innerHTML = items
+        .map(
+            (a) => `<li class="ann-item">
+        <h3 class="ann-title">${escapeHtml(a.title)}</h3>
+        <p class="ann-body">${escapeHtml(a.body).replace(/\n/g, '<br>')}</p>
+      </li>`,
+        )
+        .join('');
+}
+
 async function refresh() {
     try {
-        const res = await fetch('/api/metaverses', { cache: 'no-store', credentials: 'include' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const [metaRes, annRes] = await Promise.all([
+            fetch('/api/metaverses', { cache: 'no-store', credentials: 'include' }),
+            fetch('/api/announcements', { cache: 'no-store' }),
+        ]);
+        if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status}`);
+        const data = await metaRes.json();
         worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
+        if (annRes.ok) {
+            const annData = await annRes.json();
+            announcements = Array.isArray(annData.announcements) ? annData.announcements : [];
+        } else {
+            announcements = [];
+        }
         render();
+        renderAnnouncements();
         lastListUpdatedAt = parseLobbyInstant(data.updatedAt);
         paintRefreshHint(lastListUpdatedAt);
     } catch {
@@ -618,6 +654,7 @@ window.addEventListener('lobby:locale-change', () => {
     window.LobbyI18n?.applyDom();
     syncAuthModal();
     render();
+    renderAnnouncements();
     paintRefreshHint();
 });
 

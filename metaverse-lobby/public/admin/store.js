@@ -21,6 +21,7 @@
   const store = {
     worlds: [],
     users: [],
+    announcements: [],
     overview: null,
     async refresh() {
       if (!API) throw new Error("api_unavailable");
@@ -108,7 +109,27 @@
     },
     async joinLogs(page) {
       return API.joinLogs(page);
-    }
+    },
+    async refreshAnnouncements() {
+      if (!API) return [];
+      const data = await API.listAnnouncements();
+      this.announcements = data.announcements || [];
+      return this.announcements;
+    },
+    async createAnnouncement(payload) {
+      const data = await API.createAnnouncement(payload);
+      await this.refreshAnnouncements();
+      return data.announcement;
+    },
+    async updateAnnouncement(id, payload) {
+      const data = await API.updateAnnouncement(id, payload);
+      await this.refreshAnnouncements();
+      return data.announcement;
+    },
+    async removeAnnouncement(id) {
+      await API.deleteAnnouncement(id);
+      this.announcements = this.announcements.filter((a) => a.id !== id);
+    },
   };
 
   function hourly(w) {
