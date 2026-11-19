@@ -422,8 +422,10 @@ function render() {
             ? `<img src="${escapeHtml(String(w.thumbnailUrl))}" alt="">`
             : `<div class="thumb-ph"><span>${t('lobby.thumbPlaceholder')}</span></div>`;
         const fav = isWorldFavorited(w.id);
+        const favStar = fav ? '<span class="star" aria-hidden="true">★</span>' : '';
         card.innerHTML = `
         <div class="ph">
+          ${favStar}
           <span class="badge ${st.cls}"><i></i>${st.txt}</span>
           ${thumb}
         </div>
