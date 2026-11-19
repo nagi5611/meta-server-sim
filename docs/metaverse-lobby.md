@@ -28,7 +28,7 @@
 | `LOBBY_WORKER_SYNC_SECRET` | sync POST の Bearer（Worker 側 `LOBBY_WORKER_SYNC_SECRET` と同一） |
 | `LOBBY_MAINTENANCE=1` | ロビー向けにメンテ表示を強制 |
 | `LOBBY_SIM_SERVICE_TOKEN` | ロビー Worker → sim `/service/*` |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | 公開ロビーの Google 新規登録・ログイン（[lobby-google-oauth.md](./lobby-google-oauth.md)） |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（Worker） | 公開ロビーの Google 新規登録・ログイン（[lobby-google-oauth.md](./lobby-google-oauth.md)） |
 | `RESEND_API_KEY` | パスワード再設定メール（Resend） |
 | `RESEND_FROM_EMAIL` | 送信元（例: `みんなでメタ <noreply@yourdomain.com>`） |
 | `LOBBY_PASSWORD_RESET_URL` | 任意。再設定ページ URL（既定 `https://m.mmh-virtual.jp/reset-password.html`） |
