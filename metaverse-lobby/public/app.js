@@ -1,5 +1,10 @@
 import { formatLobbyDate, formatLobbyLocalTime, parseLobbyInstant } from './lobby-time.js';
 import { cropProfileImageFile } from './profile-avatar.js';
+import {
+    ANN_PAGE_SIZE,
+    announcementPageSlice,
+    clampAnnouncementPage,
+} from './lobby-announcements.js';
 
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
@@ -11,8 +16,13 @@ const hint = $('#refresh-hint');
 const annPanel = $('#announcements-panel');
 const annList = $('#announcement-list');
 const annEmpty = $('#announcement-empty');
+const annPager = $('#announcement-pager');
+const annPagerPrev = $('#ann-pager-prev');
+const annPagerNext = $('#ann-pager-next');
+const annPagerPages = $('#ann-pager-pages');
 /** @type {Array<{ id: string, title: string, createdAt?: string, updatedAt?: string }>} */
 let announcements = [];
+let annPage = 0;
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
@@ -320,40 +330,114 @@ function announcementDateLabel(a) {
     return raw ? formatLobbyDate(raw) : '';
 }
 
+function appendAnnouncementRow(a) {
+    const li = document.createElement('li');
+    li.className = 'ann-item';
+
+    const head = document.createElement('div');
+    head.className = 'ann-head';
+    const dateStr = announcementDateLabel(a);
+    if (dateStr) {
+        const timeEl = document.createElement('time');
+        timeEl.className = 'ann-date';
+        timeEl.dateTime = String(a.createdAt || a.updatedAt || '');
+        timeEl.textContent = dateStr;
+        head.appendChild(timeEl);
+    }
+    const title = document.createElement('h3');
+    title.className = 'ann-title';
+    title.textContent = a.title;
+    head.appendChild(title);
+    li.appendChild(head);
+    annList.appendChild(li);
+}
+
+/** @param {number} pageCount */
+function buildAnnPagerTokens(pageCount) {
+    if (pageCount <= 7) {
+        return Array.from({ length: pageCount }, (_, i) => ({ type: 'page', index: i }));
+    }
+    const tokens = [{ type: 'page', index: 0 }];
+    const left = Math.max(1, annPage - 1);
+    const right = Math.min(pageCount - 2, annPage + 1);
+    if (left > 1) tokens.push({ type: 'ellipsis' });
+    for (let i = left; i <= right; i += 1) tokens.push({ type: 'page', index: i });
+    if (right < pageCount - 2) tokens.push({ type: 'ellipsis' });
+    tokens.push({ type: 'page', index: pageCount - 1 });
+    return tokens;
+}
+
+function renderAnnouncementPager(pageCount) {
+    if (!annPager || !annPagerPages || !annPagerPrev || !annPagerNext) return;
+    if (pageCount <= 1) {
+        annPager.hidden = true;
+        annPagerPages.replaceChildren();
+        return;
+    }
+    annPager.hidden = false;
+    annPagerPrev.disabled = annPage <= 0;
+    annPagerNext.disabled = annPage >= pageCount - 1;
+
+    annPagerPages.replaceChildren();
+    const useDots = pageCount > 7;
+    for (const token of buildAnnPagerTokens(pageCount)) {
+        if (token.type === 'ellipsis') {
+            const span = document.createElement('span');
+            span.className = 'ann-pager-ellipsis';
+            span.setAttribute('aria-hidden', 'true');
+            span.textContent = '…';
+            annPagerPages.appendChild(span);
+            continue;
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const current = token.index === annPage;
+        btn.className = useDots ? 'ann-pager-dot' : 'ann-pager-num';
+        btn.dataset.annPage = String(token.index);
+        btn.setAttribute('aria-label', t('lobby.announcementsPageGoto', { page: token.index + 1 }));
+        if (!useDots) btn.textContent = String(token.index + 1);
+        if (current) btn.setAttribute('aria-current', 'page');
+        annPagerPages.appendChild(btn);
+    }
+}
+
 function renderAnnouncements() {
     if (!annPanel || !annList) return;
     const items = announcements.filter((a) => a.title);
     if (!items.length) {
         annPanel.hidden = true;
         if (annEmpty) annEmpty.hidden = true;
+        if (annPager) annPager.hidden = true;
         annList.replaceChildren();
+        annPage = 0;
         return;
     }
+    const { pageIndex, pageCount, slice } = announcementPageSlice(items, annPage, ANN_PAGE_SIZE);
+    annPage = pageIndex;
+
     annPanel.hidden = false;
     if (annEmpty) annEmpty.hidden = true;
     annList.replaceChildren();
-    for (const a of items) {
-        const li = document.createElement('li');
-        li.className = 'ann-item';
-
-        const head = document.createElement('div');
-        head.className = 'ann-head';
-        const dateStr = announcementDateLabel(a);
-        if (dateStr) {
-            const timeEl = document.createElement('time');
-            timeEl.className = 'ann-date';
-            timeEl.dateTime = String(a.createdAt || a.updatedAt || '');
-            timeEl.textContent = dateStr;
-            head.appendChild(timeEl);
-        }
-        const title = document.createElement('h3');
-        title.className = 'ann-title';
-        title.textContent = a.title;
-        head.appendChild(title);
-        li.appendChild(head);
-        annList.appendChild(li);
-    }
+    for (const a of slice) appendAnnouncementRow(a);
+    renderAnnouncementPager(pageCount);
 }
+
+function setAnnouncementPage(nextPage) {
+    const items = announcements.filter((a) => a.title);
+    const pageCount = Math.ceil(items.length / ANN_PAGE_SIZE) || 0;
+    annPage = clampAnnouncementPage(nextPage, pageCount);
+    renderAnnouncements();
+}
+
+annPagerPrev?.addEventListener('click', () => setAnnouncementPage(annPage - 1));
+annPagerNext?.addEventListener('click', () => setAnnouncementPage(annPage + 1));
+annPagerPages?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-ann-page]');
+    if (!btn || !annPagerPages.contains(btn)) return;
+    const page = Number(btn.dataset.annPage);
+    if (!Number.isFinite(page)) return;
+    setAnnouncementPage(page);
+});
 
 async function refresh() {
     try {

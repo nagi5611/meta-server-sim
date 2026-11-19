@@ -23,6 +23,11 @@
             <h2 id="annTitle">お知らせ</h2>
           </div>
           <ul class="ann-list" id="announcement-list"></ul>
+          <nav class="ann-pager" id="announcement-pager" hidden aria-label="お知らせのページ">
+            <button type="button" class="ann-pager-btn" id="ann-pager-prev" aria-label="前のページ">‹</button>
+            <div class="ann-pager-pages" id="ann-pager-pages" role="group"></div>
+            <button type="button" class="ann-pager-btn" id="ann-pager-next" aria-label="次のページ">›</button>
+          </nav>
         </section>
         <section class="panel join-code-panel" aria-labelledby="joinCodeTitle">
           <div class="panel-head">
@@ -43,27 +48,88 @@
     </div>
   </div>
   <script type="module">
-    const items = [
-      { id: '1', title: '短い告知', createdAt: '2026-11-20T09:00:00.000Z' },
-      { id: '2', title: 'とても長いタイトルのお知らせで省略記号が出るかどうかの確認用サンプル', createdAt: '2026-11-19T08:00:00.000Z' },
-    ];
+    import {
+      ANN_PAGE_SIZE,
+      announcementPageSlice,
+      clampAnnouncementPage,
+    } from './lobby-announcements.js';
+
+    const items = Array.from({ length: 12 }, (_, i) => ({
+      id: String(i + 1),
+      title: `お知らせ ${i + 1}: ${i % 3 === 0 ? 'とても長いタイトルのお知らせで省略記号が出るかどうかの確認用サンプル' : '短い告知'}`,
+      createdAt: `2026-11-${String(20 - (i % 10)).padStart(2, '0')}T09:00:00.000Z`,
+    }));
+
     const list = document.getElementById('announcement-list');
-    for (const a of items) {
-      const li = document.createElement('li');
-      li.className = 'ann-item';
-      const head = document.createElement('div');
-      head.className = 'ann-head';
-      const title = document.createElement('h3');
-      title.className = 'ann-title';
-      title.textContent = a.title;
-      const timeEl = document.createElement('time');
-      timeEl.className = 'ann-date';
-      timeEl.textContent = '2026/11/20';
-      head.appendChild(timeEl);
-      head.appendChild(title);
-      li.appendChild(head);
-      list.appendChild(li);
+    const pager = document.getElementById('announcement-pager');
+    const pagerPages = document.getElementById('ann-pager-pages');
+    const prevBtn = document.getElementById('ann-pager-prev');
+    const nextBtn = document.getElementById('ann-pager-next');
+    let page = 0;
+
+    function renderRows(slice) {
+      list.replaceChildren();
+      for (const a of slice) {
+        const li = document.createElement('li');
+        li.className = 'ann-item';
+        const head = document.createElement('div');
+        head.className = 'ann-head';
+        const timeEl = document.createElement('time');
+        timeEl.className = 'ann-date';
+        timeEl.textContent = '2026/11/20';
+        const title = document.createElement('h3');
+        title.className = 'ann-title';
+        title.textContent = a.title;
+        head.appendChild(timeEl);
+        head.appendChild(title);
+        li.appendChild(head);
+        list.appendChild(li);
+      }
     }
+
+    function renderPager(pageCount) {
+      if (pageCount <= 1) {
+        pager.hidden = true;
+        return;
+      }
+      pager.hidden = false;
+      prevBtn.disabled = page <= 0;
+      nextBtn.disabled = page >= pageCount - 1;
+      pagerPages.replaceChildren();
+      for (let i = 0; i < pageCount; i += 1) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ann-pager-num';
+        btn.textContent = String(i + 1);
+        btn.dataset.page = String(i);
+        if (i === page) btn.setAttribute('aria-current', 'page');
+        pagerPages.appendChild(btn);
+      }
+    }
+
+    function paint() {
+      const { pageIndex, pageCount, slice } = announcementPageSlice(items, page, ANN_PAGE_SIZE);
+      page = pageIndex;
+      renderRows(slice);
+      renderPager(pageCount);
+    }
+
+    prevBtn.addEventListener('click', () => {
+      page = clampAnnouncementPage(page - 1, Math.ceil(items.length / ANN_PAGE_SIZE));
+      paint();
+    });
+    nextBtn.addEventListener('click', () => {
+      page = clampAnnouncementPage(page + 1, Math.ceil(items.length / ANN_PAGE_SIZE));
+      paint();
+    });
+    pagerPages.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-page]');
+      if (!btn) return;
+      page = Number(btn.dataset.page);
+      paint();
+    });
+
+    paint();
   </script>
 </body>
 </html>

@@ -82,6 +82,12 @@
           <h2 id="annTitle" data-i18n="lobby.announcements">お知らせ</h2>
         </div>
         <ul class="ann-list" id="announcement-list"></ul>
+        <nav class="ann-pager" id="announcement-pager" hidden aria-labelledby="annPagerLabel">
+          <span class="sr-only" id="annPagerLabel" data-i18n="lobby.announcementsPagerAria">お知らせのページ</span>
+          <button type="button" class="ann-pager-btn" id="ann-pager-prev" aria-controls="announcement-list" data-i18n-aria="lobby.announcementsPagePrev">‹</button>
+          <div class="ann-pager-pages" id="ann-pager-pages" role="group"></div>
+          <button type="button" class="ann-pager-btn" id="ann-pager-next" aria-controls="announcement-list" data-i18n-aria="lobby.announcementsPageNext">›</button>
+        </nav>
         <p class="ann-empty" id="announcement-empty" hidden data-i18n="lobby.announcementsEmpty">現在お知らせはありません</p>
       </section>
 
@@ -105,6 +111,8 @@
       <div class="panel-head">
         <div class="panel-head-leading">
           <h2 id="panelTitle" data-i18n="lobby.worldList">メタバース一覧</h2>
+        </div>
+        <div class="panel-head-trailing">
           <span id="refresh-hint" class="hint num" aria-live="polite">同期中…</span>
         </div>
       </div>
