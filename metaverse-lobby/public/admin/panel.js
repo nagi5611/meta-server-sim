@@ -83,7 +83,7 @@
 
   /* ================= メタバース ================= */
   function series() {
-    void store.fetchMetrics(state.range).then(() => drawChart());
+    void store.fetchMetrics(state.range).then(() => drawChart()).catch(() => drawChart());
     const ws = store.worlds;
     const get = state.range === "24h" ? M.hourly : M.daily;
     const len = state.range === "24h" ? 24 : 7;
@@ -532,7 +532,7 @@
     const fo = t.closest("[data-focus]");
     if (fo) { e.preventDefault(); const id = fo.dataset.focus; state.focus = state.focus === id || !id ? null : id; return render(); }
     const rg = t.closest("[data-range]");
-    if (rg) { state.range = rg.dataset.range; store.fetchMetrics(state.range).then(() => render()); return; }
+    if (rg) { state.range = rg.dataset.range; store.fetchMetrics(state.range).then(() => render()).catch(() => render()); return; }
     const fl = t.closest("[data-filter]");
     if (fl) { state.filter = fl.dataset.filter; return render(); }
     const vw = t.closest("[data-viewer]");

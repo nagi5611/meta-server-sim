@@ -32,7 +32,11 @@
       } catch {
         this.overview = null;
       }
-      await store.fetchMetrics("24h");
+      try {
+        await store.fetchMetrics("24h");
+      } catch {
+        /* metrics optional — empty charts if 401 or LOBBY_DB unset */
+      }
     },
     async fetchMetrics(range) {
       if (!API) return metricsCache;

@@ -45,7 +45,7 @@ export async function handleAdminLogin(request, env) {
     const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
     if (!secret) return json({ error: 'session_not_configured' }, 503);
     const token = await signJwt({ sub: user, role: 'admin', admin: true }, secret, 60 * 60 * 12);
-    const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/admin');
+    const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
     return json({ ok: true, user: { username: user, role: 'admin' } }, 200, { 'set-cookie': cookie });
 }
 
@@ -60,7 +60,7 @@ export async function handleAdminApi(request, env, kv) {
 
     if (url.pathname === '/api/admin/logout' && request.method === 'POST') {
         return json({ ok: true }, 200, {
-            'set-cookie': setCookieHeader(ADMIN_COOKIE, '', 0, '/admin'),
+            'set-cookie': setCookieHeader(ADMIN_COOKIE, '', 0, '/'),
         });
     }
 
