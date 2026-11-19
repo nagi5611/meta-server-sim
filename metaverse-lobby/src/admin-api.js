@@ -22,6 +22,7 @@ import {
 import { handleThumbnailUpload } from './lobby-assets.js';
 import { isLobbySuperAdmin } from './lobby-super-admin.js';
 import { getSuperAdminLoginAudit, handleAdminLoginSuper } from './admin-super-login.js';
+import { resolveAdminSessionSecret } from './admin-secrets.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
@@ -53,7 +54,7 @@ function json(data, status = 200, extraHeaders = {}) {
  * @param {Record<string, unknown>} env
  */
 async function verifyAdmin(request, env) {
-    const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
+    const secret = resolveAdminSessionSecret(env);
     if (!secret) return null;
     const token =
         readCookie(request, ADMIN_COOKIE) ||
@@ -94,7 +95,7 @@ export async function handleAdminApi(request, env, kv) {
         if (!publicSession || String(publicSession.role || '') !== 'admin') {
             return json({ error: 'forbidden' }, 403);
         }
-        const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
+        const secret = resolveAdminSessionSecret(env);
         if (!secret) return json({ error: 'session_not_configured' }, 503);
         const sessionUser = String(publicSession.username || publicSession.sub || 'admin');
         const token = await signJwt(

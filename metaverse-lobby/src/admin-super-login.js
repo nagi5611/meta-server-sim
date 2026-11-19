@@ -10,6 +10,7 @@ import {
     normalizeJapanPhoneE164,
     sendAdminOtpSms,
 } from './aws-sns-sms.js';
+import { resolveAdminOtpSecret, resolveAdminSessionSecret } from './admin-secrets.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const OTP_KV_PREFIX = 'super_admin_otp:';
@@ -71,7 +72,7 @@ export function resolveSuperAdminOtpChannel(env) {
  * @returns {string}
  */
 function otpSecretMaterial(env) {
-    return String(env.ADMIN_OTP_SECRET || env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
+    return resolveAdminOtpSecret(env);
 }
 
 /**
@@ -179,7 +180,7 @@ async function logSuperAdminAttempt(db, row) {
  * @param {boolean} superAdmin
  */
 async function issueAdminSession(env, sessionUser, superAdmin) {
-    const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
+    const secret = resolveAdminSessionSecret(env);
     if (!secret) return { error: 'session_not_configured', status: 503 };
     const token = await signJwt(
         { sub: sessionUser, role: 'admin', admin: true, superAdmin },
