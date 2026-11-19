@@ -135,6 +135,29 @@
   }
   .account #logoutBtn:hover{color:var(--color-primary-dark);background:transparent;border:none}
 
+  /* ---------- footer ---------- */
+  .site-footer{
+    margin-top:auto;border-top:1px solid var(--color-border);background:var(--color-surface);
+  }
+  .site-footer__inner{
+    max-width:var(--container);margin:0 auto;padding:18px 24px 22px;
+    display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+  }
+  .site-footer__org{
+    margin:0;font-size:var(--fs-caption);font-weight:600;color:var(--color-heading);line-height:1.45;
+  }
+  .site-footer__links{
+    display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;
+    font-size:var(--fs-note);line-height:1.4;
+  }
+  .site-footer__link{
+    color:var(--color-primary);font-weight:600;text-decoration:none;border-radius:var(--radius-xs);
+    padding:2px 4px;margin:-2px -4px;
+  }
+  .site-footer__link:hover{color:var(--color-primary-dark);text-decoration:underline}
+  .site-footer__link:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+  .site-footer__sep{color:var(--color-text-faint);user-select:none;font-weight:400}
+
   /* ---------- layout ---------- */
   main.lobby-main{flex:1;width:100%;max-width:var(--container);margin:0 auto;padding:28px 24px 40px}
   .lobby-layout{
@@ -543,5 +566,9 @@
     .dlg-name{font-size:16px}
     .dlg-btns{grid-template-columns:1fr 1fr}
     .toast{right:12px;left:12px;bottom:12px;max-width:none}
+    .site-footer__inner{padding:14px 16px 18px;gap:8px}
+    .site-footer__org{font-size:var(--fs-note)}
+    .site-footer__links{flex-direction:column;gap:6px}
+    .site-footer__sep{display:none}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
