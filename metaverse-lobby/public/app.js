@@ -1,5 +1,7 @@
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
+const t = (key, vars) => window.LobbyI18n?.t(key, vars) ?? key;
+await window.LobbyI18n?.ready;
 
 const localTimeFmt = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
@@ -48,10 +50,10 @@ function saveAuthState() {
 
 function statusInfo(status) {
     const s = String(status || 'online');
-    if (s === 'maint') return { txt: 'メンテナンス', cls: 'maint' };
-    if (s === 'live') return { txt: 'イベント中', cls: 'live' };
-    if (s === 'degraded') return { txt: '診断中', cls: 'maint' };
-    return { txt: '稼働中', cls: '' };
+    if (s === 'maint') return { txt: t('status.maint'), cls: 'maint' };
+    if (s === 'live') return { txt: t('status.live'), cls: 'live' };
+    if (s === 'degraded') return { txt: t('status.degraded'), cls: 'maint' };
+    return { txt: t('status.online'), cls: '' };
 }
 
 function fmtNum(n) {
@@ -177,7 +179,7 @@ function render() {
         btn.dataset.id = String(w.id);
         const thumb = w.thumbnailUrl
             ? `<img src="${escapeHtml(String(w.thumbnailUrl))}" alt="">`
-            : '<span>サムネ画像</span>';
+            : `<span>${t('lobby.thumbPlaceholder')}</span>`;
         btn.innerHTML = `
         <div class="ph">
           <span class="badge ${st.cls}"><i></i>${st.txt}</span>
@@ -186,7 +188,7 @@ function render() {
         <div class="card-body">
           <div class="cb-txt">
             <div class="nm">${mqHTML(String(w.name || ''))}</div>
-            <div class="meta">${off ? '接続停止中' : `<b class="num">${fmtNum(w.players)}</b> 人オンライン`}</div>
+            <div class="meta">${off ? t('lobby.offlineMaint') : `<b class="num">${fmtNum(w.players)}</b>${t('admin.onlineSuffix')}`}</div>
           </div>
           <div class="cb-spark">
             ${sparkSVG(w, 56, 24, false, off)}
@@ -195,7 +197,7 @@ function render() {
         </div>`;
         btn.addEventListener('click', () => {
             if (off) {
-                showToast('このサーバーはメンテナンス中です');
+                showToast(t('toast.maintServer'));
                 return;
             }
             openJoin(w);
@@ -266,9 +268,9 @@ function closeJoin() {
 
 function validateName(name) {
     const n = String(name || '').trim();
-    if (!n) return { ok: false, error: '表示名を入力してください' };
+    if (!n) return { ok: false, error: t('join.errDisplayRequired') };
     if (n.length > 16) return { ok: false, error: '16文字以内で入力してください' };
-    if (!/^[\p{L}\p{N}_\- ]+$/u.test(n)) return { ok: false, error: '使用できない文字が含まれています' };
+    if (!/^[\p{L}\p{N}_\- ]+$/u.test(n)) return { ok: false, error: t('join.errDisplayChars') };
     return { ok: true, value: n };
 }
 
@@ -303,12 +305,12 @@ async function refresh() {
         worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
         render();
         if (hint) {
-            const t = data.updatedAt ? new Date(data.updatedAt) : new Date();
-            hint.textContent = `更新 ${localTimeFmt.format(t)}`;
+            const at = data.updatedAt ? new Date(data.updatedAt) : new Date();
+            hint.textContent = `${t('common.updatePrefix')}${localTimeFmt.format(at)}`;
         }
     } catch {
-        if (hint) hint.textContent = '取得失敗';
-        showToast('一覧の更新に失敗しました');
+        if (hint) hint.textContent = t('common.refreshFailed');
+        showToast(t('toast.listRefreshFail'));
     }
 }
 
@@ -317,11 +319,11 @@ let authTab = authState.mode || 'login';
 
 function syncAuthModal() {
     const signup = authTab === 'signup';
-    $('#modalTitle').textContent = signup ? '新規登録' : 'ログイン';
+    $('#modalTitle').textContent = signup ? t('auth.signup') : t('auth.login');
     $('#fldName').hidden = !signup;
-    $('#authSubmit').textContent = signup ? '登録してはじめる' : 'ログイン';
-    $('#switchLead').textContent = signup ? 'アカウントをお持ちの方は' : 'アカウントをお持ちでない方は';
-    $('#switchTab').textContent = signup ? 'ログインへ' : '新規登録';
+    $('#authSubmit').textContent = signup ? t('auth.submitSignup') : t('auth.submitLogin');
+    $('#switchLead').textContent = signup ? t('auth.switchToLoginLead') : t('auth.switchToSignupLead');
+    $('#switchTab').textContent = signup ? t('auth.switchToLogin') : t('auth.switchToSignup');
     $('#mPass').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
 }
 
@@ -403,7 +405,7 @@ function signIn(user) {
             $('#jCount').textContent = `${dn.length}/16`;
         }
     }
-    showToast('ログインしました。表示名を同期しました');
+    showToast(t('toast.loginOk'));
 }
 
 async function signOut() {
@@ -416,7 +418,7 @@ async function signOut() {
     saveAuthState();
     renderAuthHeader();
     refresh();
-    showToast('ログアウトしました');
+    showToast(t('toast.logoutOk'));
 }
 
 /* ---------- wire events ---------- */
@@ -438,10 +440,10 @@ $('#join-go')?.addEventListener('click', () => {
     setJoinMsg('');
     const btn = $('#join-go');
     btn.disabled = true;
-    btn.textContent = '接続中…';
+    btn.textContent = t('join.connecting');
     setTimeout(() => {
         btn.disabled = false;
-        btn.textContent = '参加';
+        btn.textContent = t('common.join');
         navigateToWorld(selected, v.value);
     }, 600);
 });
@@ -464,27 +466,27 @@ $('#join-code-btn')?.addEventListener('click', () => {
         .slice(0, 12);
     if (code.length < 6) {
         joinCodeInput?.classList.add('bad');
-        showToast('参加コードは6文字以上で入力してください');
+        showToast(t('toast.codeShort'));
         joinCodeInput?.focus();
         return;
     }
     joinCodeInput?.classList.remove('bad');
     const btn = $('#join-code-btn');
     btn.disabled = true;
-    btn.textContent = '照合中…';
+    btn.textContent = t('join.lookingUp');
     setTimeout(() => {
         btn.disabled = false;
-        btn.textContent = '参加';
+        btn.textContent = t('common.join');
         const hit = worlds.find((w) => String(w.joinCode || '').toUpperCase() === code);
         if (hit && hit.status === 'maint') {
-            showToast('このコードのサーバーはメンテナンス中です');
+            showToast(t('toast.maintByCode'));
             return;
         }
         if (hit) {
             openJoin(hit);
             return;
         }
-        showToast(`参加コード ${code} に一致するワールドがありません`);
+        showToast(t('toast.codeNotFound', { code }));
     }, 500);
 });
 
@@ -523,7 +525,7 @@ $('#authForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (authTab === 'signup') {
         const err = $('#authErr');
-        err.textContent = '新規登録は sim 管理から行ってください';
+        err.textContent = t('auth.errSignupDisabled');
         err.classList.add('on');
         return;
     }
@@ -534,12 +536,12 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         err.textContent = t;
         err.classList.add('on');
     };
-    if (!email) return showErr('ユーザー名を入力してください');
-    if (pass.length < 4) return showErr('パスワードは4文字以上で入力してください');
+    if (!email) return showErr(t('auth.errUserRequired'));
+    if (pass.length < 4) return showErr(t('auth.errPassShort'));
 
     const btn = $('#authSubmit');
     btn.disabled = true;
-    btn.textContent = '認証中…';
+    btn.textContent = t('auth.authenticating');
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -549,17 +551,17 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         });
         const data = await res.json();
         if (!res.ok) {
-            return showErr(data.error === 'banned' ? 'アカウントが停止されています' : 'ユーザー名またはパスワードが違います');
+            return showErr(data.error === 'banned' ? t('auth.errBanned') : t('auth.errInvalid'));
         }
         signIn(data.user);
         clearDraft();
         hideAuthModal();
         refresh();
     } catch {
-        showErr('認証に失敗しました');
+        showErr(t('auth.errFailed'));
     } finally {
         btn.disabled = false;
-        btn.textContent = 'ログイン';
+        btn.textContent = t('auth.submitLogin');
     }
 });
 
@@ -593,6 +595,12 @@ async function bootstrapAuth() {
     }
     renderAuthHeader();
 }
+
+window.addEventListener('lobby:locale-change', () => {
+    window.LobbyI18n?.applyDom();
+    syncAuthModal();
+    render();
+});
 
 bootstrapAuth();
 refresh();

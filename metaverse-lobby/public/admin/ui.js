@@ -2,6 +2,7 @@
 (function () {
   "use strict";
   const { STATUS, AUDIENCE, visible, fmtNum } = window.MMH;
+  const tr = (k) => (window.LobbyI18n && window.LobbyI18n.t(k)) || k;
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -9,33 +10,41 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
-  const ST_TEXT = { open: "稼働中", event: "イベント中", maint: "メンテナンス中" };
-  function status(s) {
-    return `<span class="st ${s === "open" ? "" : s}">${ST_TEXT[s] || ST_TEXT.open}</span>`;
+  function stText(s) {
+    const map = { open: tr("status.online"), event: tr("status.live"), maint: tr("status.maint") };
+    return map[s] || map.open;
   }
-  const AUD_TEXT = { all: "全員", signed: "サインイン済みのみ", admin: "管理者のみ" };
+  function status(s) {
+    return `<span class="st ${s === "open" ? "" : s}">${stText(s)}</span>`;
+  }
+  function audText(a) {
+    return { all: tr("admin.audAll"), signed: tr("admin.audSigned"), admin: tr("admin.audAdmin") }[a] || a;
+  }
   function audience(a) {
-    return a === "all" ? `<span class="dim">全員</span>` : esc(AUD_TEXT[a]);
+    return a === "all" ? `<span class="dim">${esc(tr("admin.audAll"))}</span>` : esc(audText(a));
   }
 
-  const VIEWER_TEXT = { guest: "ゲスト", signed: "サインイン済み", admin: "管理者" };
+  function viewerText(v) {
+    return { guest: tr("ui.viewerGuest"), signed: tr("ui.viewerSigned"), admin: tr("ui.viewerAdmin") }[v] || v;
+  }
+  const VIEWER_TEXT = new Proxy({}, { get: (_t, k) => viewerText(String(k)) });
 
   /* ---------- 公開ページの再現（一覧） ---------- */
   function lobby(target, worlds, viewer) {
     const shown = worlds.filter((x) => visible(x, viewer));
     const cards = shown.map((x) => {
       const bd = x.status === "maint" ? "maint" : x.status === "event" ? "event" : "";
-      const meta = x.status === "maint" ? "接続停止中" : `<b>${fmtNum(x.players)}</b> 人オンライン`;
+      const meta = x.status === "maint" ? tr("lobby.offlineMaint") : `<b>${fmtNum(x.players)}</b>${tr("admin.onlineSuffix")}`;
       return `<div class="lc ${x.id === target.id ? "me" : ""} ${x.status === "maint" ? "maint" : ""}">
-        <div class="ph">${x.thumb ? `<img src="${esc(x.thumb)}" alt="">` : ""}<span class="bd ${bd}">${ST_TEXT[x.status]}</span></div>
+        <div class="ph">${x.thumb ? `<img src="${esc(x.thumb)}" alt="">` : ""}<span class="bd ${bd}">${stText(x.status)}</span></div>
         <div class="b"><div class="n">${esc(x.name || "名称未設定")}</div><div class="m">${meta}</div></div>
       </div>`;
     }).join("");
     return `<div class="lob">
       <div class="lob-h"><img src="icon-192.png" alt="">みんなでメタ</div>
       <div class="lob-p">
-        <div class="lob-t">メタバース一覧</div>
-        <div class="lob-g">${cards || `<div class="lob-none">表示できるメタバースがありません</div>`}</div>
+        <div class="lob-t">${tr("lobby.worldList")}</div>
+        <div class="lob-g">${cards || `<div class="lob-none">${tr("ui.previewNone")}</div>`}</div>
       </div>
     </div>`;
   }
@@ -43,17 +52,17 @@
   /* ---------- 公開ページの再現（ポップアップ） ---------- */
   function popup(w, viewer) {
     if (!visible(w, viewer)) {
-      return `<div class="pop-hidden"><b>${VIEWER_TEXT[viewer]}には表示されません</b>公開範囲が「${esc(AUD_TEXT[w.audience])}」のため、一覧に出ずポップアップも開けません。</div>`;
+      return `<div class="pop-hidden"><b>${viewerText(viewer)}</b> — ${tr("admin.audSigned")} / ${esc(audText(w.audience))}</div>`;
     }
     const bd = w.status === "maint" ? "maint" : w.status === "event" ? "event" : "";
     const off = w.status === "maint";
     return `<div class="pop">
       <div class="ph">${w.thumb ? `<img src="${esc(w.thumb)}" alt="">` : ""}</div>
-      <div class="nm"><b>${esc(w.name || "名称未設定")}</b><span class="bd ${bd}">${ST_TEXT[w.status]}</span></div>
-      <div class="pl"><b class="num">${fmtNum(w.players)}</b> 人オンライン</div>
-      <div class="ds"><span>説明</span><p>${esc(w.desc || "（未入力）")}</p></div>
-      <div class="fl">参加時の表示名</div><div class="fi"></div>
-      <div class="bt"><span class="c">キャンセル</span><span class="j ${off ? "off" : ""}">${off ? "接続停止中" : "参加"}</span></div>
+      <div class="nm"><b>${esc(w.name || "—")}</b><span class="bd ${bd}">${stText(w.status)}</span></div>
+      <div class="pl"><b class="num">${fmtNum(w.players)}</b>${tr("admin.onlineSuffix")}</div>
+      <div class="ds"><span>${tr("lobby.descLabel")}</span><p>${esc(w.desc || "—")}</p></div>
+      <div class="fl">${tr("lobby.displayName")}</div><div class="fi"></div>
+      <div class="bt"><span class="c">${tr("common.cancel")}</span><span class="j ${off ? "off" : ""}">${off ? tr("lobby.offlineMaint") : tr("common.join")}</span></div>
     </div>`;
   }
 
@@ -111,5 +120,5 @@
     return { padL, iw: W - padL - padR, n };
   };
 
-  window.UI = { esc, status, audience, lobby, popup, chart, ST_TEXT, AUD_TEXT, VIEWER_TEXT };
+  window.UI = { esc, status, audience, lobby, popup, chart, VIEWER_TEXT };
 })();

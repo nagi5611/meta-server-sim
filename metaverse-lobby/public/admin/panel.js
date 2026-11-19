@@ -1,6 +1,7 @@
 /* みんなでメタ 管理パネル v2 — 画面 */
 (function () {
   "use strict";
+  const tr = (k, v) => (window.LobbyI18n && window.LobbyI18n.t(k, v)) || k;
   const M = window.MMH, U = window.UI;
   const { store, AUDIENCE, fmtNum, fmtDateTime, fmtDur } = M;
   const { esc } = U;
@@ -25,7 +26,7 @@
       app.hidden = false;
       render();
     } catch (err) {
-      $("#gateErr").textContent = err?.data?.error === "unauthorized" ? "セッションの有効期限が切れました。再ログインしてください。" : "データの読み込みに失敗しました。";
+      $("#gateErr").textContent = err?.data?.error === "unauthorized" ? tr("admin.gateSessionExpired") : tr("admin.gateLoadFail");
       gate.hidden = false;
       app.hidden = true;
     } finally {
@@ -39,7 +40,7 @@
       await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
       await enter();
     } catch {
-      $("#gateErr").textContent = "ユーザー名かパスワードが違います。";
+      $("#gateErr").textContent = tr("admin.gateErr");
       $("#gPass").select();
     }
   });
@@ -208,23 +209,23 @@
         <td class="hide-sm">${U.audience(w.audience)}</td>
         <td class="r num">${w.status === "maint" ? `<span class="dim">—</span>` : fmtNum(w.players)}</td>
         <td class="ops">
-          <button class="txt-btn" data-act="preview" data-id="${esc(w.id)}">プレビュー</button>
-          <button class="txt-btn danger" data-act="delete" data-id="${esc(w.id)}">削除</button>
+          <button class="txt-btn" data-act="preview" data-id="${esc(w.id)}">${tr("admin.preview")}</button>
+          <button class="txt-btn danger" data-act="delete" data-id="${esc(w.id)}">${tr("admin.delete")}</button>
         </td>
       </tr>`).join("");
 
-    const f = [["all", "すべて"], ["open", "稼働中"], ["event", "イベント中"], ["maint", "メンテナンス中"]];
-    return head("メタバース", `<button class="btn btn-primary" data-act="new">メタバースを追加</button>`) +
+    const f = [["all", tr("admin.filterAll")], ["open", tr("admin.filterOpen")], ["event", tr("admin.filterEvent")], ["maint", tr("admin.filterMaint")]];
+    return head(tr("admin.worldsTitle"), `<button class="btn btn-primary" data-act="new">${tr("admin.addWorld")}</button>`) +
       overview() +
       `<section class="block">
         <div class="tools">
           <div class="toggle">${f.map((x) => `<button data-filter="${x[0]}" class="${state.filter === x[0] ? "on" : ""}">${x[1]}</button>`).join("")}</div>
-          <div class="search"><input class="inp" id="q" type="search" placeholder="名前・URL・コードで検索" value="${esc(state.q)}"></div>
+          <div class="search"><input class="inp" id="q" type="search" placeholder="${esc(tr("admin.searchPh"))}" value="${esc(state.q)}"></div>
           <span class="count num">${list.length}件</span>
         </div>
         <div class="sheet"><table>
-          <thead><tr><th>名前</th><th class="hide-sm" style="width:150px">ステータス</th><th class="hide-sm" style="width:160px">公開範囲</th><th class="r" style="width:110px">オンライン</th><th style="width:170px"></th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="5"><div class="empty">該当するメタバースはありません</div></td></tr>`}</tbody>
+          <thead><tr><th>${tr("admin.colName")}</th><th class="hide-sm" style="width:150px">${tr("admin.colStatus")}</th><th class="hide-sm" style="width:160px">${tr("admin.colAudience")}</th><th class="r" style="width:110px">${tr("admin.colOnline")}</th><th style="width:170px"></th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="5"><div class="empty">${tr("admin.emptyWorlds")}</div></td></tr>`}</tbody>
         </table></div>
       </section>`;
   }
@@ -649,4 +650,9 @@
     const el = $("#toast"); el.textContent = m; el.classList.add("on");
     clearTimeout(tt); tt = setTimeout(() => el.classList.remove("on"), 2200);
   }
+
+  window.addEventListener("lobby:locale-change", () => {
+    window.LobbyI18n?.applyDom(document.body);
+    render();
+  });
 })();

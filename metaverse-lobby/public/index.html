@@ -8,28 +8,33 @@
   <link rel="stylesheet" href="/colors_and_type.css">
   <link rel="stylesheet" href="/password-visibility.css">
   <link rel="stylesheet" href="/lobby.css">
+  <script src="/i18n.js"></script>
 </head>
-<body>
+<body data-i18n-document-title="lobby.title">
 
 <header class="site-header">
   <div class="header-inner">
     <div class="site-title">
-      <img src="/assets/icon-192.png" alt="松山南高校 自然科学部">
-      みんなでメタ
-      <span class="sub">松山南高校 ばーちゃるず</span>
+      <img src="/assets/icon-192.png" alt="" data-i18n-alt="lobby.title">
+      <span data-i18n="lobby.title">みんなでメタ</span>
+      <span class="sub" data-i18n="lobby.subtitle">松山南高校 ばーちゃるず</span>
     </div>
 
     <div class="hdr-actions" id="hdrGuest">
+      <select class="lang-select locale-select" aria-labelledby="langLblGuest"></select>
+      <span id="langLblGuest" class="sr-only" data-i18n="common.language">言語</span>
       <span class="hdr-user" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7v1H4v-1z"/></svg>
       </span>
-      <button type="button" class="btn btn-text" id="openLogin">ログイン・サインアップ</button>
+      <button type="button" class="btn btn-text" id="openLogin" data-i18n="lobby.loginSignup">ログイン・サインアップ</button>
     </div>
 
     <div class="account" id="hdrUser">
+      <select class="lang-select locale-select" aria-labelledby="langLblUser"></select>
+      <span id="langLblUser" class="sr-only" data-i18n="common.language">言語</span>
       <div class="av" id="avInitial">N</div>
       <div class="who"><b id="acctName">user</b><span id="acctId">@user</span></div>
-      <button type="button" id="logoutBtn">ログアウト</button>
+      <button type="button" id="logoutBtn" data-i18n="lobby.logout">ログアウト</button>
     </div>
   </div>
 </header>
@@ -37,23 +42,23 @@
 <main>
   <section class="panel" aria-labelledby="panelTitle">
     <div class="panel-head">
-      <h2 id="panelTitle">メタバース一覧</h2>
-      <span id="refresh-hint" class="hint num" aria-live="polite">同期中…</span>
+      <h2 id="panelTitle" data-i18n="lobby.worldList">メタバース一覧</h2>
+      <span id="refresh-hint" class="hint num" aria-live="polite" data-i18n="common.syncing">同期中…</span>
     </div>
 
     <div class="grid" id="world-grid" role="list"></div>
 
     <div class="other">
       <div class="oh">
-        <b>その他のメタバース</b>
-        <span>参加コードで入室</span>
+        <b data-i18n="lobby.otherWorlds">その他のメタバース</b>
+        <span data-i18n="lobby.joinByCode">参加コードで入室</span>
       </div>
       <div class="of">
         <div class="iwrap">
-          <input id="join-code" class="inp code-inp" type="text" maxlength="12" placeholder="参加コード" autocomplete="off" spellcheck="false" aria-label="参加コード">
+          <input id="join-code" class="inp code-inp" type="text" maxlength="12" data-i18n-placeholder="lobby.joinCode" data-i18n-aria="lobby.joinCode" autocomplete="off" spellcheck="false">
           <span class="cnt num" id="codeCount">0/12</span>
         </div>
-        <button type="button" class="btn btn-primary" id="join-code-btn">参加</button>
+        <button type="button" class="btn btn-primary" id="join-code-btn" data-i18n="common.join">参加</button>
       </div>
     </div>
   </section>
@@ -62,20 +67,20 @@
 <div class="scrim" id="join-scrim" role="dialog" aria-modal="true" aria-labelledby="jName" hidden>
   <div class="dlg" id="jDlg">
     <div class="dlg-left">
-      <div class="dlg-ph" id="jPh"><span>サムネ画像</span></div>
+      <div class="dlg-ph" id="jPh"><span data-i18n="lobby.thumbPlaceholder">サムネ画像</span></div>
       <div class="dlg-info">
         <div class="txt">
           <div class="dlg-name">
             <span id="jName"></span>
-            <span class="badge" id="jStatus"><i></i>稼働中</span>
+            <span class="badge" id="jStatus"><i></i><span data-i18n="status.online">稼働中</span></span>
           </div>
           <p class="dlg-players">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4.1 3.4-6.4 7.5-6.4s7.5 2.3 7.5 6.4v1h-15v-1z"/></svg>
-            <b class="num" id="jPlayers">0</b>人オンライン
+            <b class="num" id="jPlayers">0</b><span id="jPlayersSuffix" data-i18n="admin.onlineSuffix">人オンライン</span>
           </p>
         </div>
         <div class="dlg-spark">
-          <svg class="spark" id="jSpark" width="104" height="34" viewBox="0 0 104 34" role="img" aria-label="過去24時間のアクセス推移"></svg>
+          <svg class="spark" id="jSpark" width="104" height="34" viewBox="0 0 104 34" role="img" data-i18n-aria="lobby.spark24h"></svg>
           <span class="lbl">24h</span>
         </div>
       </div>
@@ -83,22 +88,22 @@
 
     <div class="dlg-right">
       <div class="desc">
-        <span class="lb">説明</span>
+        <span class="lb" data-i18n="lobby.descLabel">説明</span>
         <p id="jDesc"></p>
       </div>
 
       <div class="fld" id="jField">
-        <label for="display-name">参加時の表示名</label>
+        <label for="display-name" data-i18n="lobby.displayName">参加時の表示名</label>
         <div class="iwrap">
-          <input id="display-name" class="inp" type="text" maxlength="16" placeholder="参加時の表示名" autocomplete="nickname">
+          <input id="display-name" class="inp" type="text" maxlength="16" data-i18n-placeholder="lobby.displayName" autocomplete="nickname">
           <span class="cnt num" id="jCount">0/16</span>
         </div>
         <p class="msg" id="jMsg" role="alert"></p>
       </div>
 
       <div class="dlg-btns" id="jBtns">
-        <button type="button" class="btn btn-secondary" id="join-cancel">キャンセル</button>
-        <button type="button" class="btn btn-primary" id="join-go">参加</button>
+        <button type="button" class="btn btn-secondary" id="join-cancel" data-i18n="common.cancel">キャンセル</button>
+        <button type="button" class="btn btn-primary" id="join-go" data-i18n="common.join">参加</button>
       </div>
     </div>
   </div>
@@ -108,31 +113,31 @@
   <div class="amodal">
     <div class="am-top">
       <div>
-        <h2 id="modalTitle">ログイン</h2>
+        <h2 id="modalTitle" data-i18n="auth.login">ログイン</h2>
       </div>
-      <button type="button" class="am-x" id="closeModal" aria-label="閉じる">×</button>
+      <button type="button" class="am-x" id="closeModal" data-i18n-aria="common.close">×</button>
     </div>
     <form id="authForm" novalidate>
       <div class="fld" id="fldName" hidden>
-        <label for="mName">ユーザー名</label>
+        <label for="mName" data-i18n="auth.username">ユーザー名</label>
         <input id="mName" type="text" placeholder="example user" autocomplete="username">
       </div>
       <div class="fld">
-        <label for="mEmail">メールアドレス</label>
+        <label for="mEmail" data-i18n="auth.email">メールアドレス</label>
         <input id="mEmail" type="email" placeholder="you@example.com" autocomplete="email">
       </div>
       <div class="fld">
-        <label for="mPass">パスワード</label>
+        <label for="mPass" data-i18n="auth.password">パスワード</label>
         <div class="pwd-wrap">
           <input id="mPass" type="password" placeholder="" autocomplete="current-password" minlength="4">
         </div>
       </div>
       <p class="msg" id="authErr" role="alert"></p>
-      <button class="btn btn-primary btn-block" type="submit" id="authSubmit">ログイン</button>
+      <button class="btn btn-primary btn-block" type="submit" id="authSubmit" data-i18n="auth.submitLogin">ログイン</button>
     </form>
     <div class="am-switch">
-      <span id="switchLead">アカウントをお持ちでない方は</span>
-      <button type="button" id="switchTab">新規登録</button>
+      <span id="switchLead" data-i18n="auth.switchToSignupLead">アカウントをお持ちでない方は</span>
+      <button type="button" id="switchTab" data-i18n="auth.switchToSignup">新規登録</button>
     </div>
   </div>
 </div>
