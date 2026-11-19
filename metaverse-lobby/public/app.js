@@ -11,8 +11,10 @@ const hint = $('#refresh-hint');
 const annPanel = $('#announcements-panel');
 const annList = $('#announcement-list');
 const annEmpty = $('#announcement-empty');
-/** @type {Array<{ id: string, title: string, createdAt?: string, updatedAt?: string }>} */
+/** @type {Array<{ id: string, title: string, body?: string, createdAt?: string, updatedAt?: string }>} */
 let announcements = [];
+/** @type {Set<string>} */
+const annExpanded = new Set();
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
@@ -333,11 +335,24 @@ function renderAnnouncements() {
     if (annEmpty) annEmpty.hidden = true;
     annList.replaceChildren();
     for (const a of items) {
+        const id = String(a.id || '');
+        const hasBody = Boolean(String(a.body || '').trim());
+        const expanded = annExpanded.has(id);
         const li = document.createElement('li');
-        li.className = 'ann-item';
+        li.className = hasBody ? 'ann-item is-expandable' : 'ann-item';
+        if (expanded) li.classList.add('is-expanded');
+        if (hasBody) {
+            li.tabIndex = 0;
+            li.setAttribute('role', 'button');
+            li.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        }
 
         const head = document.createElement('div');
         head.className = 'ann-head';
+        const title = document.createElement('h3');
+        title.className = 'ann-title';
+        title.textContent = a.title;
+        head.appendChild(title);
         const dateStr = announcementDateLabel(a);
         if (dateStr) {
             const timeEl = document.createElement('time');
@@ -346,11 +361,27 @@ function renderAnnouncements() {
             timeEl.textContent = dateStr;
             head.appendChild(timeEl);
         }
-        const title = document.createElement('h3');
-        title.className = 'ann-title';
-        title.textContent = a.title;
-        head.appendChild(title);
         li.appendChild(head);
+
+        if (hasBody) {
+            const body = document.createElement('p');
+            body.className = 'ann-body';
+            body.textContent = a.body;
+            li.appendChild(body);
+            const toggle = () => {
+                const nowExpanded = li.classList.toggle('is-expanded');
+                li.setAttribute('aria-expanded', nowExpanded ? 'true' : 'false');
+                if (nowExpanded) annExpanded.add(id);
+                else annExpanded.delete(id);
+            };
+            li.addEventListener('click', toggle);
+            li.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    toggle();
+                }
+            });
+        }
         annList.appendChild(li);
     }
 }
