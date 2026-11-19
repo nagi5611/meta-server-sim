@@ -117,6 +117,44 @@ export async function handlePublicAuth(request, env) {
         });
     }
 
+    if (url.pathname === '/api/auth/profile' && request.method === 'PATCH') {
+        const session = await getPublicSession(request, env);
+        if (!session?.sub) return json({ error: 'unauthorized' }, 401);
+        const body = await request.json();
+        const displayName = String(body?.displayName || body?.name || '').trim();
+        if (!displayName) return json({ error: 'name_required' }, 400);
+        if (displayName.length > 64) return json({ error: 'name_too_long', maxLength: 64 }, 400);
+        if (!/^[\p{L}\p{N}_\- ]+$/u.test(displayName)) {
+            return json({ error: 'invalid_name_chars' }, 400);
+        }
+        const sim = await fetchSim(env, '/service/lobby/user-profile', {
+            method: 'PATCH',
+            body: { userRef: session.sub, displayName },
+        });
+        if (!sim.ok) return json(sim.data || { error: 'profile_update_failed' }, sim.status || 400);
+        const user = sim.data?.user;
+        if (!user) return json({ error: 'profile_update_failed' }, 500);
+        const secret = String(env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ error: 'jwt_not_configured' }, 503);
+        const token = await signJwt(
+            {
+                sub: session.sub,
+                username: user.username,
+                displayName: user.displayName,
+                role: session.role,
+                banned: session.banned,
+            },
+            secret,
+            60 * 60 * 24 * 7,
+        );
+        const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
+        return json(
+            { ok: true, user: { name: user.displayName, handle: `@${user.username}`, role: session.role } },
+            200,
+            { 'set-cookie': cookie },
+        );
+    }
+
     if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
         const body = await request.json();
         const sim = await fetchSim(env, '/api/lobby/auth/reset-password', { method: 'POST', body });

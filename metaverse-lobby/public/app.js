@@ -14,11 +14,13 @@ const annEmpty = $('#announcement-empty');
 let announcements = [];
 /** @type {Set<string>} */
 const annExpanded = new Set();
-const ANN_COLLAPSE_CHARS = 140;
+const ANN_COLLAPSE_CHARS = 72;
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
 const authScrim = $('#auth-scrim');
+const profileScrim = $('#profile-scrim');
+const profileInput = $('#pName');
 const displayInput = $('#display-name');
 const joinCodeInput = $('#join-code');
 const codeCount = $('#codeCount');
@@ -465,6 +467,55 @@ function hideAuthModal() {
     authScrim.hidden = true;
 }
 
+function openProfileModal() {
+    if (!authState.user?.name) return;
+    const err = $('#profileErr');
+    if (err) {
+        err.textContent = '';
+        err.classList.remove('on');
+    }
+    const dn = (localStorage.getItem('lobbyDisplayName') || authState.user.name).slice(0, 16);
+    if (profileInput) {
+        profileInput.value = dn;
+        profileInput.classList.remove('bad');
+    }
+    const pc = $('#pCount');
+    if (pc) pc.textContent = `${dn.length}/16`;
+    profileScrim.hidden = false;
+    profileScrim.classList.add('on');
+    setTimeout(() => profileInput?.focus(), 60);
+}
+
+function hideProfileModal() {
+    profileScrim.classList.remove('on');
+    profileScrim.hidden = true;
+}
+
+function mapProfileApiError(data) {
+    const code = data?.error;
+    if (code === 'name_required') return t('auth.errNameRequired');
+    if (code === 'invalid_name_chars') return t('join.errDisplayChars');
+    if (code === 'name_too_long') return t('join.errDisplayRequired');
+    if (code === 'unauthorized') return t('auth.errInvalid');
+    return t('profile.errFailed');
+}
+
+function applyDisplayNameLocally(name) {
+    const dn = name.slice(0, 16);
+    localStorage.setItem('mnm.name', dn);
+    localStorage.setItem('lobbyDisplayName', dn);
+    if (authState.user) {
+        authState.user = { ...authState.user, name: name.slice(0, 32) };
+        saveAuthState();
+        renderAuthHeader();
+    }
+    if (joinScrim.classList.contains('on') && displayInput) {
+        displayInput.value = dn;
+        const jc = $('#jCount');
+        if (jc) jc.textContent = `${dn.length}/16`;
+    }
+}
+
 function handleTo(name) {
     return `@${String(name)
         .toLowerCase()
@@ -487,7 +538,7 @@ function renderAuthHeader() {
     }
 }
 
-function signIn(user) {
+function signIn(user, opts = {}) {
     const name = String(user?.name || user?.displayName || '').trim().slice(0, 32);
     if (!name) return;
     const handle = user?.handle || handleTo(user?.username || name);
@@ -495,7 +546,8 @@ function signIn(user) {
     saveAuthState();
     renderAuthHeader();
     const dn = name.slice(0, 16);
-    if (!localStorage.getItem('mnm.name')) {
+    const syncName = opts.syncDisplayName || !localStorage.getItem('mnm.name');
+    if (syncName) {
         localStorage.setItem('mnm.name', dn);
         localStorage.setItem('lobbyDisplayName', dn);
         if (joinScrim.classList.contains('on') && displayInput) {
@@ -503,7 +555,7 @@ function signIn(user) {
             $('#jCount').textContent = `${dn.length}/16`;
         }
     }
-    showToast(t('toast.loginOk'));
+    if (!opts.quiet) showToast(t('toast.loginOk'));
 }
 
 async function signOut() {
@@ -682,9 +734,67 @@ $('#authForm')?.addEventListener('submit', async (e) => {
 
 $('#logoutBtn')?.addEventListener('click', signOut);
 
+$('#openProfile')?.addEventListener('click', openProfileModal);
+$('#closeProfile')?.addEventListener('click', hideProfileModal);
+profileScrim?.addEventListener('click', (ev) => {
+    if (ev.target === profileScrim) hideProfileModal();
+});
+
+profileInput?.addEventListener('input', () => {
+    profileInput.classList.remove('bad');
+    const err = $('#profileErr');
+    if (err) {
+        err.textContent = '';
+        err.classList.remove('on');
+    }
+    const pc = $('#pCount');
+    if (pc) pc.textContent = `${profileInput.value.length}/16`;
+});
+
+$('#profileForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#profileErr');
+    const showErr = (msg) => {
+        if (!err) return;
+        err.textContent = msg;
+        err.classList.add('on');
+    };
+    const v = validateName(profileInput?.value || '');
+    if (!v.ok) {
+        profileInput?.classList.add('bad');
+        return showErr(v.error);
+    }
+    profileInput?.classList.remove('bad');
+    const btn = $('#profileSubmit');
+    btn.disabled = true;
+    const prev = btn.textContent;
+    btn.textContent = t('profile.saving');
+    try {
+        const res = await fetch('/api/auth/profile', {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ displayName: v.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) return showErr(mapProfileApiError(data));
+        if (data.user) signIn(data.user, { quiet: true, syncDisplayName: true });
+        else applyDisplayNameLocally(v.value);
+        hideProfileModal();
+        showToast(t('toast.profileOk'));
+    } catch {
+        showErr(t('profile.errFailed'));
+    } finally {
+        btn.disabled = false;
+        btn.textContent = prev;
+    }
+});
+
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (joinScrim?.classList.contains('on')) closeJoin();
+    if (profileScrim?.classList.contains('on')) hideProfileModal();
+    if (authScrim?.classList.contains('on')) hideAuthModal();
 });
 
 let mqTimer;

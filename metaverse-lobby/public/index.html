@@ -32,8 +32,10 @@
     <div class="account" id="hdrUser">
       <div class="locale-select" data-locale-select aria-labelledby="langLblUser"></div>
       <span id="langLblUser" class="sr-only" data-i18n="common.language">言語</span>
-      <div class="av" id="avInitial">N</div>
-      <div class="who"><b id="acctName">user</b><span id="acctId">@user</span></div>
+      <button type="button" class="acct-profile" id="openProfile" data-i18n-aria="profile.open">
+        <span class="av" id="avInitial">N</span>
+        <span class="who"><b id="acctName">user</b><span id="acctId">@user</span></span>
+      </button>
       <button type="button" id="logoutBtn" data-i18n="lobby.logout">ログアウト</button>
     </div>
   </div>
@@ -147,6 +149,29 @@
       <span id="switchLead" data-i18n="auth.switchToSignupLead">アカウントをお持ちでない方は</span>
       <button type="button" id="switchTab" data-i18n="auth.switchToSignup">新規登録</button>
     </div>
+  </div>
+</div>
+
+<div class="scrim" id="profile-scrim" role="dialog" aria-modal="true" aria-labelledby="profileTitle" hidden>
+  <div class="amodal">
+    <div class="am-top">
+      <div>
+        <h2 id="profileTitle" data-i18n="profile.title">表示名の変更</h2>
+      </div>
+      <button type="button" class="am-x" id="closeProfile" data-i18n-aria="common.close">×</button>
+    </div>
+    <form id="profileForm" novalidate>
+      <div class="fld">
+        <label for="pName" data-i18n="auth.displayName">表示名</label>
+        <div class="iwrap">
+          <input id="pName" class="inp" type="text" maxlength="16" data-i18n-placeholder="lobby.displayName" autocomplete="nickname">
+          <span class="cnt num" id="pCount">0/16</span>
+        </div>
+        <p class="hint" data-i18n="profile.hint">ワールド参加時にも使われます</p>
+      </div>
+      <p class="msg" id="profileErr" role="alert"></p>
+      <button class="btn btn-primary btn-block" type="submit" id="profileSubmit" data-i18n="profile.save">保存する</button>
+    </form>
   </div>
 </div>
 
