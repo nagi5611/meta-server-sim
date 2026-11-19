@@ -172,19 +172,7 @@
     margin:0;font-size:13.5px;font-weight:600;color:var(--color-heading);line-height:1.3;
     flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .ann-item.is-expanded .ann-title{white-space:normal;font-weight:700}
   .ann-date{font-size:11.5px;color:var(--color-text-faint);white-space:nowrap;flex-shrink:0;font-variant-numeric:tabular-nums}
-  .ann-item:not(.is-expanded) .ann-date{display:none}
-  .ann-body{
-    margin:0;font-size:13.5px;line-height:1.5;color:var(--color-text);white-space:pre-wrap;word-break:break-word;
-    display:none;
-  }
-  .ann-item.is-expanded .ann-body{display:block;margin-top:8px}
-  .ann-item.is-expanded .ann-head{flex-direction:column;align-items:flex-start;gap:2px}
-  .ann-item.is-expanded .ann-date{display:block;font-size:12px}
-  .ann-item.is-expandable{cursor:pointer}
-  .ann-item.is-expandable:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px;border-radius:2px}
-  .ann-item.is-expandable:hover .ann-title{color:var(--color-text-muted)}
   .ann-empty{margin:0;padding:0 16px 10px;font-size:14px;color:var(--color-text-faint)}
 
   .grid{
