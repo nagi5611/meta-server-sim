@@ -129,7 +129,7 @@ const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM students`;
 
 const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
-                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
                         COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM teachers`;
 
 /**
@@ -153,7 +153,7 @@ function rowToVerifiedUser(row, kind) {
         username: String(row.username),
         displayName: String(row.display_name),
         banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        lobbyRole: String(row.lobby_role || 'user'),
         email: String(row.email || ''),
         avatarUrl: String(row.avatar_url || ''),
         kind,
@@ -346,7 +346,7 @@ function mapTeacherRow(row) {
         displayName: String(row.display_name),
         createdAt: row.created_at,
         banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || 'admin'),
+        lobbyRole: String(row.lobby_role || 'user'),
         email: String(row.email || ''),
         kind: 'teacher',
     };
@@ -371,7 +371,7 @@ export async function listTeachers() {
         async () => {
             const rows = await d1All(
                 `SELECT id, username, display_name, created_at,
-                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'admin') AS lobby_role,
+                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'user') AS lobby_role,
                         COALESCE(email,'') AS email FROM teachers ORDER BY id`,
             );
             return rows.map(mapTeacherRow);

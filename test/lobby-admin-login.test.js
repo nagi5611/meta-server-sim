@@ -59,7 +59,7 @@ async function postAdminLogin(base, token, body) {
 test('POST /service/lobby/admin-login accepts teacher username or email', async () => {
     await withLobbyServiceDb(async ({ base, token }) => {
         const teacher = registerTeacherSqlite('sensei', 'TeacherPass9!', 'Sensei');
-        patchLobbyUserFlagsSqlite('teacher', teacher.id, { email: 'sensei@school.jp' });
+        patchLobbyUserFlagsSqlite('teacher', teacher.id, { email: 'sensei@school.jp', lobbyRole: 'admin' });
 
         const byUser = await postAdminLogin(base, token, { login: 'sensei', password: 'TeacherPass9!' });
         assert.equal(byUser.status, 200);
@@ -88,6 +88,18 @@ test('POST /service/lobby/admin-login accepts student with lobbyRole admin', asy
         const data = await res.json();
         assert.equal(data.user.kind, 'student');
         assert.equal(data.user.lobbyRole, 'admin');
+    });
+});
+
+test('POST /service/lobby/admin-login rejects teacher without lobbyRole admin', async () => {
+    await withLobbyServiceDb(async ({ base, token }) => {
+        registerTeacherSqlite('plainteacher', 'TeacherPass9!', 'Plain');
+        const res = await postAdminLogin(base, token, {
+            login: 'plainteacher',
+            password: 'TeacherPass9!',
+        });
+        assert.equal(res.status, 403);
+        assert.equal((await res.json()).error, 'admin_required');
     });
 });
 

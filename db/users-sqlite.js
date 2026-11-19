@@ -105,7 +105,7 @@ function rowToLobbyUser(row, kind) {
         username: row.username,
         displayName: row.display_name,
         banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        lobbyRole: String(row.lobby_role || 'user'),
         email: String(row.email || ''),
         avatarUrl: String(row.avatar_url || ''),
         kind,

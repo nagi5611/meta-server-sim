@@ -237,7 +237,7 @@ export async function handleAdminApi(request, env, kv) {
         const rows = [];
         for (const u of [...(students.data || []), ...(teachers.data || [])]) {
             const userRef = `${u.kind}-${u.id}`;
-            const role = u.lobbyRole === 'admin' || u.kind === 'teacher' ? 'admin' : 'member';
+            const role = u.lobbyRole === 'admin' ? 'admin' : 'member';
             rows.push({
                 id: userRef,
                 name: u.displayName || u.username,

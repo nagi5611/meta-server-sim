@@ -148,6 +148,7 @@ export async function handlePublicAuth(request, env) {
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
         if (!session) return json({ user: null });
+        let role = String(session.role || 'member');
         const refMatch = /^((?:student|teacher))-(\d+)$/.exec(String(session.sub || ''));
         if (refMatch) {
             const sim = await fetchSim(env, `/service/users/${refMatch[1]}/${refMatch[2]}`);
@@ -158,6 +159,8 @@ export async function handlePublicAuth(request, env) {
                 if (session.banned) {
                     return json({ user: null, banned: false, reauth: true });
                 }
+                const lobbyRole = String(sim.data.lobbyRole || 'user');
+                role = lobbyRole === 'admin' ? 'admin' : 'member';
             } else if (isLobbySessionBanned(session)) {
                 return json({ user: null, banned: true, message: 'banned' });
             }
@@ -168,7 +171,7 @@ export async function handlePublicAuth(request, env) {
         const user = {
             name: session.displayName || session.username,
             handle: `@${session.username}`,
-            role: session.role,
+            role,
         };
         if (avatarUrl) user.avatarUrl = avatarUrl;
         return json({ user });
