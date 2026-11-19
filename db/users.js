@@ -22,6 +22,7 @@ import {
     getUserForPasswordResetSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
+    closeSqliteUsersDb,
 } from './users-sqlite.js';
 import { getPlatformUsersDbPath } from './users-path.js';
 
@@ -113,6 +114,14 @@ export function getUsersDbStatus() {
         sqlitePath: getPlatformUsersDbPath(),
         sqliteExists: sqliteUsersDbExists(),
     };
+}
+
+/** @internal test isolation */
+export function resetUsersDbStateForTests() {
+    initialized = false;
+    primaryBackend = null;
+    sqliteReady = false;
+    closeSqliteUsersDb();
 }
 
 const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,

@@ -72,7 +72,8 @@
   }
 
   window.LobbyAdminApi = {
-    login: (username, password) => request("/login", { method: "POST", body: { username, password } }),
+    login: (login, password) =>
+      request("/login", { method: "POST", body: { login, password, username: login, email: login } }),
     bootstrapFromLobby: () => request("/bootstrap-from-lobby", { method: "POST", body: {} }),
     logout: () => request("/logout", { method: "POST", body: {} }),
     getCatalog: () => request("/catalog"),

@@ -64,7 +64,7 @@ export async function handleAdminLogin(request, env) {
     const url = new URL(request.url);
     if (url.pathname !== '/api/admin/login') return null;
     const body = await request.json();
-    const login = String(body.username || body.email || '').trim();
+    const login = String(body.login || body.username || body.email || '').trim();
     const pass = String(body.password || '');
     const expectUser = String(env.LOBBY_ADMIN_USER || 'admin').trim();
     const expectPass = String(env.LOBBY_ADMIN_PASSWORD || '').trim();
@@ -72,23 +72,32 @@ export async function handleAdminLogin(request, env) {
     /** @type {string} */
     let sessionUser = login;
     let authenticated = false;
+    /** @type {{ ok: boolean, status: number, data: Record<string, unknown> | null }} | null */
+    let simResult = null;
 
     if (expectPass && login === expectUser && pass === expectPass) {
         authenticated = true;
         sessionUser = expectUser;
     } else {
-        const sim = await fetchSim(env, '/service/lobby/admin-login', {
+        simResult = await fetchSim(env, '/service/lobby/admin-login', {
             method: 'POST',
             body: { login, password: pass },
         });
-        if (sim.ok && sim.data?.user) {
+        if (simResult.ok && simResult.data?.user) {
             authenticated = true;
-            sessionUser = String(sim.data.user.username || login);
+            sessionUser = String(simResult.data.user.username || login);
         }
     }
 
     if (!authenticated) {
-        return json({ error: 'invalid_credentials' }, 401);
+        const simError = String(simResult?.data?.error || '').trim();
+        if (simError === 'banned') return json({ error: 'banned' }, 403);
+        if (simError === 'admin_required') return json({ error: 'admin_required' }, 403);
+        if (simError === 'login_and_password_required') {
+            return json({ error: 'login_and_password_required' }, 400);
+        }
+        const status = simResult && !simResult.ok && simResult.status >= 400 ? simResult.status : 401;
+        return json({ error: simError || 'invalid_credentials' }, status === 403 ? 403 : 401);
     }
     const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
     if (!secret) return json({ error: 'session_not_configured' }, 503);

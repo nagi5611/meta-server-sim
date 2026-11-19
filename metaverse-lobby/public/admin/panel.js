@@ -40,8 +40,17 @@
     try {
       await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
       await enter();
-    } catch {
-      $("#gateErr").textContent = tr("admin.gateErr");
+    } catch (err) {
+      const code = err?.data?.error;
+      const key =
+        code === "banned"
+          ? "admin.gateBanned"
+          : code === "admin_required"
+            ? "admin.gateAdminRequired"
+            : code === "session_not_configured"
+              ? "admin.gateSessionNotConfigured"
+              : "admin.gateErr";
+      $("#gateErr").textContent = tr(key);
       $("#gPass").select();
     }
   });

@@ -87,6 +87,18 @@ function requireDb() {
     return db;
 }
 
+/** @internal test isolation */
+export function closeSqliteUsersDb() {
+    if (db) {
+        try {
+            db.close();
+        } catch {
+            /* already closed */
+        }
+        db = null;
+    }
+}
+
 function rowToLobbyUser(row, kind) {
     return {
         id: row.id,
