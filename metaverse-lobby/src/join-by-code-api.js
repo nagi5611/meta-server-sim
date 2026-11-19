@@ -1,5 +1,6 @@
 import { getPublicSession, resolveLobbyViewer } from './auth-api.js';
 import { resolveLobbySessionBan } from './lobby-ban-guard.js';
+import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 
 const LIVE_KEY = 'live';
 
@@ -104,6 +105,9 @@ export async function handleJoinByCodeRequest(request, env) {
     const hit = findRegistryEntryByJoinCode(registry.metaverses || [], code);
     if (!hit) {
         return json({ error: 'not_found', code }, 404);
+    }
+    if (!isLobbyEntryUrlAllowed(hit.entryUrl, env)) {
+        return json({ error: 'entry_url_not_allowed' }, 403);
     }
     if (!audienceVisible(hit.audience, viewer)) {
         return json({ error: 'not_found', code }, 404);

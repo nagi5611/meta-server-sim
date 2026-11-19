@@ -1,3 +1,5 @@
+import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
+
 /**
  * Lobby status/presence URLs are platform-scoped (origin + /api/lobby/*), not per-tenant paths.
  * @param {{ entryUrl?: string, statusUrl?: string, presenceUrl?: string }} entry
@@ -18,14 +20,29 @@ export function resolveLobbyPollUrls(entry) {
     }
 }
 
-/** @param {Record<string, unknown>} world */
-export function normalizeRegistryMetaverse(world) {
+/**
+ * @param {Record<string, unknown>} world
+ * @param {Record<string, unknown> | undefined} env
+ */
+export function normalizeRegistryMetaverse(world, env) {
+    const entryUrl = String(world?.entryUrl || '').trim();
+    if (!entryUrl || !isLobbyEntryUrlAllowed(entryUrl, env)) return null;
     const urls = resolveLobbyPollUrls(world);
     return {
         ...world,
         statusUrl: urls.statusUrl ?? null,
         presenceUrl: urls.presenceUrl ?? null,
     };
+}
+
+/**
+ * @param {unknown[]} metaverses
+ * @param {Record<string, unknown> | undefined} env
+ */
+export function normalizeRegistryMetaverseList(metaverses, env) {
+    return (Array.isArray(metaverses) ? metaverses : [])
+        .map((m) => normalizeRegistryMetaverse(/** @type {Record<string, unknown>} */ (m), env))
+        .filter(Boolean);
 }
 
 /**

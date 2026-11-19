@@ -79,6 +79,8 @@
   import * as LobbyTime from '/lobby-time.js';
   window.LobbyTime = LobbyTime;
   import '/admin-thumbnail.js';
+  import { isLobbyEntryUrlAllowed, lobbyEntryUrlPolicyHintJa } from '/lobby-entry-url-policy.js';
+  window.LobbyEntryUrlPolicy = { isLobbyEntryUrlAllowed, lobbyEntryUrlPolicyHintJa };
 </script>
 <script src="/admin/api.js"></script>
 <script src="/admin/store.js"></script>

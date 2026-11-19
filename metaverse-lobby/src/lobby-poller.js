@@ -56,9 +56,9 @@ export class LobbyPoller {
         const kv = /** @type {KVNamespace} */ (this.env.LOBBY_KV);
         const secret = String(this.env.LOBBY_PRESENCE_SECRET || '').trim();
         const registry = await kv.get('registry', 'json');
-        const list = (Array.isArray(registry?.metaverses) ? registry.metaverses : []).map(
-            normalizeRegistryMetaverse,
-        );
+        const list = (Array.isArray(registry?.metaverses) ? registry.metaverses : [])
+            .map((m) => normalizeRegistryMetaverse(m, this.env))
+            .filter(Boolean);
         const prevLive = (await kv.get(LIVE_KEY, 'json')) || { worlds: {}, series: {} };
         const worlds = { ...(prevLive.worlds || {}) };
         const series = { ...(prevLive.series || {}) };

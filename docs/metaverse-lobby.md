@@ -32,6 +32,7 @@
 | `RESEND_API_KEY` | パスワード再設定メール（Resend） |
 | `RESEND_FROM_EMAIL` | 送信元（例: `みんなでメタ <noreply@yourdomain.com>`） |
 | `LOBBY_PASSWORD_RESET_URL` | 任意。再設定ページ URL（既定 `https://m.mmh-virtual.jp/reset-password.html`） |
+| `LOBBY_ENTRY_URL_ALLOWED_ORIGINS` | 任意。カタログ `entryUrl` の許可 origin（カンマ区切り、`https://*.mmh-virtual.jp` 形式可）。未設定時は **https の `*.mmh-virtual.jp` のみ**（sim `.env` と Worker vars の両方で同じ値を推奨） |
 
 ### Google OAuth（ロビー登録・ログイン）
 

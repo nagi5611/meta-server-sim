@@ -6,6 +6,7 @@ import {
     announcementPageSlice,
     clampAnnouncementPage,
 } from './lobby-announcements.js';
+import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
@@ -601,6 +602,10 @@ async function navigateToWorld(world, displayName) {
 
     const target = data?.entryUrl || world.entryUrl;
     const base = String(target || '/');
+    if (!isLobbyEntryUrlAllowed(base)) {
+        showToast('参加先 URL が許可されていません');
+        return;
+    }
     const url = new URL(base, window.location.href);
     url.searchParams.set('displayName', displayName);
     const socketJoin = data?.socketJoinToken;

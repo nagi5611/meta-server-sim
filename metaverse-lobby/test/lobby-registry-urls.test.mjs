@@ -16,6 +16,16 @@ test('resolveLobbyPollUrls uses entry origin not tenant path', () => {
     assert.equal(urls.presenceUrl, 'https://sim.mmh-virtual.jp/api/lobby/presence');
 });
 
+test('normalizeRegistryMetaverse rejects disallowed entryUrl', () => {
+    assert.equal(
+        normalizeRegistryMetaverse({
+            id: 'evil',
+            entryUrl: 'https://evil.example/',
+        }, {}),
+        null,
+    );
+});
+
 test('normalizeRegistryMetaverse rewrites poll URLs on registry rows', () => {
     const row = normalizeRegistryMetaverse({
         id: 'tenant-p-01',

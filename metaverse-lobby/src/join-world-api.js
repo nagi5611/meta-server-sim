@@ -4,6 +4,7 @@ import { findRegistryEntryByJoinCode, normalizeJoinCode } from './join-by-code-a
 import { insertJoinEvent } from './db-ops.js';
 import { moderateLobbyDisplayName } from './display-name-moderator.js';
 import { fetchSim } from './sim-client.js';
+import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 
 const LIVE_KEY = 'live';
 
@@ -96,6 +97,9 @@ export async function handleJoinWorldRequest(request, env) {
     const list = registry.metaverses || [];
     const hit = worldId ? findRegistryEntryByWorldId(list, worldId) : findRegistryEntryByJoinCode(list, joinCode);
     if (!hit) return json({ error: 'not_found' }, 404);
+    if (!isLobbyEntryUrlAllowed(hit.entryUrl, env)) {
+        return json({ error: 'entry_url_not_allowed' }, 403);
+    }
 
     const viewer = await resolveLobbyViewer(request, env);
     if (!audienceVisible(hit.audience, viewer)) return json({ error: 'not_found' }, 404);

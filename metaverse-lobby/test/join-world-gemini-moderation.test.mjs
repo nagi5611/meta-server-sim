@@ -7,7 +7,7 @@ function mockKv() {
         async get(key, type) {
             if (key === 'registry') {
                 return {
-                    metaverses: [{ id: 'world-a', name: 'A', entryUrl: 'https://example.com/a', audience: 'all' }],
+                    metaverses: [{ id: 'world-a', name: 'A', entryUrl: 'https://sim.mmh-virtual.jp/P-01/', audience: 'all' }],
                 };
             }
             return type === 'json' ? { worlds: {}, series: {} } : null;

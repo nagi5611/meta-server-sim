@@ -56,7 +56,7 @@ test('GET /api/metaverses returns empty list for banned session', async () => {
                 {
                     id: 'world-a',
                     name: 'Visible World',
-                    entryUrl: 'https://example.com/a',
+                    entryUrl: 'https://sim.mmh-virtual.jp/P-01/',
                     audience: 'all',
                 },
             ],
@@ -88,7 +88,7 @@ test('GET /api/metaverses hides catalog when sim reports ban on stale JWT', asyn
         LOBBY_SIM_ORIGIN: 'https://sim.test',
         LOBBY_SIM_SERVICE_TOKEN: 'tok',
         LOBBY_KV: mockKv({
-            metaverses: [{ id: 'world-a', name: 'W', entryUrl: 'https://example.com/a', audience: 'all' }],
+            metaverses: [{ id: 'world-a', name: 'W', entryUrl: 'https://sim.mmh-virtual.jp/P-01/', audience: 'all' }],
         }),
     };
     try {
@@ -114,7 +114,7 @@ test('GET /api/metaverses returns catalog for guest without session', async () =
                 {
                     id: 'world-a',
                     name: 'Visible World',
-                    entryUrl: 'https://example.com/a',
+                    entryUrl: 'https://sim.mmh-virtual.jp/P-01/',
                     audience: 'all',
                 },
             ],
@@ -142,7 +142,7 @@ test('POST /api/join-by-code rejects banned lobby session', async () => {
                     id: 'world-a',
                     name: 'Visible World',
                     joinCode: 'WORLD-A',
-                    entryUrl: 'https://example.com/a',
+                    entryUrl: 'https://sim.mmh-virtual.jp/P-01/',
                     audience: 'all',
                 },
             ],
@@ -170,7 +170,7 @@ test('POST /api/join-by-code resolves code for guests', async () => {
                     id: 'world-a',
                     name: 'Visible World',
                     joinCode: 'WORLD-A',
-                    entryUrl: 'https://example.com/a',
+                    entryUrl: 'https://sim.mmh-virtual.jp/P-01/',
                     audience: 'all',
                 },
             ],

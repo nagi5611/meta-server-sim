@@ -8,7 +8,8 @@ import { handleProfileAvatarGet } from './lobby-profile-assets.js';
 import { pickAnnouncementText, resolveClientLocale } from './announcement-i18n.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 import { handleJoinByCodeRequest } from './join-by-code-api.js';
-import { normalizeRegistryMetaverse } from './lobby-registry-urls.js';
+import { normalizeRegistryMetaverseList } from './lobby-registry-urls.js';
+import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 import { pollStatus } from './lobby-poll-status.js';
 
 export { LobbyPoller };
@@ -62,9 +63,7 @@ async function handleApi(request, env) {
             return json({ error: 'unauthorized' }, 401);
         }
         const body = await request.json();
-        const metaverses = Array.isArray(body?.metaverses)
-            ? body.metaverses.map((m) => normalizeRegistryMetaverse(m))
-            : [];
+        const metaverses = normalizeRegistryMetaverseList(body?.metaverses, env);
         const normalized = { ...body, metaverses, updatedAt: body.updatedAt || new Date().toISOString() };
         await kv.put('registry', JSON.stringify(normalized));
         const id = env.LOBBY_POLLER.idFromName('primary');
@@ -116,6 +115,7 @@ async function handleApi(request, env) {
         const viewer = await resolveLobbyViewer(request, env);
         const preview = url.searchParams.get('preview') === '1' && viewer === 'admin';
         const metaverses = (registry.metaverses || [])
+            .filter((m) => isLobbyEntryUrlAllowed(m.entryUrl, env))
             .filter((m) => preview || audienceVisible(m.audience, viewer))
             .map((m) => {
                 const id = m.id;

@@ -1238,7 +1238,13 @@
     const w = state.editing; let ok = true;
     const set = (id, el, msg) => { $(id).textContent = msg; $(el).classList.toggle("bad", !!msg); if (msg) ok = false; };
     set("#eName", "#fName", w.name.trim() ? "" : "名前を入力してください");
-    set("#eUrl", "#fUrl", /^https?:\/\/\S+\.\S+/.test(w.url.trim()) ? "" : "http:// または https:// で始まるURLを入力してください");
+    const urlTrim = w.url.trim();
+    const urlOkShape = /^https?:\/\/\S+\.\S+/.test(urlTrim);
+    let urlMsg = urlOkShape ? "" : "http:// または https:// で始まるURLを入力してください";
+    if (urlOkShape && window.LobbyEntryUrlPolicy && !window.LobbyEntryUrlPolicy.isLobbyEntryUrlAllowed(urlTrim)) {
+      urlMsg = window.LobbyEntryUrlPolicy.lobbyEntryUrlPolicyHintJa() || "参加先 URL の origin が許可されていません";
+    }
+    set("#eUrl", "#fUrl", urlMsg);
     if (!ok) return;
     if (state.isNew) {
       w.id = (w.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "world") + "-" + Math.random().toString(36).slice(2, 5);

@@ -13,7 +13,7 @@ export async function pollStatus(env) {
     const worlds = { ...(prevLive.worlds || {}) };
 
     for (const raw of list) {
-        const world = normalizeRegistryMetaverse(raw);
+        const world = normalizeRegistryMetaverse(raw, env);
         const id = String(world?.id || '');
         if (!id) continue;
         let status = 'online';

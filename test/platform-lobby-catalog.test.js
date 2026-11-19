@@ -25,8 +25,8 @@ test('buildLobbyWorkerRegistry normalizes poll URLs from entryUrl origin', () =>
 test('buildLobbyWorkerRegistry filters disabled entries', () => {
     const reg = buildLobbyWorkerRegistry({
         metaverses: [
-            { id: 'a', name: 'A', entryUrl: 'https://x/', enabled: true },
-            { id: 'b', name: 'B', entryUrl: 'https://y/', enabled: false },
+            { id: 'a', name: 'A', entryUrl: 'https://sim.mmh-virtual.jp/a/', enabled: true },
+            { id: 'b', name: 'B', entryUrl: 'https://sim.mmh-virtual.jp/b/', enabled: false },
         ],
     });
     assert.equal(reg.metaverses.length, 1);
@@ -37,12 +37,23 @@ test('upsertLobbyEntryForTenant creates join code from tenant id', () => {
     const saved = upsertLobbyEntryForTenant({
         tenantId: 'P-99',
         displayName: 'Test',
-        entryUrl: 'https://sim.example/P-99/',
+        entryUrl: 'https://sim.mmh-virtual.jp/P-99/',
     });
     const row = saved.metaverses.find((m) => m.tenantId === 'P-99');
     assert.ok(row);
     assert.equal(row.name, 'Test');
     assert.ok(row.presenceUrl.includes('/api/lobby/presence'));
+});
+
+test('buildLobbyWorkerRegistry drops entries with disallowed entryUrl origin', () => {
+    const reg = buildLobbyWorkerRegistry({
+        metaverses: [
+            { id: 'ok', name: 'OK', entryUrl: 'https://sim.mmh-virtual.jp/P-01/', enabled: true },
+            { id: 'bad', name: 'Bad', entryUrl: 'https://evil.example/phish/', enabled: true },
+        ],
+    });
+    assert.equal(reg.metaverses.length, 1);
+    assert.equal(reg.metaverses[0].id, 'ok');
 });
 
 test('applyLobbyDisplayNameFromUrl respects displayName query', async () => {
