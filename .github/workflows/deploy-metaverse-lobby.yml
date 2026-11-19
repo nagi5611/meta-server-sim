@@ -58,6 +58,7 @@ jobs:
           LOBBY_WORKERS_DEV_SUBDOMAIN: ${{ secrets.LOBBY_WORKERS_DEV_SUBDOMAIN }}
           LOBBY_PRESENCE_SECRET: ${{ secrets.LOBBY_PRESENCE_SECRET }}
           LOBBY_WORKER_SYNC_SECRET: ${{ secrets.LOBBY_WORKER_SYNC_SECRET }}
+          LOBBY_ADMIN_PASSWORD: ${{ secrets.LOBBY_ADMIN_PASSWORD }}
           LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME || 'm.mmh-virtual.jp' }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
