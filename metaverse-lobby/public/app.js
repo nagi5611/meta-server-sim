@@ -12,9 +12,6 @@ const annList = $('#announcement-list');
 const annEmpty = $('#announcement-empty');
 /** @type {Array<{ id: string, title: string, body: string, createdAt?: string, updatedAt?: string }>} */
 let announcements = [];
-/** @type {Set<string>} */
-const annExpanded = new Set();
-const ANN_COLLAPSE_CHARS = 72;
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
@@ -315,14 +312,9 @@ function announcementDateLabel(a) {
     return raw ? formatLobbyDate(raw) : '';
 }
 
-function isLongAnnouncementBody(body) {
-    const text = String(body || '');
-    return text.length > ANN_COLLAPSE_CHARS || text.split('\n').length > 3;
-}
-
 function renderAnnouncements() {
     if (!annPanel || !annList) return;
-    const items = announcements.filter((a) => a.title && a.body);
+    const items = announcements.filter((a) => a.title);
     if (!items.length) {
         annPanel.hidden = true;
         if (annEmpty) annEmpty.hidden = true;
@@ -333,9 +325,6 @@ function renderAnnouncements() {
     if (annEmpty) annEmpty.hidden = true;
     annList.replaceChildren();
     for (const a of items) {
-        const id = String(a.id || '');
-        const longBody = isLongAnnouncementBody(a.body);
-        const expanded = annExpanded.has(id);
         const li = document.createElement('li');
         li.className = 'ann-item';
 
@@ -354,34 +343,6 @@ function renderAnnouncements() {
             head.appendChild(timeEl);
         }
         li.appendChild(head);
-
-        const body = document.createElement('p');
-        body.className = 'ann-body';
-        if (longBody && !expanded) body.classList.add('is-collapsed');
-        if (longBody) {
-            body.classList.add('is-expandable');
-            body.tabIndex = 0;
-            body.setAttribute('role', 'button');
-            body.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        }
-        body.textContent = a.body;
-        if (longBody) {
-            const toggle = () => {
-                const collapsed = body.classList.toggle('is-collapsed');
-                const nowExpanded = !collapsed;
-                body.setAttribute('aria-expanded', nowExpanded ? 'true' : 'false');
-                if (nowExpanded) annExpanded.add(id);
-                else annExpanded.delete(id);
-            };
-            body.addEventListener('click', toggle);
-            body.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter' || ev.key === ' ') {
-                    ev.preventDefault();
-                    toggle();
-                }
-            });
-        }
-        li.appendChild(body);
         annList.appendChild(li);
     }
 }
