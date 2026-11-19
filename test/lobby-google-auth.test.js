@@ -10,6 +10,7 @@ import {
     peekLobbyGoogleAuthSqlite,
     registerLobbyStudentSqlite,
     verifyStudentSqlite,
+    updateStudentSqlite,
 } from '../db/users-sqlite.js';
 import { registerPlatformLobbyServiceRoutes } from '../lib/platform-lobby-service-routes.js';
 import { initUsersDb, resetUsersDbStateForTests } from '../db/users.js';
@@ -27,25 +28,41 @@ test('completeLobbyGoogleAuth: create, login, and link email/password account', 
         initSqliteUsersDb(tmp);
 
         assert.deepEqual(peekLobbyGoogleAuthSqlite('google-sub-1', 'google@example.com'), { action: 'create' });
+        const googlePic = 'https://lh3.googleusercontent.com/a/test-sub-1=s96-c';
         const created = completeLobbyGoogleAuthSqlite({
             googleSub: 'google-sub-1',
             email: 'google@example.com',
             displayName: 'Google User',
             emailVerified: true,
+            picture: googlePic,
         });
         assert.equal(created.kind, 'student');
         assert.equal(created.user.username, 'google@example.com');
+        assert.equal(created.user.avatarUrl, googlePic);
 
         assert.deepEqual(peekLobbyGoogleAuthSqlite('google-sub-1', 'google@example.com'), {
             action: 'login',
             kind: 'student',
         });
+        const googlePic2 = 'https://lh3.googleusercontent.com/a/test-sub-1-new=s96-c';
         const again = completeLobbyGoogleAuthSqlite({
             googleSub: 'google-sub-1',
             email: 'google@example.com',
             emailVerified: true,
+            picture: googlePic2,
         });
         assert.equal(again.user.id, created.user.id);
+        assert.equal(again.user.avatarUrl, googlePic2);
+
+        const hosted = 'https://lobby.example/api/assets/profile-avatars/student-1.webp';
+        updateStudentSqlite(created.user.id, { avatarUrl: hosted });
+        const afterCustom = completeLobbyGoogleAuthSqlite({
+            googleSub: 'google-sub-1',
+            email: 'google@example.com',
+            emailVerified: true,
+            picture: 'https://lh3.googleusercontent.com/a/ignored=s96-c',
+        });
+        assert.equal(afterCustom.user.avatarUrl, hosted);
 
         registerLobbyStudentSqlite('legacy@example.com', 'WelcomePass8', 'Legacy');
         assert.deepEqual(peekLobbyGoogleAuthSqlite('google-sub-legacy', 'legacy@example.com'), {

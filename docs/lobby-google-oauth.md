@@ -82,9 +82,11 @@ OAuth コールバック後、Worker は sim に **peek**（`POST /service/lobby
 
 sim の `completeLobbyGoogleAuth` は次を行います。
 
-- `google_sub` 一致 → ログイン
-- 同一メールの既存アカウント（パスワード登録含む）→ `google_sub` をリンクしてログイン
-- 未登録 → **送信された表示名**で学生を新規作成（ランダム不可パスワードハッシュ）
+- `google_sub` 一致 → ログイン（Google `picture` URL を `avatar_url` に同期。手動アップロードの R2 URL は上書きしない）
+- 同一メールの既存アカウント（パスワード登録含む）→ `google_sub` をリンクしてログイン（同様に `picture` 同期）
+- 未登録 → **表示名モーダル完了後**、送信された表示名で学生を新規作成（ランダム不可パスワードハッシュ）。`picture` は `avatar_url` に保存（Google CDN URL。128px 丸表示はロビー CSS の既存 `.av.av-img` を使用）
+
+カスタムアバターは従来どおり `POST /api/auth/profile/avatar` で R2 に保存され、その URL が設定されている間は Google の写真で置き換えません。
 
 ## API
 
