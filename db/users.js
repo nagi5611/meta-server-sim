@@ -16,6 +16,9 @@ import {
     updateStudentSqlite,
     updateTeacherSqlite,
     patchLobbyUserFlagsSqlite,
+    consumePasswordResetTokenSqlite,
+    createPasswordResetTokenSqlite,
+    getUserForPasswordResetSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
 } from './users-sqlite.js';
@@ -416,4 +419,90 @@ export async function deleteBenchUsers(_runId) {
 
 export async function countBenchUsers() {
     return 0;
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ */
+export async function getUserForPasswordReset(kind, id) {
+    return withUsersBackend(
+        async () => {
+            const table = kind === 'teacher' ? 'teachers' : 'students';
+            const row = await d1First(
+                `SELECT id, username, display_name, COALESCE(email,'') AS email FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!row) return null;
+            return {
+                id: Number(row.id),
+                username: String(row.username),
+                displayName: String(row.display_name),
+                email: String(row.email || ''),
+                kind,
+            };
+        },
+        () => getUserForPasswordResetSqlite(kind, id),
+    );
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {number} ttlMs
+ */
+export async function createPasswordResetToken(kind, id, ttlMs) {
+    return withUsersBackend(
+        () => createPasswordResetTokenD1(kind, id, ttlMs),
+        () => createPasswordResetTokenSqlite(kind, id, ttlMs),
+    );
+}
+
+/**
+ * @param {string} token
+ * @param {string} newPassword
+ */
+export async function consumePasswordResetToken(token, newPassword) {
+    return withUsersBackend(
+        () => consumePasswordResetTokenD1(token, newPassword),
+        () => consumePasswordResetTokenSqlite(token, newPassword),
+    );
+}
+
+async function createPasswordResetTokenD1(kind, id, ttlMs) {
+    const crypto = await import('node:crypto');
+    const token = crypto.randomBytes(32).toString('base64url');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + ttlMs);
+    await d1Run('DELETE FROM password_reset_tokens WHERE user_kind = ? AND user_id = ?', [kind, id]);
+    await d1Run(
+        'INSERT INTO password_reset_tokens (token_hash, user_kind, user_id, expires_at) VALUES (?, ?, ?, ?)',
+        [hash, kind, id, expiresAt.toISOString()],
+    );
+    return { token, expiresAt };
+}
+
+async function consumePasswordResetTokenD1(token, newPassword) {
+    const crypto = await import('node:crypto');
+    const hash = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const row = await d1First('SELECT * FROM password_reset_tokens WHERE token_hash = ?', [hash]);
+    if (!row || row.used_at) {
+        const err = new Error('invalid_or_used_token');
+        err.code = 'INVALID_TOKEN';
+        throw err;
+    }
+    if (new Date(String(row.expires_at)).getTime() < Date.now()) {
+        const err = new Error('token_expired');
+        err.code = 'TOKEN_EXPIRED';
+        throw err;
+    }
+    const kind = row.user_kind === 'teacher' ? 'teacher' : 'student';
+    const userId = Number(row.user_id);
+    if (kind === 'teacher') {
+        await updateTeacher(userId, { password: newPassword });
+    } else {
+        await updateStudent(userId, { password: newPassword });
+    }
+    await d1Run(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE token_hash = ?`, [hash]);
+    return { ok: true, kind, userId };
 }

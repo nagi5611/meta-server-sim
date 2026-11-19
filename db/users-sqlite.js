@@ -2,6 +2,7 @@
 
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { validateUserPassword } from '../lib/password-policy.js';
 import { ensurePlatformUsersDbDir, getPlatformUsersDbPath } from './users-path.js';
@@ -48,6 +49,17 @@ export function initSqliteUsersDb(dbPath = getPlatformUsersDbPath()) {
         );
     `);
     ensureLobbyUserColumns(db);
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token_hash TEXT PRIMARY KEY,
+            user_kind TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            used_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_kind, user_id);
+    `);
     return db;
 }
 
@@ -270,4 +282,76 @@ export function countTeachersSqlite() {
 
 export function sqliteUsersDbExists() {
     return fs.existsSync(getPlatformUsersDbPath());
+}
+
+function hashToken(token) {
+    return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ */
+export function getUserForPasswordResetSqlite(kind, id) {
+    const table = kind === 'teacher' ? 'teachers' : 'students';
+    const row = requireDb()
+        .prepare(`SELECT id, username, display_name, email FROM ${table} WHERE id = ?`)
+        .get(id);
+    if (!row) return null;
+    return {
+        id: row.id,
+        username: row.username,
+        displayName: row.display_name,
+        email: String(row.email || ''),
+        kind,
+    };
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {number} ttlMs
+ */
+export function createPasswordResetTokenSqlite(kind, id, ttlMs) {
+    const token = crypto.randomBytes(32).toString('base64url');
+    const hash = hashToken(token);
+    const expiresAt = new Date(Date.now() + ttlMs);
+    requireDb().prepare('DELETE FROM password_reset_tokens WHERE user_kind = ? AND user_id = ?').run(kind, id);
+    requireDb()
+        .prepare(
+            'INSERT INTO password_reset_tokens (token_hash, user_kind, user_id, expires_at) VALUES (?, ?, ?, ?)',
+        )
+        .run(hash, kind, id, expiresAt.toISOString());
+    return { token, expiresAt };
+}
+
+/**
+ * @param {string} token
+ * @param {string} newPassword
+ */
+export function consumePasswordResetTokenSqlite(token, newPassword) {
+    const hash = hashToken(token);
+    const row = requireDb()
+        .prepare('SELECT * FROM password_reset_tokens WHERE token_hash = ?')
+        .get(hash);
+    if (!row || row.used_at) {
+        const err = new Error('invalid_or_used_token');
+        err.code = 'INVALID_TOKEN';
+        throw err;
+    }
+    if (new Date(row.expires_at).getTime() < Date.now()) {
+        const err = new Error('token_expired');
+        err.code = 'TOKEN_EXPIRED';
+        throw err;
+    }
+    const kind = row.user_kind === 'teacher' ? 'teacher' : 'student';
+    if (kind === 'teacher') {
+        updateTeacherSqlite(row.user_id, { password: newPassword });
+    } else {
+        updateStudentSqlite(row.user_id, { password: newPassword });
+    }
+    requireDb()
+        .prepare('UPDATE password_reset_tokens SET used_at = datetime(\'now\') WHERE token_hash = ?')
+        .run(hash);
+    return { ok: true, kind, userId: row.user_id };
 }

@@ -80,6 +80,9 @@
       await API.kickUser(id);
       await this.refresh();
     },
+    async sendPasswordReset(id) {
+      return API.sendPasswordReset(id);
+    },
     world(id) {
       return this.worlds.find((w) => w.id === id) || null;
     },

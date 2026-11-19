@@ -25,6 +25,10 @@
 | `LOBBY_WORKER_SYNC_URL` | 例: `https://metaverse-lobby.<account>.workers.dev/api/admin/sync`（sync は Worker 直 URL 推奨） |
 | `LOBBY_WORKER_SYNC_SECRET` | sync POST の Bearer（Worker 側 `LOBBY_WORKER_SYNC_SECRET` と同一） |
 | `LOBBY_MAINTENANCE=1` | ロビー向けにメンテ表示を強制 |
+| `LOBBY_SIM_SERVICE_TOKEN` | ロビー Worker → sim `/service/*` |
+| `RESEND_API_KEY` | パスワード再設定メール（Resend） |
+| `RESEND_FROM_EMAIL` | 送信元（例: `みんなでメタ <noreply@yourdomain.com>`） |
+| `LOBBY_PASSWORD_RESET_URL` | 任意。再設定ページ URL（既定 `https://m.mmh-virtual.jp/reset-password.html`） |
 
 カタログ本体: `data/platform/lobby-catalog.json`
 

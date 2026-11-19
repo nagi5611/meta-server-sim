@@ -66,7 +66,7 @@ metaverse-lobby/public/admin/
 | 11 | **BAN / ロール** | banned フラグ・admin 付与 | なし | D1 カラム or `user_flags` テーブル + **`PATCH /admin/users/:id`** + 監査ログ | L | 高 |
 | 12 | **接続切断** | オンライン socket kill | tenant socket のみ内部 | **`POST /admin/users/:id/kick`**（platform が tenant 横断で socket 特定） | M | 中 |
 | 13 | **参加履歴** | 全ユーザー合算ログ | なし | join 時に **イベントログ**（D1/KV）: user, world, at, dur, ok | L | 高 |
-| 14 | **パスワード再設定** | メール送信 | なし | Turnstile + Email Sending または既存メール基盤 | L | 高 |
+| 14 | **パスワード再設定** | Resend メール | **実装済** | sim `RESEND_*` + `/reset-password.html` | S | 低 |
 | 15 | **プレビュー** | 公開ロビーと同一コンポーネント | `ui.js` が HTML 複製 | **共有モジュール化**（`lobby.css` + 小さな `preview.js`）で乖離防止 | M | 中 |
 | 16 | **サムネアップロード** | URL 入力のみ（設計） | 同左 | 任意: sim **R2** 既存パターンで `POST /admin/lobby/upload` | M | 中 |
 | 17 | **監査ログ** | BAN・削除・権限変更 | なし | `lobby_audit_log`（who, what, target, at） | M | 中 |

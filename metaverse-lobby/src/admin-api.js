@@ -184,6 +184,7 @@ export async function handleAdminApi(request, env, kv) {
         const body = await request.json();
         const patch = {};
         if (body.banned !== undefined) patch.banned = Boolean(body.banned);
+        if (body.email !== undefined) patch.email = String(body.email).trim();
         if (body.role === 'admin' || body.lobbyRole === 'admin') patch.lobbyRole = 'admin';
         if (body.role === 'member' || body.lobbyRole === 'user') patch.lobbyRole = 'user';
         const sim = await fetchSim(env, `/service/users/${kind}/${rawId}`, { method: 'PATCH', body: patch });
@@ -201,6 +202,14 @@ export async function handleAdminApi(request, env, kv) {
             });
         }
         return json({ ok: true, user: sim.data });
+    }
+
+    const resetMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/password-reset$/);
+    if (resetMatch && request.method === 'POST') {
+        const userId = decodeURIComponent(resetMatch[1]);
+        const [kind, rawId] = userId.split('-');
+        const sim = await fetchSim(env, `/service/users/${kind}/${rawId}/password-reset`, { method: 'POST', body: {} });
+        return json(sim.data || { ok: sim.ok }, sim.status || (sim.ok ? 200 : 502));
     }
 
     const kickMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/kick$/);

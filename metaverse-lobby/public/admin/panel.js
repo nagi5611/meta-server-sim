@@ -439,7 +439,20 @@
       return;
     }
     if (k === "reset") {
-      toast("パスワード再設定メールは準備中です");
+      const email = u.email && !u.email.endsWith("@mmh.local") ? u.email : "";
+      if (!email) {
+        toast("メールアドレスが未登録です。ユーザー情報に有効な email を設定してください");
+        return;
+      }
+      store.sendPasswordReset(id).then((res) => {
+        toast(`${res.email || email} にパスワード再設定メールを送信しました`);
+      }).catch((err) => {
+        const msg =
+          err?.data?.error === "EMAIL_REQUIRED" ? "有効なメールアドレスが必要です" :
+          err?.data?.error === "RESEND_NOT_CONFIGURED" ? "メール送信（Resend）が未設定です" :
+          "送信に失敗しました";
+        toast(msg);
+      });
       return;
     }
     if (k === "delete") {
@@ -480,8 +493,7 @@
       <div class="set-row"><h3>管理ログイン</h3><div>
         <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。カタログは sim 本番 JSON が正本です。</p></div></div>
       <div class="set-row"><h3>パスワード再設定メール</h3><div>
-        <p>メール連携は準備中です（Turnstile + Email Sending 予定）。</p>
-        <button class="btn btn-line" type="button" disabled style="margin-top:10px;opacity:.5">再設定メール（未実装）</button></div></div>
+        <p>Resend で再設定リンクを送信します。sim の <code>RESEND_API_KEY</code> と <code>RESEND_FROM_EMAIL</code>、任意で <code>LOBBY_PASSWORD_RESET_URL</code> を設定してください。</p></div></div>
     </div>`;
   }
 

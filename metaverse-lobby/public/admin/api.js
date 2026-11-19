@@ -45,6 +45,8 @@
     getUsers: () => request("/users"),
     patchUser: (id, body) => request(`/users/${encodeURIComponent(id)}`, { method: "PATCH", body }),
     kickUser: (id) => request(`/users/${encodeURIComponent(id)}/kick`, { method: "POST", body: {} }),
+    sendPasswordReset: (id) =>
+      request(`/users/${encodeURIComponent(id)}/password-reset`, { method: "POST", body: {} }),
     joinLogs: (page) => request(`/join-logs?page=${page || 1}`),
   };
 })();

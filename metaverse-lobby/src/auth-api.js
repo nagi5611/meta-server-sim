@@ -90,6 +90,12 @@ export async function handlePublicAuth(request, env) {
         });
     }
 
+    if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {
+        const body = await request.json();
+        const sim = await fetchSim(env, '/api/lobby/auth/reset-password', { method: 'POST', body });
+        return json(sim.data || { error: 'reset_failed' }, sim.status || (sim.ok ? 200 : 400));
+    }
+
     if (url.pathname === '/api/join-events' && request.method === 'POST') {
         const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
         const body = await request.json();
