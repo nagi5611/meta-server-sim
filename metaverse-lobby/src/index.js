@@ -142,7 +142,7 @@ async function handleApi(request, env) {
                 };
             });
         return json({
-            updatedAt: registry.updatedAt || live.updatedAt || null,
+            updatedAt: live.updatedAt || registry.updatedAt || null,
             metaverses,
             viewer,
         });

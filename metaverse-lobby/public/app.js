@@ -1,17 +1,14 @@
+import { formatLobbyLocalTime, parseLobbyInstant } from './lobby-time.js';
+
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
 const t = (key, vars) => window.LobbyI18n?.t(key, vars) ?? key;
 await window.LobbyI18n?.ready;
 
-const localTimeFmt = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-});
-
 const grid = $('#world-grid');
 const hint = $('#refresh-hint');
+/** @type {Date | null} */
+let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
 const authScrim = $('#auth-scrim');
 const displayInput = $('#display-name');
@@ -297,6 +294,12 @@ function canViewWorld(world) {
     return authState.user.role === 'admin';
 }
 
+function paintRefreshHint(at = lastListUpdatedAt) {
+    if (!hint) return;
+    if (!(at instanceof Date) || Number.isNaN(at.getTime())) return;
+    hint.textContent = `${t('common.updatePrefix')}${formatLobbyLocalTime(at)}`;
+}
+
 async function refresh() {
     try {
         const res = await fetch('/api/metaverses', { cache: 'no-store', credentials: 'include' });
@@ -304,10 +307,8 @@ async function refresh() {
         const data = await res.json();
         worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
         render();
-        if (hint) {
-            const at = data.updatedAt ? new Date(data.updatedAt) : new Date();
-            hint.textContent = `${t('common.updatePrefix')}${localTimeFmt.format(at)}`;
-        }
+        lastListUpdatedAt = parseLobbyInstant(data.updatedAt);
+        paintRefreshHint(lastListUpdatedAt);
     } catch {
         if (hint) hint.textContent = t('common.refreshFailed');
         showToast(t('toast.listRefreshFail'));
@@ -617,6 +618,7 @@ window.addEventListener('lobby:locale-change', () => {
     window.LobbyI18n?.applyDom();
     syncAuthModal();
     render();
+    paintRefreshHint();
 });
 
 bootstrapAuth();

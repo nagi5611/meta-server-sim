@@ -140,7 +140,9 @@
       return Number(n || 0).toLocaleString("ja-JP");
     },
     fmtDateTime(iso) {
-      const d = new Date(iso);
+      const d = window.LobbyTime?.parseLobbyInstant
+        ? window.LobbyTime.parseLobbyInstant(iso)
+        : new Date(iso);
       if (isNaN(d)) return "—";
       return new Intl.DateTimeFormat(undefined, {
         month: "numeric",
