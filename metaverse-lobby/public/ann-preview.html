@@ -6,22 +6,26 @@
   <title>Announcements preview</title>
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; background: #f4f5f7; }
-    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px; display: grid; grid-template-columns: 268px 1fr; gap: 20px; align-items: start; }
-    .side { min-width: 0; }
-    .main-ph { min-height: 200px; border: 1px dashed #ccc; border-radius: 12px; display: grid; place-items: center; color: #888; font-size: 14px; }
+    .wrap { max-width: 960px; margin: 40px auto; padding: 0 24px; }
+    .lobby-layout { display: flex; flex-direction: column; gap: 20px; }
+    .main-ph {
+      min-height: 120px; border: 1px dashed #ccc; border-radius: 12px;
+      display: grid; place-items: center; color: #888; font-size: 14px;
+      background: #fff;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <aside class="side">
-    <section class="panel announcements" id="announcements-panel" aria-labelledby="annTitle">
-      <div class="panel-head" style="display:flex;padding:16px;border-bottom:1px solid #e5e7eb">
-        <h2 id="annTitle" style="margin:0;font-size:18px">お知らせ</h2>
-      </div>
-      <ul class="ann-list" id="announcement-list"></ul>
-    </section>
-    </aside>
-    <div class="main-ph">メタバース一覧（右カラム）</div>
+    <div class="lobby-layout">
+      <section class="panel announcements" id="announcements-panel" aria-labelledby="annTitle">
+        <div class="panel-head" style="display:flex;padding:12px 20px;border-bottom:1px solid #e5e7eb">
+          <h2 id="annTitle" style="margin:0;font-size:16px">お知らせ</h2>
+        </div>
+        <ul class="ann-list" id="announcement-list"></ul>
+      </section>
+      <div class="main-ph">メタバース一覧（下のパネル）</div>
+    </div>
   </div>
   <script type="module">
     const items = [
@@ -37,11 +41,11 @@
       const title = document.createElement('h3');
       title.className = 'ann-title';
       title.textContent = a.title;
-      head.appendChild(title);
       const timeEl = document.createElement('time');
       timeEl.className = 'ann-date';
       timeEl.textContent = '2026/11/20';
       head.appendChild(timeEl);
+      head.appendChild(title);
       li.appendChild(head);
       list.appendChild(li);
     }

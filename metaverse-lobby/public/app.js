@@ -338,10 +338,6 @@ function renderAnnouncements() {
 
         const head = document.createElement('div');
         head.className = 'ann-head';
-        const title = document.createElement('h3');
-        title.className = 'ann-title';
-        title.textContent = a.title;
-        head.appendChild(title);
         const dateStr = announcementDateLabel(a);
         if (dateStr) {
             const timeEl = document.createElement('time');
@@ -350,6 +346,10 @@ function renderAnnouncements() {
             timeEl.textContent = dateStr;
             head.appendChild(timeEl);
         }
+        const title = document.createElement('h3');
+        title.className = 'ann-title';
+        title.textContent = a.title;
+        head.appendChild(title);
         li.appendChild(head);
         annList.appendChild(li);
     }
