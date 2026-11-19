@@ -371,7 +371,7 @@ function render() {
         card.dataset.id = String(w.id);
         const thumb = w.thumbnailUrl
             ? `<img src="${escapeHtml(String(w.thumbnailUrl))}" alt="">`
-            : `<span>${t('lobby.thumbPlaceholder')}</span>`;
+            : `<div class="thumb-ph"><span>${t('lobby.thumbPlaceholder')}</span></div>`;
         const fav = isWorldFavorited(w.id);
         card.innerHTML = `
         <div class="ph">
