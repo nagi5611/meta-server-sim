@@ -697,9 +697,6 @@ $('#logoutBtn')?.addEventListener('click', signOut);
 
 $('#openProfile')?.addEventListener('click', openProfileModal);
 $('#closeProfile')?.addEventListener('click', hideProfileModal);
-profileScrim?.addEventListener('click', (ev) => {
-    if (ev.target === profileScrim) hideProfileModal();
-});
 
 profileInput?.addEventListener('input', () => {
     profileInput.classList.remove('bad');
@@ -754,7 +751,6 @@ $('#profileForm')?.addEventListener('submit', async (e) => {
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (joinScrim?.classList.contains('on')) closeJoin();
-    if (profileScrim?.classList.contains('on')) hideProfileModal();
     if (authScrim?.classList.contains('on')) hideAuthModal();
 });
 
