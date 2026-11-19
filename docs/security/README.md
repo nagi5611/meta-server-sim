@@ -4,6 +4,7 @@
 
 | ドキュメント | 内容 |
 |--------------|------|
+| [env-file-permissions.md](./env-file-permissions.md) | fleet 各コア `.env` を mode 0600・所有者 nagi に揃える |
 | [fail2ban-production.md](./fail2ban-production.md) | fail2ban（sshd / 任意で nginx）導入 |
 | [ssh-key-only-migration.md](./ssh-key-only-migration.md) | SSH 鍵認証への移行（パスワード廃止前のロックアウト防止） |
 
