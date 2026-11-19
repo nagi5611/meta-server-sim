@@ -88,17 +88,25 @@
     display:flex;align-items:center;gap:10px;padding:0;margin:0;border:0;background:transparent;
     cursor:pointer;border-radius:var(--radius-sm);font:inherit;color:inherit;text-align:left;
   }
-  .account .acct-profile:hover .av:not(.av-img){filter:brightness(.96)}
+  .account .acct-profile:hover .av-slot .av-fallback{filter:brightness(.96)}
   .account .acct-profile:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
-  .account .av{
-    width:30px;height:30px;border-radius:50%;background:var(--color-primary-soft);
-    color:var(--color-primary-dark);display:grid;place-items:center;font-size:13px;font-weight:700;
-    flex-shrink:0;
+  .av-slot{
+    position:relative;width:30px;height:30px;flex-shrink:0;display:block;
   }
-  .account .av.av-img,.profile-photo__preview .av-img{
+  .av-slot--lg{width:56px;height:56px}
+  .av-slot .av{
+    position:absolute;inset:0;width:100%;height:100%;border-radius:50%;margin:0;
+  }
+  .account .av-slot .av-fallback,.profile-photo__preview .av-fallback{
+    background:var(--color-primary-soft);color:var(--color-primary-dark);
+    display:grid;place-items:center;font-size:13px;font-weight:700;
+  }
+  .profile-photo__preview .av-slot .av-fallback{font-size:20px}
+  .av-slot .av-img{
     display:block;object-fit:cover;background:var(--color-surface-muted);
   }
-  .account .av.av-img[hidden],.profile-photo__preview .av-img[hidden]{display:none!important}
+  .av-slot .av[hidden]{display:none!important}
+  .av-slot:has(.av-img:not([hidden])) .av-fallback{display:none!important}
   .profile-drop{
     position:absolute;right:0;top:calc(100% + 6px);width:min(300px,calc(100vw - 32px));
     padding:14px 14px 12px;background:var(--color-surface);
@@ -109,7 +117,6 @@
   .profile-photo{margin-bottom:12px}
   .profile-photo__label{display:block;font-size:12px;font-weight:600;color:var(--color-text-muted);margin-bottom:8px}
   .profile-photo__row{display:flex;align-items:flex-start;gap:12px}
-  .profile-photo__preview .av{width:56px;height:56px;font-size:20px}
   .profile-photo__actions{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
   .profile-photo__pick{font-size:12.5px;padding:2px 0}
   .profile-photo__actions .hint{margin:0;font-size:11px;line-height:1.35}

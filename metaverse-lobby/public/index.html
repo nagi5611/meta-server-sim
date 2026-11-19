@@ -34,8 +34,10 @@
       <span id="langLblUser" class="sr-only" data-i18n="common.language">言語</span>
       <div class="profile-menu" id="profileMenu">
         <button type="button" class="acct-profile" id="openProfile" aria-expanded="false" aria-controls="profileDrop" data-i18n-aria="profile.open">
-          <span class="av" id="avInitial">N</span>
-          <img class="av av-img" id="avImg" alt="" hidden decoding="async" referrerpolicy="no-referrer">
+          <span class="av-slot" id="hdrAvatarSlot" aria-hidden="true">
+            <span class="av av-fallback" id="avInitial">N</span>
+            <img class="av av-img" id="avImg" alt="" hidden decoding="async" referrerpolicy="no-referrer">
+          </span>
           <span class="who"><b id="acctName">user</b><span id="acctId">@user</span></span>
         </button>
         <div class="profile-drop" id="profileDrop" hidden>
@@ -45,8 +47,10 @@
               <span class="profile-photo__label" data-i18n="profile.photo">プロフィール写真</span>
               <div class="profile-photo__row">
                 <div class="profile-photo__preview" id="profilePhotoPreview">
-                  <span class="av" id="profileAvatarPlaceholder" aria-hidden="true">?</span>
-                  <img id="profileAvatarPreview" class="av av-img" alt="" hidden decoding="async" referrerpolicy="no-referrer">
+                  <span class="av-slot av-slot--lg" id="profileAvatarSlot" aria-hidden="true">
+                    <span class="av av-fallback" id="profileAvatarPlaceholder">?</span>
+                    <img id="profileAvatarPreview" class="av av-img" alt="" hidden decoding="async" referrerpolicy="no-referrer">
+                  </span>
                 </div>
                 <div class="profile-photo__actions">
                   <input type="file" id="profileAvatarFile" accept="image/jpeg,image/png,image/webp" hidden>
