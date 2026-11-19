@@ -35,18 +35,37 @@ export async function handleAdminLogin(request, env) {
     const url = new URL(request.url);
     if (url.pathname !== '/api/admin/login') return null;
     const body = await request.json();
-    const user = String(body.username || '').trim();
+    const login = String(body.username || body.email || '').trim();
     const pass = String(body.password || '');
     const expectUser = String(env.LOBBY_ADMIN_USER || 'admin').trim();
     const expectPass = String(env.LOBBY_ADMIN_PASSWORD || '').trim();
-    if (!expectPass || user !== expectUser || pass !== expectPass) {
+
+    /** @type {string} */
+    let sessionUser = login;
+    let authenticated = false;
+
+    if (expectPass && login === expectUser && pass === expectPass) {
+        authenticated = true;
+        sessionUser = expectUser;
+    } else {
+        const sim = await fetchSim(env, '/service/lobby/admin-login', {
+            method: 'POST',
+            body: { login, password: pass },
+        });
+        if (sim.ok && sim.data?.user) {
+            authenticated = true;
+            sessionUser = String(sim.data.user.username || login);
+        }
+    }
+
+    if (!authenticated) {
         return json({ error: 'invalid_credentials' }, 401);
     }
     const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
     if (!secret) return json({ error: 'session_not_configured' }, 503);
-    const token = await signJwt({ sub: user, role: 'admin', admin: true }, secret, 60 * 60 * 12);
+    const token = await signJwt({ sub: sessionUser, role: 'admin', admin: true }, secret, 60 * 60 * 12);
     const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
-    return json({ ok: true, user: { username: user, role: 'admin' } }, 200, { 'set-cookie': cookie });
+    return json({ ok: true, user: { username: sessionUser, role: 'admin' } }, 200, { 'set-cookie': cookie });
 }
 
 /**

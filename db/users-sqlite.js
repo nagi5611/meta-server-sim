@@ -98,23 +98,51 @@ function rowToLobbyUser(row, kind) {
     };
 }
 
-export function verifyStudentSqlite(username, password) {
-    const row = requireDb()
+function findStudentLoginRowSqlite(login) {
+    const key = String(login || '').trim();
+    if (!key) return null;
+    const byUser = requireDb()
         .prepare(
             'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM students WHERE username = ?',
         )
-        .get(username.trim());
+        .get(key);
+    if (byUser) return byUser;
+    if (!key.includes('@')) return null;
+    return requireDb()
+        .prepare(
+            `SELECT id, username, password_hash, display_name, banned, lobby_role, email
+             FROM students WHERE email != '' AND lower(email) = lower(?)`,
+        )
+        .get(key);
+}
+
+function findTeacherLoginRowSqlite(login) {
+    const key = String(login || '').trim();
+    if (!key) return null;
+    const byUser = requireDb()
+        .prepare(
+            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM teachers WHERE username = ?',
+        )
+        .get(key);
+    if (byUser) return byUser;
+    if (!key.includes('@')) return null;
+    return requireDb()
+        .prepare(
+            `SELECT id, username, password_hash, display_name, banned, lobby_role, email
+             FROM teachers WHERE email != '' AND lower(email) = lower(?)`,
+        )
+        .get(key);
+}
+
+export function verifyStudentSqlite(username, password) {
+    const row = findStudentLoginRowSqlite(username);
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
     return rowToLobbyUser(row, 'student');
 }
 
 export function verifyTeacherSqlite(username, password) {
-    const row = requireDb()
-        .prepare(
-            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM teachers WHERE username = ?',
-        )
-        .get(username.trim());
+    const row = findTeacherLoginRowSqlite(username);
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
     return rowToLobbyUser(row, 'teacher');

@@ -114,28 +114,49 @@ export function getUsersDbStatus() {
     };
 }
 
+const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
+                        COALESCE(email, '') AS email FROM students`;
+
+const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
+                        COALESCE(email, '') AS email FROM teachers`;
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {string} login
+ */
+async function findUserLoginRowD1(kind, login) {
+    const key = String(login || '').trim();
+    if (!key) return null;
+    const table = kind === 'teacher' ? TEACHER_LOGIN_SELECT : STUDENT_LOGIN_SELECT;
+    let row = await d1First(`${table} WHERE username = ?`, [key]);
+    if (!row && key.includes('@')) {
+        row = await d1First(`${table} WHERE email != '' AND lower(email) = lower(?)`, [key]);
+    }
+    return row;
+}
+
+function rowToVerifiedUser(row, kind) {
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        email: String(row.email || ''),
+        kind,
+    };
+}
+
 export async function verifyStudent(username, password) {
     return withUsersBackend(
         async () => {
-            const row = await d1First(
-                `SELECT id, username, password_hash, display_name,
-                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
-                        COALESCE(email, '') AS email
-                 FROM students WHERE username = ?`,
-                [username.trim()]
-            );
+            const row = await findUserLoginRowD1('student', username);
             if (!row) return null;
             const bcrypt = await import('bcryptjs');
             if (!bcrypt.default.compareSync(password, String(row.password_hash))) return null;
-            return {
-                id: Number(row.id),
-                username: String(row.username),
-                displayName: String(row.display_name),
-                banned: Boolean(row.banned),
-                lobbyRole: String(row.lobby_role || 'user'),
-                email: String(row.email || ''),
-                kind: 'student',
-            };
+            return rowToVerifiedUser(row, 'student');
         },
         () => verifyStudentSqlite(username, password)
     );
@@ -144,25 +165,11 @@ export async function verifyStudent(username, password) {
 export async function verifyTeacher(username, password) {
     return withUsersBackend(
         async () => {
-            const row = await d1First(
-                `SELECT id, username, password_hash, display_name,
-                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
-                        COALESCE(email, '') AS email
-                 FROM teachers WHERE username = ?`,
-                [username.trim()]
-            );
+            const row = await findUserLoginRowD1('teacher', username);
             if (!row) return null;
             const bcrypt = await import('bcryptjs');
             if (!bcrypt.default.compareSync(password, String(row.password_hash))) return null;
-            return {
-                id: Number(row.id),
-                username: String(row.username),
-                displayName: String(row.display_name),
-                banned: Boolean(row.banned),
-                lobbyRole: String(row.lobby_role || 'admin'),
-                email: String(row.email || ''),
-                kind: 'teacher',
-            };
+            return rowToVerifiedUser(row, 'teacher');
         },
         () => verifyTeacherSqlite(username, password)
     );

@@ -6,6 +6,7 @@
 <title>管理｜みんなでメタ</title>
 <link rel="icon" href="/assets/icon-192.png">
 <link rel="stylesheet" href="/colors_and_type.css">
+<link rel="stylesheet" href="/password-visibility.css">
 <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
@@ -15,14 +16,16 @@
   <form class="gate-box" id="gateForm" novalidate autocomplete="off">
     <div class="gate-mark"><img src="/assets/icon-192.png" alt="">みんなでメタ</div>
     <h1>管理画面にログイン</h1>
-    <p class="lead">Basic 認証のユーザー名とパスワードを入力してください。</p>
+    <p class="lead">ユーザー名またはメールアドレスとパスワードを入力してください。</p>
     <div class="field">
-      <label for="gUser">ユーザー名</label>
+      <label for="gUser">ユーザー名 / メール</label>
       <input class="inp" id="gUser" type="text" autocomplete="username" spellcheck="false">
     </div>
     <div class="field">
       <label for="gPass">パスワード</label>
-      <input class="inp" id="gPass" type="password" autocomplete="current-password">
+      <div class="pwd-wrap">
+        <input class="inp" id="gPass" type="password" autocomplete="current-password">
+      </div>
     </div>
     <p class="gate-err" id="gateErr" role="alert"></p>
     <button class="btn btn-primary btn-block" type="submit" id="gateBtn" style="height:40px">ログイン</button>
@@ -63,6 +66,7 @@
 <div class="scrim" id="scrim"></div>
 <div class="toast" id="toast"></div>
 
+<script src="/password-toggle.js"></script>
 <script src="/admin/api.js"></script>
 <script src="/admin/store.js"></script>
 <script src="/admin/ui.js"></script>
