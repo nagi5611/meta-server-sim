@@ -8,6 +8,8 @@ on:
     paths:
       - 'metaverse-lobby/**'
       - 'scripts/lobby-provision-cloudflare.sh'
+      - 'migrations/lobby_users_google_oauth.sql'
+      - 'test/lobby-google-auth.test.js'
       - '.github/workflows/deploy-metaverse-lobby.yml'
 
 permissions:
