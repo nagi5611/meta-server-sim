@@ -66,7 +66,7 @@ bash scripts/lobby-provision-cloudflare.sh
 
 生成された `LOBBY_*` はリポジトリ直下の `lobby-secrets.env`（または `LOBBY_SECRETS_OUTPUT`）に出力されます。sim 本番 `.env` にその3行を追記してください。
 
-**GitHub Actions** — **Repository secrets** に `CLOUDFLARE_API_TOKEN`（必須）、`CLOUDFLARE_ACCOUNT_ID`、`LOBBY_PRESENCE_SECRET`、`LOBBY_WORKER_SYNC_SECRET`（sim `.env` と同一・ローテ禁止）を登録。Google OAuth 利用時は任意で `GOOGLE_OAUTH_CLIENT_ID` と `GOOGLE_OAUTH_CLIENT_SECRET`（Worker に反映。シークレットはコミットしない）。初回ローカル provision のみ `LOBBY_ALLOW_SECRET_GENERATE=1` で自動生成可。**Environment secrets** は本 workflow では未使用（`environment:` 未指定のため）。Cursor アプリ Secret と同じ値を複製する。任意で Google ログイン用に `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（互換 `LOBBY_GOOGLE_*`）。成功時 **Artifacts** に `lobby-secrets.env`（3 日保存）。トークン未設定時はデプロイ step が notice を出してスキップ（緑）。
+**GitHub Actions** — **Repository secrets** に `CLOUDFLARE_API_TOKEN`（必須）、`CLOUDFLARE_ACCOUNT_ID`、`LOBBY_PRESENCE_SECRET`、`LOBBY_WORKER_SYNC_SECRET`（sim `.env` と同一・ローテ禁止）を登録。Google OAuth 利用時は推奨で `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（互換 `LOBBY_GOOGLE_*` / 旧 `GOOGLE_OAUTH_*`）。初回ローカル provision のみ `LOBBY_ALLOW_SECRET_GENERATE=1` で自動生成可。**Environment secrets** は本 workflow では未使用（`environment:` 未指定のため）。成功時 **Artifacts** に `lobby-secrets.env`（3 日保存）。トークン未設定時はデプロイ step が notice を出してス
 
 **手動**
 
