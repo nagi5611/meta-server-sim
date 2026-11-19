@@ -43,7 +43,7 @@
 | **互換（GHA）** | `LOBBY_GOOGLE_CLIENT_ID`, `LOBBY_GOOGLE_CLIENT_SECRET` | 未設定時のフォールバック |
 | **Cursor Environment secrets** | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`（または互換 `LOBBY_GOOGLE_*`） | ローカル provision / 手動デプロイ用 |
 | **Cloudflare Worker** | var `GOOGLE_CLIENT_ID`、secret `GOOGLE_CLIENT_SECRET` | provision が GHA / 環境変数をマッピングして投入 |
-| **任意** | `LOBBY_GOOGLE_REDIRECT_URI` | 未設定時はリクエスト origin（本番 `https://m.mmh-virtual.jp/api/auth/google/callback`） |
+| **任意** | `GOOGLE_OAUTH_REDIRECT_URI` / `LOBBY_GOOGLE_REDIRECT_URI` | 未設定時はリクエスト origin（本番は `wrangler.toml` で `https://m.mmh-virtual.jp/api/auth/google/callback` に固定） |
 | **互換** | `GOOGLE_OAUTH_CLIENT_ID`（Actions variable 可）, `GOOGLE_OAUTH_CLIENT_SECRET` | 旧名。Worker コードと provision がフォールバック読み取り |
 
 Google Cloud Console の OAuth クライアントで **承認済みリダイレクト URI** に `https://m.mmh-virtual.jp/api/auth/google/callback`（および staging の origin があれば同様）を登録してください。

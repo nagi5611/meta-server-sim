@@ -4,11 +4,34 @@
 
 ## Google Cloud コンソール
 
-1. **APIs & Services → Credentials → OAuth client ID**（Web アプリケーション）
-2. **Authorized redirect URIs**（コールバック）:
-   - 本番例: `https://m.mmh-virtual.jp/api/auth/google/callback`
-   - workers.dev 直叩き時: `https://metaverse-lobby.<account>.workers.dev/api/auth/google/callback`
-3. **Scopes**（Worker が要求）: `openid`, `email`, `profile`
+1. **APIs & Services → Credentials → OAuth client ID**（種別: **Web application**）
+2. **Authorized JavaScript origins**（本番のみ）:
+   - `https://m.mmh-virtual.jp`
+3. **Authorized redirect URIs** — 本番 `m.mmh-virtual.jp` では **次の 1 行を完全一致で** 登録（末尾スラッシュ・`www`・別ホストは不可）:
+
+   ```
+   https://m.mmh-virtual.jp/api/auth/google/callback
+   ```
+
+   Worker が Google に送る `redirect_uri` は上記固定です（`wrangler.toml` の `GOOGLE_OAUTH_REDIRECT_URI` と本番 curl で確認済み）。Console にこの URI が無いと **Error 400: redirect_uri_mismatch** になります。
+
+   ローカル / workers.dev 直叩き用（本番ホストと混同しないこと）:
+
+   - ローカル wrangler: `http://127.0.0.1:8787/api/auth/google/callback`（または利用ポート）
+   - workers.dev のみ: `https://metaverse-lobby.<account>.workers.dev/api/auth/google/callback`
+
+4. **Scopes**（Worker が要求）: `openid`, `email`, `profile`
+
+### 本番で送信中の redirect_uri を確認
+
+```bash
+curl -s -D - -o /dev/null 'https://m.mmh-virtual.jp/api/auth/google/start' \
+  | awk -F'[?&]' '/^location:/ { for (i=1;i<=NF;i++) if ($i ~ /^redirect_uri=/) print $i }' \
+  | sed 's/redirect_uri=//' | python3 -c "import sys,urllib.parse; print(urllib.parse.unquote(sys.stdin.read().strip()))"
+# 期待: https://m.mmh-virtual.jp/api/auth/google/callback
+```
+
+`GET /api/auth/google/callback` は Worker 上に存在し、未完了フローでは `/?google_auth=error&google_error=invalid_state` へ 302 します（ルート欠落ではありません）。
 
 ## Worker シークレット / 変数
 
@@ -25,8 +48,8 @@
 
 | 名前 | 用途 |
 |------|------|
-| `GOOGLE_OAUTH_REDIRECT_URI` | コールバック URL を固定（未設定時はリクエストの `Origin` + `/api/auth/google/callback`） |
-| `LOBBY_PUBLIC_ORIGIN` | Pages 以外から Worker を直接叩くときのフォールバック Origin |
+| `GOOGLE_OAUTH_REDIRECT_URI` / `LOBBY_GOOGLE_REDIRECT_URI` | コールバック URL を固定（本番は `https://m.mmh-virtual.jp/api/auth/google/callback`） |
+| `LOBBY_PUBLIC_ORIGIN` / `LOBBY_PUBLIC_URL` | `redirect_uri` 未固定時のフォールバック Origin（`wrangler.toml` で `LOBBY_PUBLIC_ORIGIN`） |
 
 ローカル: `metaverse-lobby/.dev.vars` に上記を記載（`.dev.vars.example` 参照）。
 
