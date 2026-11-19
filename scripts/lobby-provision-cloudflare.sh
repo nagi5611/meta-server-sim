@@ -270,6 +270,38 @@ run_wrangler_deploy() {
   fi
 }
 
+resolve_google_oauth_client_id() {
+  printf '%s' "${GOOGLE_CLIENT_ID:-${LOBBY_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}}"
+}
+
+resolve_google_oauth_client_secret() {
+  printf '%s' "${GOOGLE_CLIENT_SECRET:-${LOBBY_GOOGLE_CLIENT_SECRET:-${GOOGLE_OAUTH_CLIENT_SECRET:-}}}"
+}
+
+# Worker [vars] must be set before wrangler deploy; secrets are applied after deploy.
+patch_wrangler_google_oauth_vars() {
+  local id="${1:-}"
+  [[ -n "$id" ]] || return 0
+  local esc="${id//\\/\\\\}"
+  esc="${esc//\"/\\\"}"
+  if grep -q '^GOOGLE_CLIENT_ID = ' "$WRANGLER_TOML" 2>/dev/null; then
+    sed -i "s|^GOOGLE_CLIENT_ID = .*|GOOGLE_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML"
+  fi
+  if grep -q '^LOBBY_GOOGLE_CLIENT_ID = ' "$WRANGLER_TOML" 2>/dev/null; then
+    sed -i "s|^LOBBY_GOOGLE_CLIENT_ID = .*|LOBBY_GOOGLE_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML"
+  fi
+  if grep -q '^GOOGLE_OAUTH_CLIENT_ID = ' "$WRANGLER_TOML" 2>/dev/null; then
+    sed -i "s|^GOOGLE_OAUTH_CLIENT_ID = .*|GOOGLE_OAUTH_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML"
+  fi
+  log "patched wrangler.toml Google OAuth client id var(s)"
+}
+
+put_google_oauth_client_secret() {
+  local secret="${1:-}"
+  [[ -n "$secret" ]] || return 0
+  printf '%s' "$secret" | npx wrangler secret put GOOGLE_CLIENT_SECRET
+}
+
 write_pages_api_proxy_function() {
   local worker_base="$1"
   worker_base="${worker_base%/}"
@@ -372,6 +404,10 @@ ensure_lobby_r2_bucket "$ACCOUNT_ID"
 ensure_workers_dev_subdomain "$ACCOUNT_ID"
 ensure_lobby_r2_bucket "$ACCOUNT_ID"
 
+LOBBY_GOOGLE_ID="$(resolve_google_oauth_client_id)"
+LOBBY_GOOGLE_SECRET="$(resolve_google_oauth_client_secret)"
+patch_wrangler_google_oauth_vars "$LOBBY_GOOGLE_ID"
+
 log "deploying worker (API only) …"
 run_wrangler_deploy
 
@@ -401,16 +437,7 @@ elif [[ -n "${TYPESAFE_API_KEY:-}" ]]; then
   printf '%s' "$TYPESAFE_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
 fi
 
-LOBBY_GOOGLE_ID="${GOOGLE_CLIENT_ID:-${LOBBY_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}}"
-LOBBY_GOOGLE_SECRET="${GOOGLE_CLIENT_SECRET:-${LOBBY_GOOGLE_CLIENT_SECRET:-${GOOGLE_OAUTH_CLIENT_SECRET:-}}}"
-if [[ -n "$LOBBY_GOOGLE_ID" ]]; then
-  esc="${LOBBY_GOOGLE_ID//\\/\\\\}"
-  esc="${esc//\"/\\\"}"
-  sed -i "s|^GOOGLE_CLIENT_ID = .*|GOOGLE_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML" 2>/dev/null || true
-fi
-if [[ -n "$LOBBY_GOOGLE_SECRET" ]]; then
-  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET
-fi
+put_google_oauth_client_secret "$LOBBY_GOOGLE_SECRET"
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
   log "applying D1 migrations (lobby-ops) if database exists …"
