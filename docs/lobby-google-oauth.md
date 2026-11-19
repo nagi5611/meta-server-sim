@@ -14,10 +14,10 @@
 
 | 名前 | 種別 | 用途 |
 |------|------|------|
-| `GOOGLE_CLIENT_ID` | Wrangler **var**（`wrangler.toml`、provision が上書き） | OAuth Client ID（公開値） |
-| `GOOGLE_CLIENT_SECRET` | Wrangler **secret** | Client secret（リポジトリに入れない） |
-| `LOBBY_GOOGLE_CLIENT_ID` / `LOBBY_GOOGLE_CLIENT_SECRET` | 互換（Worker・provision がフォールバック読み取り） | 旧 GHA 名 |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | 互換（旧 Wrangler 名） | さらに古いデプロイ向け |
+| `LOBBY_GOOGLE_CLIENT_ID` | Wrangler **var**（`wrangler.toml`、provision が上書き） | OAuth Client ID（公開値） |
+| `LOBBY_GOOGLE_CLIENT_SECRET` | Wrangler **secret** | Client secret（リポジトリに入れない） |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 互換 | GHA 旧名・provision が secret を二重投入 |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | 互換 | さらに古いデプロイ向け |
 | `LOBBY_JWT_SECRET` | secret | OAuth `state` 署名とロビーセッション JWT |
 | `LOBBY_SIM_SERVICE_TOKEN` | secret | Worker → sim `POST /service/lobby/auth/google` |
 
@@ -32,10 +32,17 @@
 
 ```bash
 cd metaverse-lobby
-npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put LOBBY_GOOGLE_CLIENT_SECRET
 ```
 
-GitHub Actions デプロイ時は Repository secrets **`GOOGLE_CLIENT_ID`** と **`GOOGLE_CLIENT_SECRET`** を設定（`deploy-metaverse-lobby.yml`）。互換として `LOBBY_GOOGLE_*` または variable `GOOGLE_OAUTH_CLIENT_ID` + secret `GOOGLE_OAUTH_CLIENT_SECRET` も provision が読み取れます。
+**GitHub Actions**（Repository secrets、`deploy-metaverse-lobby.yml`）— **必須名（推奨）:**
+
+- `LOBBY_GOOGLE_CLIENT_ID`
+- `LOBBY_GOOGLE_CLIENT_SECRET`
+
+互換: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`GOOGLE_OAUTH_CLIENT_ID`（variable 可）/ `GOOGLE_OAUTH_CLIENT_SECRET`。エージェントは GitHub Secrets を設定できないため、リポジトリ **Settings → Secrets and variables → Actions** で手動追加してください。
+
+**Cursor Environment secrets**（Cloud Agent / ローカル provision）— 上記と**同じ名前・同じ値**を登録。
 
 ## sim 側（ユーザー DB）
 

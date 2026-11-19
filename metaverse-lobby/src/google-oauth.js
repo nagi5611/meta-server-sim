@@ -13,8 +13,8 @@ const OAUTH_SCOPES = 'openid email profile';
  */
 function googleOAuthClientId(env) {
     return String(
-        env.GOOGLE_CLIENT_ID
-            || env.LOBBY_GOOGLE_CLIENT_ID
+        env.LOBBY_GOOGLE_CLIENT_ID
+            || env.GOOGLE_CLIENT_ID
             || env.GOOGLE_OAUTH_CLIENT_ID
             || '',
     ).trim();
@@ -25,8 +25,8 @@ function googleOAuthClientId(env) {
  */
 function googleOAuthClientSecret(env) {
     return String(
-        env.GOOGLE_CLIENT_SECRET
-            || env.LOBBY_GOOGLE_CLIENT_SECRET
+        env.LOBBY_GOOGLE_CLIENT_SECRET
+            || env.GOOGLE_CLIENT_SECRET
             || env.GOOGLE_OAUTH_CLIENT_SECRET
             || '',
     ).trim();

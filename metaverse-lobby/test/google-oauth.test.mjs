@@ -21,10 +21,10 @@ test('isGoogleOAuthConfigured requires client id and secret', () => {
     );
     assert.equal(
         isGoogleOAuthConfigured({
-            GOOGLE_CLIENT_ID: 'primary',
             LOBBY_GOOGLE_CLIENT_ID: 'lobby',
+            GOOGLE_CLIENT_ID: 'primary',
             GOOGLE_OAUTH_CLIENT_ID: 'legacy',
-            GOOGLE_CLIENT_SECRET: 'sec',
+            LOBBY_GOOGLE_CLIENT_SECRET: 'sec',
         }),
         true,
     );
@@ -49,11 +49,24 @@ test('GET /api/auth/google/status returns enabled flag', async () => {
     assert.deepEqual(data.scopes, ['openid', 'email', 'profile']);
 });
 
+test('GET /api/auth/google/start prefers LOBBY_GOOGLE_CLIENT_ID', async () => {
+    const req = new Request('https://lobby.test/api/auth/google/start');
+    const res = await handleGoogleOAuthApi(req, {
+        LOBBY_GOOGLE_CLIENT_ID: 'lobby-id.apps.googleusercontent.com',
+        GOOGLE_CLIENT_ID: 'other.apps.googleusercontent.com',
+        LOBBY_GOOGLE_CLIENT_SECRET: 'csec',
+        LOBBY_JWT_SECRET: SECRET,
+    });
+    assert.equal(res.status, 302);
+    const loc = res.headers.get('Location') || '';
+    assert.ok(loc.includes('client_id=lobby-id.apps.googleusercontent.com'));
+});
+
 test('GET /api/auth/google/start redirects to Google when configured', async () => {
     const req = new Request('https://lobby.test/api/auth/google/start');
     const res = await handleGoogleOAuthApi(req, {
-        GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com',
-        GOOGLE_CLIENT_SECRET: 'csec',
+        LOBBY_GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com',
+        LOBBY_GOOGLE_CLIENT_SECRET: 'csec',
         LOBBY_JWT_SECRET: SECRET,
     });
     assert.equal(res.status, 302);
