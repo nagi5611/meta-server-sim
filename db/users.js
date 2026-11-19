@@ -17,12 +17,16 @@ import {
     updateStudentSqlite,
     updateTeacherSqlite,
     patchLobbyUserFlagsSqlite,
+    getLobbyUserByIdSqlite,
     consumePasswordResetTokenSqlite,
     createPasswordResetTokenSqlite,
     getUserForPasswordResetSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
     closeSqliteUsersDb,
+    listLobbyWorldFavoritesSqlite,
+    setLobbyWorldFavoriteSqlite,
+    toggleLobbyWorldFavoriteSqlite,
 } from './users-sqlite.js';
 import { getPlatformUsersDbPath } from './users-path.js';
 
@@ -385,6 +389,31 @@ export async function listTeachers() {
  * @param {number} id
  * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
  */
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ */
+export async function getLobbyUserByKindId(kind, id) {
+    return withUsersBackend(
+        async () => {
+            const table = kind === 'teacher' ? 'teachers' : 'students';
+            const row = await d1First(
+                `SELECT id, username, display_name, banned, lobby_role, email, avatar_url
+                 FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!row) return null;
+            return kind === 'teacher'
+                ? { ...mapTeacherRow({ ...row, created_at: null }), avatarUrl: String(row.avatar_url || '') }
+                : {
+                      ...mapStudentRow({ ...row, created_at: null }),
+                      avatarUrl: String(row.avatar_url || ''),
+                  };
+        },
+        () => getLobbyUserByIdSqlite(kind, id),
+    );
+}
+
 export async function patchLobbyUserFlags(kind, id, patch) {
     return withUsersBackend(
         async () => {
@@ -566,6 +595,79 @@ export async function consumePasswordResetToken(token, newPassword) {
     return withUsersBackend(
         () => consumePasswordResetTokenD1(token, newPassword),
         () => consumePasswordResetTokenSqlite(token, newPassword),
+    );
+}
+
+/**
+ * @param {string} userRef
+ */
+export async function listLobbyWorldFavorites(userRef) {
+    const key = String(userRef || '').trim();
+    if (!key) return [];
+    return withUsersBackend(
+        async () => {
+            const rows = await d1All(
+                `SELECT world_slug FROM lobby_world_favorites WHERE user_ref = ?
+                 ORDER BY datetime(created_at) DESC`,
+                [key],
+            );
+            return (rows || []).map((r) => String(r.world_slug));
+        },
+        () => listLobbyWorldFavoritesSqlite(key),
+    );
+}
+
+/**
+ * @param {string} userRef
+ * @param {string} worldSlug
+ * @param {boolean} favorite
+ */
+export async function setLobbyWorldFavorite(userRef, worldSlug, favorite) {
+    const key = String(userRef || '').trim();
+    const slug = String(worldSlug || '').trim();
+    if (!key || !slug) return false;
+    return withUsersBackend(
+        async () => {
+            if (favorite) {
+                await d1Run(
+                    `INSERT INTO lobby_world_favorites (user_ref, world_slug) VALUES (?, ?)
+                     ON CONFLICT(user_ref, world_slug) DO UPDATE SET created_at = datetime('now')`,
+                    [key, slug],
+                );
+                return true;
+            }
+            const result = await d1Run(
+                'DELETE FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?',
+                [key, slug],
+            );
+            return (result?.changes ?? 0) > 0;
+        },
+        () => setLobbyWorldFavoriteSqlite(key, slug, favorite),
+    );
+}
+
+/**
+ * @param {string} userRef
+ * @param {string} worldSlug
+ */
+export async function toggleLobbyWorldFavorite(userRef, worldSlug) {
+    const key = String(userRef || '').trim();
+    const slug = String(worldSlug || '').trim();
+    if (!key || !slug) return { favorite: false, toggled: false };
+    return withUsersBackend(
+        async () => {
+            const existing = await d1First(
+                'SELECT 1 AS ok FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?',
+                [key, slug],
+            );
+            if (existing) {
+                await d1Run('DELETE FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?', [key, slug]);
+                return { favorite: false, toggled: true };
+            }
+            await d1Run('INSERT INTO lobby_world_favorites (user_ref, world_slug) VALUES (?, ?)', [key, slug]);
+            return { favorite: true, toggled: true };
+        },
+        () => toggleLobbyWorldFavoriteSqlite(key, slug),
     );
 }
 
