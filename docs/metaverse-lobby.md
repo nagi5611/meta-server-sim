@@ -66,6 +66,8 @@ Worker 静的アカウント `LOBBY_ADMIN_USER` / `LOBBY_ADMIN_PASSWORD` は JWT
 
 `ADMIN_PHONE` も `ADMIN_EMAIL` も未設定のときは OTP をスキップし、従来どおり即セッションです。
 
+管理 UI は `POST /admin/api/login`（Cloudflare Pages → Worker `POST /api/admin/login`）を使います。パスワード誤りは **401** `invalid_credentials`。スーパー管理者で OTP 送信に失敗すると **503**（例: `admin_phone_invalid`, `otp_sms_not_configured`）または **502** `otp_sms_send_failed`。
+
 試行は D1 `super_admin_login_events` に **クライアント IP + JST 時刻** を記録します。管理 UI のゲート（OTP 手順）と設定画面の監査表、サイドバーの「前回ログイン」に表示します。OTP は KV（TTL 10 分）にハッシュ保存します。
 
 有効化確認: `GET /api/auth/google/status` → `{ "enabled": true }`。`/api/auth/google/start` は 302 で `accounts.google.com` へリダイレクト（未設定時 503 `google_oauth_not_configured`）。
