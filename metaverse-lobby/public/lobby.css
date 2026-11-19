@@ -83,23 +83,52 @@
 
   .account{display:none;align-items:center;gap:10px}
   .account.on{display:flex}
+  .profile-menu{position:relative;z-index:35}
   .account .acct-profile{
     display:flex;align-items:center;gap:10px;padding:0;margin:0;border:0;background:transparent;
     cursor:pointer;border-radius:var(--radius-sm);font:inherit;color:inherit;text-align:left;
   }
-  .account .acct-profile:hover .av{filter:brightness(.96)}
+  .account .acct-profile:hover .av:not(.av-img){filter:brightness(.96)}
   .account .acct-profile:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
   .account .av{
     width:30px;height:30px;border-radius:50%;background:var(--color-primary-soft);
     color:var(--color-primary-dark);display:grid;place-items:center;font-size:13px;font-weight:700;
     flex-shrink:0;
   }
+  .account .av.av-img,.profile-photo__preview .av-img{
+    display:block;object-fit:cover;background:var(--color-surface-muted);
+  }
+  .account .av.av-img[hidden],.profile-photo__preview .av-img[hidden]{display:none!important}
+  .profile-drop{
+    position:absolute;right:0;top:calc(100% + 6px);width:min(300px,calc(100vw - 32px));
+    padding:14px 14px 12px;background:var(--color-surface);
+    border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  }
+  .profile-drop__title{margin:0 0 12px;font-size:14px;font-weight:700;color:var(--color-heading)}
+  .profile-menu.is-open .acct-profile{color:var(--color-primary-dark)}
+  .profile-photo{margin-bottom:12px}
+  .profile-photo__label{display:block;font-size:12px;font-weight:600;color:var(--color-text-muted);margin-bottom:8px}
+  .profile-photo__row{display:flex;align-items:flex-start;gap:12px}
+  .profile-photo__preview .av{width:56px;height:56px;font-size:20px}
+  .profile-photo__actions{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+  .profile-photo__pick{font-size:12.5px;padding:2px 0}
+  .profile-photo__actions .hint{margin:0;font-size:11px;line-height:1.35}
+  .profile-drop .fld{margin-bottom:10px}
+  .profile-drop .fld label{font-size:12px}
+  .profile-drop .msg{margin:0 0 8px}
   .account .who{display:flex;flex-direction:column;line-height:1.3}
   .account .who b{font-size:13px}
   .account .who span{font-size:10.5px;color:var(--color-text-faint)}
   .account .locale-select__trigger{
     background:transparent;border:none;border-radius:0;box-shadow:none;padding:0;
   }
+  .account .hdr-admin{
+    font-size:12.5px;font-weight:600;color:var(--color-primary);padding:4px 6px;border-radius:var(--radius-sm);
+    text-decoration:none;white-space:nowrap;
+  }
+  .account .hdr-admin:hover{color:var(--color-primary-dark);text-decoration:underline}
+  .account .hdr-admin:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
+  .account .hdr-admin[hidden]{display:none!important}
   .account #logoutBtn{
     background:transparent;border:none;border-radius:0;box-shadow:none;
     font-size:12.5px;font-weight:600;color:var(--color-text-muted);padding:4px 2px;cursor:pointer;

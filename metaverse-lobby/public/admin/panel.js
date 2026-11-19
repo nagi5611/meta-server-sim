@@ -51,15 +51,24 @@
     $("#gPass").value = ""; $("#gUser").focus();
   });
   (async function trySession() {
-    try {
-      await store.refresh();
+    async function openApp() {
       gate.hidden = true;
       app.hidden = false;
       render();
+    }
+    try {
+      await store.refresh();
+      await openApp();
     } catch {
-      gate.hidden = false;
-      app.hidden = true;
-      setTimeout(() => $("#gUser").focus(), 50);
+      try {
+        await window.LobbyAdminApi.bootstrapFromLobby();
+        await store.refresh();
+        await openApp();
+      } catch {
+        gate.hidden = false;
+        app.hidden = true;
+        setTimeout(() => $("#gUser").focus(), 50);
+      }
     }
   })();
 

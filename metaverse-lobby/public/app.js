@@ -794,6 +794,16 @@ $('#authForm')?.addEventListener('submit', async (e) => {
 });
 
 $('#logoutBtn')?.addEventListener('click', signOut);
+$('#hdrAdminLink')?.addEventListener('click', async (ev) => {
+    if (!isLobbyAdminUser()) return;
+    ev.preventDefault();
+    try {
+        await fetch('/api/admin/bootstrap-from-lobby', { method: 'POST', credentials: 'include' });
+    } catch {
+        /* admin login gate still available */
+    }
+    window.location.assign('/admin/');
+});
 
 $('#openProfile')?.addEventListener('click', (ev) => {
     ev.stopPropagation();

@@ -1,4 +1,5 @@
 import { fetchSim } from './sim-client.js';
+import { getPublicSession } from './auth-api.js';
 import { entryToWorld, worldToEntry } from './catalog-map.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
 import { normalizeAnnouncementLocale } from './announcement-i18n.js';
@@ -109,6 +110,19 @@ export async function handleAdminApi(request, env, kv) {
         return json({ ok: true }, 200, {
             'set-cookie': setCookieHeader(ADMIN_COOKIE, '', 0, '/'),
         });
+    }
+
+    if (url.pathname === '/api/admin/bootstrap-from-lobby' && request.method === 'POST') {
+        const publicSession = await getPublicSession(request, env);
+        if (!publicSession || String(publicSession.role || '') !== 'admin') {
+            return json({ error: 'forbidden' }, 403);
+        }
+        const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ error: 'session_not_configured' }, 503);
+        const sessionUser = String(publicSession.username || publicSession.sub || 'admin');
+        const token = await signJwt({ sub: sessionUser, role: 'admin', admin: true }, secret, 60 * 60 * 12);
+        const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
+        return json({ ok: true, user: { username: sessionUser, role: 'admin' } }, 200, { 'set-cookie': cookie });
     }
 
     const session = await verifyAdmin(request, env);
