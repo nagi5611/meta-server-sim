@@ -2,6 +2,7 @@ import { fetchSim } from './sim-client.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
 import { insertJoinEvent } from './db-ops.js';
 import { handleProfileAvatarUpload } from './lobby-profile-assets.js';
+import { resolveLobbySessionBan } from './lobby-ban-guard.js';
 
 const PUBLIC_COOKIE = 'lobby_session';
 
@@ -233,11 +234,58 @@ export async function handlePublicAuth(request, env) {
         return json(sim.data || { error: 'reset_failed' }, sim.status || (sim.ok ? 200 : 400));
     }
 
+    if (url.pathname === '/api/favorites' && request.method === 'GET') {
+        const session = await getPublicSession(request, env);
+        if (!session?.sub) return json({ error: 'unauthorized' }, 401);
+        const sim = await fetchSim(env, `/service/lobby/favorites?userRef=${encodeURIComponent(session.sub)}`);
+        if (!sim.ok) return json(sim.data || { error: 'favorites_list_failed' }, sim.status || 502);
+        return json({
+            ok: true,
+            worldIds: Array.isArray(sim.data?.worldIds) ? sim.data.worldIds : [],
+        });
+    }
+
+    if (url.pathname === '/api/favorites' && request.method === 'PATCH') {
+        const session = await getPublicSession(request, env);
+        if (!session?.sub) return json({ error: 'unauthorized' }, 401);
+        const body = await request.json();
+        const sim = await fetchSim(env, '/service/lobby/favorites', {
+            method: 'PATCH',
+            body: { ...body, userRef: session.sub },
+        });
+        if (!sim.ok) return json(sim.data || { error: 'favorites_update_failed' }, sim.status || 502);
+        return json({
+            ok: true,
+            worldId: sim.data?.worldId,
+            favorite: sim.data?.favorite,
+            worldIds: Array.isArray(sim.data?.worldIds) ? sim.data.worldIds : [],
+        });
+    }
+
+    if (url.pathname === '/api/favorites/toggle' && request.method === 'POST') {
+        const session = await getPublicSession(request, env);
+        if (!session?.sub) return json({ error: 'unauthorized' }, 401);
+        const body = await request.json();
+        const sim = await fetchSim(env, '/service/lobby/favorites/toggle', {
+            method: 'POST',
+            body: { ...body, userRef: session.sub },
+        });
+        if (!sim.ok) return json(sim.data || { error: 'favorites_toggle_failed' }, sim.status || 502);
+        return json({
+            ok: true,
+            worldId: sim.data?.worldId,
+            favorite: sim.data?.favorite,
+            toggled: sim.data?.toggled,
+            worldIds: Array.isArray(sim.data?.worldIds) ? sim.data.worldIds : [],
+        });
+    }
+
     if (url.pathname === '/api/join-events' && request.method === 'POST') {
         const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
         const body = await request.json();
         const session = await getPublicSession(request, env);
-        if (isLobbySessionBanned(session)) {
+        const ban = await resolveLobbySessionBan(session, env);
+        if (ban.banned) {
             return json({ error: 'banned' }, 403);
         }
         const id = `je-${crypto.randomUUID()}`;

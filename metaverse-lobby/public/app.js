@@ -43,6 +43,11 @@ const codeCount = $('#codeCount');
 
 /** @type {Array<Record<string, unknown>>} */
 let worlds = [];
+/** @type {Set<string>} */
+let favoriteWorldIds = new Set();
+/** @type {string | null} */
+let openCardMenuId = null;
+const FAVORITES_LS_KEY = 'mnm.favorites';
 let catalogBanned = false;
 /** @type {Record<string, unknown> | null} */
 let selected = null;
@@ -219,24 +224,156 @@ function guardBannedJoin() {
     return true;
 }
 
+function favoritesMirrorKey() {
+    return authState.user?.handle ? String(authState.user.handle) : '';
+}
+
+function mirrorFavoritesToLocalStorage(worldIds) {
+    const handle = favoritesMirrorKey();
+    if (!handle) return;
+    try {
+        localStorage.setItem(
+            FAVORITES_LS_KEY,
+            JSON.stringify({ handle, worldIds: [...worldIds], updatedAt: Date.now() }),
+        );
+    } catch {
+        /* ignore */
+    }
+}
+
+function loadFavoritesFromLocalStorageMirror() {
+    const handle = favoritesMirrorKey();
+    if (!handle) return;
+    try {
+        const raw = JSON.parse(localStorage.getItem(FAVORITES_LS_KEY) || 'null');
+        if (!raw || raw.handle !== handle || !Array.isArray(raw.worldIds)) return;
+        favoriteWorldIds = new Set(raw.worldIds.map((id) => String(id)));
+    } catch {
+        /* ignore */
+    }
+}
+
+function applyFavoriteWorldIds(worldIds) {
+    favoriteWorldIds = new Set((worldIds || []).map((id) => String(id)));
+    mirrorFavoritesToLocalStorage(favoriteWorldIds);
+}
+
+function sortWorldsForGrid(list) {
+    return list
+        .map((w, index) => ({ w, index }))
+        .sort((a, b) => {
+            const af = favoriteWorldIds.has(String(a.w.id));
+            const bf = favoriteWorldIds.has(String(b.w.id));
+            if (af !== bf) return af ? -1 : 1;
+            return a.index - b.index;
+        })
+        .map((row) => row.w);
+}
+
+function closeCardMenu() {
+    openCardMenuId = null;
+    grid?.querySelectorAll('.card-menu-wrap.is-open').forEach((el) => {
+        el.classList.remove('is-open');
+        const btn = el.querySelector('.card-menu-btn');
+        const menu = el.querySelector('.card-menu');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        if (menu) menu.hidden = true;
+    });
+}
+
+function toggleCardMenu(worldId, wrap) {
+    const id = String(worldId);
+    if (openCardMenuId === id) {
+        closeCardMenu();
+        return;
+    }
+    closeCardMenu();
+    openCardMenuId = id;
+    wrap.classList.add('is-open');
+    const btn = wrap.querySelector('.card-menu-btn');
+    const menu = wrap.querySelector('.card-menu');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    if (menu) menu.hidden = false;
+}
+
+function isWorldFavorited(worldId) {
+    return favoriteWorldIds.has(String(worldId));
+}
+
+async function syncFavoritesFromServer() {
+    if (!authState.user?.name) {
+        favoriteWorldIds = new Set();
+        return;
+    }
+    loadFavoritesFromLocalStorageMirror();
+    try {
+        const res = await fetch('/api/favorites', { credentials: 'include', cache: 'no-store' });
+        if (res.status === 401) {
+            favoriteWorldIds = new Set();
+            return;
+        }
+        if (!res.ok) return;
+        const data = await res.json();
+        applyFavoriteWorldIds(Array.isArray(data.worldIds) ? data.worldIds : []);
+    } catch {
+        /* keep mirror */
+    }
+}
+
+async function toggleWorldFavorite(worldId) {
+    if (!authState.user?.name) {
+        closeCardMenu();
+        openAuthModal();
+        showToast(t('toast.favoriteLogin'));
+        return false;
+    }
+    const id = String(worldId);
+    try {
+        const res = await fetch('/api/favorites/toggle', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ worldId: id }),
+        });
+        const data = await res.json();
+        if (res.status === 401) {
+            openAuthModal();
+            showToast(t('toast.favoriteLogin'));
+            return false;
+        }
+        if (!res.ok) {
+            showToast(t('toast.favoriteFail'));
+            return false;
+        }
+        applyFavoriteWorldIds(Array.isArray(data.worldIds) ? data.worldIds : []);
+        showToast(data.favorite ? t('toast.favoriteAdded') : t('toast.favoriteRemoved'));
+        return true;
+    } catch {
+        showToast(t('toast.favoriteFail'));
+        return false;
+    }
+}
+
 function render() {
     if (!grid) return;
     grid.replaceChildren();
     if (catalogBanned) return;
-    for (const w of worlds) {
+    closeCardMenu();
+    for (const w of sortWorldsForGrid(worlds)) {
         const status = String(w.status || 'online');
         const off = status === 'maint';
         const st = statusInfo(status);
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `card${off ? ' off' : ''}`;
-        btn.setAttribute('role', 'listitem');
-        btn.setAttribute('aria-haspopup', 'dialog');
-        btn.dataset.id = String(w.id);
+        const card = document.createElement('div');
+        card.className = `card${off ? ' off' : ''}`;
+        card.setAttribute('role', 'listitem');
+        card.tabIndex = off ? -1 : 0;
+        card.setAttribute('aria-haspopup', 'dialog');
+        card.dataset.id = String(w.id);
         const thumb = w.thumbnailUrl
             ? `<img src="${escapeHtml(String(w.thumbnailUrl))}" alt="">`
             : `<span>${t('lobby.thumbPlaceholder')}</span>`;
-        btn.innerHTML = `
+        const fav = isWorldFavorited(w.id);
+        card.innerHTML = `
         <div class="ph">
           <span class="badge ${st.cls}"><i></i>${st.txt}</span>
           ${thumb}
@@ -246,19 +383,50 @@ function render() {
             <div class="nm">${mqHTML(String(w.name || ''))}</div>
             <div class="meta">${off ? t('lobby.offlineMaint') : `<b class="num">${fmtNum(w.players)}</b>${t('admin.onlineSuffix')}`}</div>
           </div>
-          <div class="cb-spark">
-            ${sparkSVG(w, 56, 24, false, off)}
-            <span class="lbl">24h</span>
+          <div class="card-body-trail">
+            <div class="cb-spark">
+              ${sparkSVG(w, 56, 24, false, off)}
+              <span class="lbl">24h</span>
+            </div>
+            <div class="card-menu-wrap">
+              <button type="button" class="card-menu-btn" aria-label="${escapeHtml(t('favorites.menu'))}" aria-haspopup="menu" aria-expanded="false">⋯</button>
+              <div class="card-menu" role="menu" hidden>
+                <button type="button" role="menuitem" class="card-menu-item" data-favorite-action="toggle">${escapeHtml(fav ? t('favorites.remove') : t('favorites.add'))}</button>
+              </div>
+            </div>
           </div>
         </div>`;
-        btn.addEventListener('click', () => {
+        const openFromCard = () => {
             if (off) {
                 showToast(t('toast.maintServer'));
                 return;
             }
             openJoin(w);
+        };
+        card.addEventListener('click', (ev) => {
+            if (ev.target.closest('.card-menu-wrap')) return;
+            openFromCard();
         });
-        grid.appendChild(btn);
+        card.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter' || ev.key === ' ') {
+                if (ev.target.closest('.card-menu-wrap')) return;
+                ev.preventDefault();
+                openFromCard();
+            }
+        });
+        const menuWrap = card.querySelector('.card-menu-wrap');
+        const menuItem = card.querySelector('[data-favorite-action="toggle"]');
+        card.querySelector('.card-menu-btn')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            toggleCardMenu(w.id, menuWrap);
+        });
+        menuItem?.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            const changed = await toggleWorldFavorite(w.id);
+            closeCardMenu();
+            if (changed) render();
+        });
+        grid.appendChild(card);
     }
     initMarquees(grid);
 }
@@ -331,18 +499,39 @@ function validateName(name) {
     return { ok: true, value: n };
 }
 
-function navigateToWorld(world, displayName) {
-    const base = String(world.entryUrl || '/');
+async function navigateToWorld(world, displayName) {
+    let data;
+    try {
+        const res = await fetch('/api/join-world', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ worldId: world.id, displayName }),
+        });
+        data = await res.json().catch(() => ({}));
+        if (res.status === 403 && data.error === 'banned') {
+            applyBannedCatalogState(true);
+            return;
+        }
+        if (!res.ok) {
+            if (data.error === 'maintenance') {
+                showToast(t('toast.maintServer'));
+            } else {
+                showToast(t('toast.listRefreshFail'));
+            }
+            return;
+        }
+    } catch {
+        showToast(t('toast.listRefreshFail'));
+        return;
+    }
+
+    const target = data?.entryUrl || world.entryUrl;
+    const base = String(target || '/');
     const url = new URL(base, window.location.href);
     url.searchParams.set('displayName', displayName);
     localStorage.setItem('mnm.name', displayName);
     localStorage.setItem('lobbyDisplayName', displayName);
-    void fetch('/api/join-events', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ worldId: world.id, displayName, ok: true }),
-    }).catch(() => {});
     window.location.href = url.toString();
 }
 
@@ -751,8 +940,9 @@ async function signOut() {
     }
     authState.user = null;
     saveAuthState();
+    favoriteWorldIds = new Set();
     renderAuthHeader();
-    refresh();
+    await refresh();
     showToast(t('toast.logoutOk'));
 }
 
@@ -767,7 +957,7 @@ bannedScrim?.addEventListener('click', (ev) => {
     if (ev.target === bannedScrim) closeBannedModal();
 });
 
-$('#join-go')?.addEventListener('click', () => {
+$('#join-go')?.addEventListener('click', async () => {
     if (guardBannedJoin()) return;
     if (!selected) return;
     const v = validateName(displayInput.value);
@@ -782,11 +972,12 @@ $('#join-go')?.addEventListener('click', () => {
     const btn = $('#join-go');
     btn.disabled = true;
     btn.textContent = t('join.connecting');
-    setTimeout(() => {
+    try {
+        await navigateToWorld(selected, v.value);
+    } finally {
         btn.disabled = false;
         btn.textContent = t('common.join');
-        navigateToWorld(selected, v.value);
-    }, 600);
+    }
 });
 
 displayInput?.addEventListener('input', () => {
@@ -934,6 +1125,7 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         signIn(data.user);
         clearDraft();
         hideAuthModal();
+        await syncFavoritesFromServer();
         refresh();
     } catch {
         showErr(t('auth.errFailed'));
@@ -961,10 +1153,11 @@ $('#openProfile')?.addEventListener('click', (ev) => {
 });
 
 document.addEventListener('click', (ev) => {
-    if (!profileDrop || profileDrop.hidden) return;
-  const t = /** @type {HTMLElement} */ (ev.target);
-  if (t.closest?.('#profileMenu')) return;
-  closeProfileDrop();
+    const target = /** @type {HTMLElement} */ (ev.target);
+    if (profileDrop && !profileDrop.hidden) {
+        if (!target.closest?.('#profileMenu')) closeProfileDrop();
+    }
+    if (openCardMenuId && !target.closest?.('.card-menu-wrap')) closeCardMenu();
 });
 
 profileAvatarPick?.addEventListener('click', () => profileAvatarFile?.click());
@@ -1071,6 +1264,7 @@ document.addEventListener('keydown', (e) => {
     if (joinScrim?.classList.contains('on')) closeJoin();
     if (authScrim?.classList.contains('on')) hideAuthModal();
     if (profileDrop && !profileDrop.hidden) closeProfileDrop();
+    if (openCardMenuId) closeCardMenu();
 });
 
 let mqTimer;
@@ -1094,7 +1288,10 @@ async function bootstrapAuth() {
             return;
         }
         catalogBanned = false;
-        if (data.user) signIn(data.user);
+        if (data.user) {
+            signIn(data.user, { quiet: true });
+            await syncFavoritesFromServer();
+        }
     } catch {
         /* guest */
     }
@@ -1108,7 +1305,6 @@ window.addEventListener('lobby:locale-change', () => {
     if (profileDrop && !profileDrop.hidden) populateProfileForm();
 });
 
-bootstrapAuth();
-refresh();
+bootstrapAuth().then(() => refresh());
 setInterval(refresh, POLL_MS);
 if (document.fonts) document.fonts.ready.then(() => initMarquees(document));

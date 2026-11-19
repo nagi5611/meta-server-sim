@@ -59,6 +59,14 @@ export function initSqliteUsersDb(dbPath = getPlatformUsersDbPath()) {
             used_at TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_password_reset_user ON password_reset_tokens (user_kind, user_id);
+        CREATE TABLE IF NOT EXISTS lobby_world_favorites (
+            user_ref TEXT NOT NULL,
+            world_slug TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (user_ref, world_slug)
+        );
+        CREATE INDEX IF NOT EXISTS idx_lobby_world_favorites_user
+            ON lobby_world_favorites (user_ref, created_at DESC);
     `);
     return db;
 }
@@ -311,6 +319,21 @@ export function patchLobbyUserFlagsSqlite(kind, id, patch) {
     return rowToLobbyUser(out, kind);
 }
 
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ */
+export function getLobbyUserByIdSqlite(kind, id) {
+    const table = kind === 'teacher' ? 'teachers' : 'students';
+    const row = requireDb()
+        .prepare(
+            `SELECT id, username, display_name, banned, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
+        )
+        .get(id);
+    if (!row) return null;
+    return rowToLobbyUser(row, kind);
+}
+
 export function updateStudentSqlite(id, { username, displayName, avatarUrl, password } = {}) {
     const row = requireDb()
         .prepare('SELECT id, username, display_name, avatar_url FROM students WHERE id = ?')
@@ -453,4 +476,67 @@ export function consumePasswordResetTokenSqlite(token, newPassword) {
         .prepare('UPDATE password_reset_tokens SET used_at = datetime(\'now\') WHERE token_hash = ?')
         .run(hash);
     return { ok: true, kind, userId: row.user_id };
+}
+
+/**
+ * @param {string} userRef
+ */
+export function listLobbyWorldFavoritesSqlite(userRef) {
+    const key = String(userRef || '').trim();
+    if (!key) return [];
+    const rows = requireDb()
+        .prepare(
+            'SELECT world_slug FROM lobby_world_favorites WHERE user_ref = ? ORDER BY datetime(created_at) DESC',
+        )
+        .all(key);
+    return rows.map((r) => String(r.world_slug));
+}
+
+/**
+ * @param {string} userRef
+ * @param {string} worldSlug
+ * @param {boolean} favorite
+ */
+export function setLobbyWorldFavoriteSqlite(userRef, worldSlug, favorite) {
+    const key = String(userRef || '').trim();
+    const slug = String(worldSlug || '').trim();
+    if (!key || !slug) return false;
+    const database = requireDb();
+    if (favorite) {
+        database
+            .prepare(
+                `INSERT INTO lobby_world_favorites (user_ref, world_slug) VALUES (?, ?)
+                 ON CONFLICT(user_ref, world_slug) DO UPDATE SET created_at = datetime('now')`,
+            )
+            .run(key, slug);
+        return true;
+    }
+    const result = database
+        .prepare('DELETE FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?')
+        .run(key, slug);
+    return result.changes > 0;
+}
+
+/**
+ * @param {string} userRef
+ * @param {string} worldSlug
+ */
+export function toggleLobbyWorldFavoriteSqlite(userRef, worldSlug) {
+    const key = String(userRef || '').trim();
+    const slug = String(worldSlug || '').trim();
+    if (!key || !slug) return { favorite: false, toggled: false };
+    const database = requireDb();
+    const existing = database
+        .prepare('SELECT 1 FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?')
+        .get(key, slug);
+    if (existing) {
+        database
+            .prepare('DELETE FROM lobby_world_favorites WHERE user_ref = ? AND world_slug = ?')
+            .run(key, slug);
+        return { favorite: false, toggled: true };
+    }
+    database
+        .prepare('INSERT INTO lobby_world_favorites (user_ref, world_slug) VALUES (?, ?)')
+        .run(key, slug);
+    return { favorite: true, toggled: true };
 }
