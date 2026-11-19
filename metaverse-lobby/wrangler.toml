@@ -33,3 +33,5 @@ crons = ["* * * * *"]
 [vars]
 LOBBY_PUBLIC_POLL_MS = "10000"
 LOBBY_SIM_ORIGIN = "https://sim.mmh-virtual.jp"
+# Optional Gemini announcement translation model (empty = gemini-3.1-flash-lite in Worker)
+GEMINI_TRANSLATION_MODEL = ""

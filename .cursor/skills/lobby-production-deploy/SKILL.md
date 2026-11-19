@@ -50,6 +50,7 @@ sim 反映: `scripts/lobby-production-apply.sh`、`scripts/metasim-production-gi
 | Secret | いつ要るか |
 |--------|------------|
 | `LOBBY_WORKERS_DEV_SUBDOMAIN` | workers.dev サブドメインが **未登録**の初回のみ（workflow は `env` に渡す。登録済みなら省略可） |
+| `GEMINI_TRANSLATION_API_KEY` | 管理画面お知らせの Gemini 自動翻訳（未設定時は原文のみ保存） |
 
 ### Repository variables（Secret ではない）
 
@@ -58,13 +59,15 @@ sim 反映: `scripts/lobby-production-apply.sh`、`scripts/metasim-production-gi
 | `LOBBY_KV_NAMESPACE_ID` | 未設定時は `metaverse-lobby/wrangler.toml` の KV id |
 | `LOBBY_CUSTOM_HOSTNAME` | 未設定時 `m.mmh-virtual.jp` |
 
+Worker **[vars]**（`metaverse-lobby/wrangler.toml`、Secret ではない）: `GEMINI_TRANSLATION_MODEL` は空プレースホルダ（省略時 Worker コードの `gemini-3.1-flash-lite`）。
+
 ---
 
 ## 3. ⚠️ `LOBBY_ADMIN_PASSWORD` / `LOBBY_SIM_SERVICE_TOKEN` のギャップ
 
 `scripts/lobby-provision-cloudflare.sh` は両方を **環境変数が設定されていれば** `wrangler secret put` するが、**現行** `.github/workflows/deploy-metaverse-lobby.yml` の **Deploy lobby Worker** ステップは次しか `env` に渡していない:
 
-- `CLOUDFLARE_*`, `LOBBY_PRESENCE_SECRET`, `LOBBY_WORKER_SYNC_SECRET`,（任意）`LOBBY_WORKERS_DEV_SUBDOMAIN`,（var）`LOBBY_KV_NAMESPACE_ID`, `LOBBY_CUSTOM_HOSTNAME`
+- `CLOUDFLARE_*`, `LOBBY_PRESENCE_SECRET`, `LOBBY_WORKER_SYNC_SECRET`,（任意）`LOBBY_WORKERS_DEV_SUBDOMAIN`,（任意 secret）`GEMINI_TRANSLATION_API_KEY`,（var）`LOBBY_KV_NAMESPACE_ID`, `LOBBY_CUSTOM_HOSTNAME`
 
 そのため GitHub に 6 件すべて登録していても、**GHA だけでは** `LOBBY_ADMIN_PASSWORD` と `LOBBY_SIM_SERVICE_TOKEN` は **Worker に載らない**。
 

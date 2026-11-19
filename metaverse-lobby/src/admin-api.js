@@ -23,8 +23,8 @@ const LIVE_KEY = 'live';
  * @param {{ sourceLocale: string, title: string, body: string }} input
  */
 async function buildAnnouncementI18n(env, input) {
-    const apiKey = String(env.GEMINI_API_KEY || '').trim();
-    const model = String(env.GEMINI_MODEL || DEFAULT_ANNOUNCEMENT_GEMINI_MODEL).trim();
+    const apiKey = String(env.GEMINI_TRANSLATION_API_KEY || '').trim();
+    const model = String(env.GEMINI_TRANSLATION_MODEL || DEFAULT_ANNOUNCEMENT_GEMINI_MODEL).trim();
     return translateAnnouncementFields({
         apiKey,
         model,

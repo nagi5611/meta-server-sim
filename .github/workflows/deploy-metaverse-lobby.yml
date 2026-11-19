@@ -62,7 +62,7 @@ jobs:
           LOBBY_JWT_SECRET: ${{ secrets.LOBBY_JWT_SECRET }}
           LOBBY_ADMIN_SESSION_SECRET: ${{ secrets.LOBBY_ADMIN_SESSION_SECRET }}
           LOBBY_SIM_SERVICE_TOKEN: ${{ secrets.LOBBY_SIM_SERVICE_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_TRANSLATION_API_KEY: ${{ secrets.GEMINI_TRANSLATION_API_KEY }}
           LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME || 'm.mmh-virtual.jp' }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then

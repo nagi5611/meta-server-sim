@@ -106,14 +106,14 @@ metaverse-lobby/public/admin/
 
 ## お知らせの自動翻訳（Gemini）
 
-管理画面でお知らせを作成・更新すると、Cloudflare Worker が **Gemini 3.1 Flash Lite**（API モデル ID: `gemini-3.1-flash-lite`、任意で Worker シークレット `GEMINI_MODEL`）を呼び出し、管理者が選んだ原文ロケールから **ja / zh-CN / zh-TW / en** へ翻訳して D1 の `i18n_json` に保存します。公開 `GET /api/announcements` はクライアントの UI ロケール（`?locale=` または `Accept-Language`）に合わせた `title` / `body` を返します。
+管理画面でお知らせを作成・更新すると、Cloudflare Worker が **Gemini 3.1 Flash Lite**（API モデル ID: `gemini-3.1-flash-lite`、任意で Worker **var** `GEMINI_TRANSLATION_MODEL`）を呼び出し、管理者が選んだ原文ロケールから **ja / zh-CN / zh-TW / en** へ翻訳して D1 の `i18n_json` に保存します。公開 `GET /api/announcements` はクライアントの UI ロケール（`?locale=` または `Accept-Language`）に合わせた `title` / `body` を返します。
 
 | 変数 | 用途 |
 |------|------|
-| `GEMINI_API_KEY` | Wrangler シークレット（未設定時は翻訳をスキップし、原文のみ保存・後方互換） |
-| `GEMINI_MODEL` | 省略時 `gemini-3.1-flash-lite` |
+| `GEMINI_TRANSLATION_API_KEY` | Wrangler シークレット（未設定時は翻訳をスキップし、原文のみ保存・後方互換） |
+| `GEMINI_TRANSLATION_MODEL` | `wrangler.toml` [vars]（空のときコード既定 `gemini-3.1-flash-lite`） |
 
-本番デプロイ: GitHub Actions **Deploy metaverse-lobby** のリポジトリシークレット `GEMINI_API_KEY`、または `scripts/lobby-provision-cloudflare.sh` 実行時に同変数を渡すと `wrangler secret put GEMINI_API_KEY` されます。API キーはログに出力しません。
+本番デプロイ: GitHub Actions **Deploy metaverse-lobby** のリポジトリシークレット `GEMINI_TRANSLATION_API_KEY`、または `scripts/lobby-provision-cloudflare.sh` 実行時に同変数を渡すと `wrangler secret put GEMINI_TRANSLATION_API_KEY` されます。API キーはログに出力しません。sim 本番のチャット検閲用 `GEMINI_API_KEY` とは別名です。
 
 ---
 

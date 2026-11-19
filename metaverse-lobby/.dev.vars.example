@@ -1,0 +1,8 @@
+# Copy to .dev.vars (gitignored) for local Worker dev.
+LOBBY_ADMIN_USER=admin
+LOBBY_ADMIN_PASSWORD=change-me
+LOBBY_ADMIN_SESSION_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+LOBBY_SIM_SERVICE_TOKEN=unused-local
+
+# Optional: announcement auto-translation (also: wrangler secret put GEMINI_TRANSLATION_API_KEY)
+GEMINI_TRANSLATION_API_KEY=

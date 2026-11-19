@@ -389,8 +389,8 @@ fi
 if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
 fi
-if [[ -n "${GEMINI_API_KEY:-}" ]]; then
-  printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
+if [[ -n "${GEMINI_TRANSLATION_API_KEY:-}" ]]; then
+  printf '%s' "$GEMINI_TRANSLATION_API_KEY" | npx wrangler secret put GEMINI_TRANSLATION_API_KEY
 fi
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
