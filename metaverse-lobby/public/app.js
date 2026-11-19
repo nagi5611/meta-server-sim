@@ -521,37 +521,54 @@ $('#switchTab')?.addEventListener('click', () => {
     setTimeout(() => (authTab === 'signup' ? $('#mName') : $('#mEmail')).focus(), 40);
 });
 
+function mapAuthApiError(data) {
+    const code = data?.error;
+    if (code === 'banned') return t('auth.errBanned');
+    if (code === 'invalid_email') return t('auth.errEmailInvalid');
+    if (code === 'email_exists') return t('auth.errEmailExists');
+    if (code === 'name_required') return t('auth.errNameRequired');
+    if (code === 'password_too_short' || code === 'password_invalid') {
+        return t('auth.errPassMin', { min: data.minLength || 8 });
+    }
+    if (code === 'invalid_credentials') return t('auth.errInvalid');
+    return t('auth.errFailed');
+}
+
 $('#authForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (authTab === 'signup') {
-        const err = $('#authErr');
-        err.textContent = t('auth.errSignupDisabled');
-        err.classList.add('on');
-        return;
-    }
-    const email = $('#mEmail').value.trim();
-    const pass = $('#mPass').value;
     const err = $('#authErr');
-    const showErr = (t) => {
-        err.textContent = t;
+    const showErr = (msg) => {
+        err.textContent = msg;
         err.classList.add('on');
     };
-    if (!email) return showErr(t('auth.errUserRequired'));
-    if (pass.length < 4) return showErr(t('auth.errPassShort'));
-
     const btn = $('#authSubmit');
+    const signup = authTab === 'signup';
+    const email = $('#mEmail').value.trim();
+    const pass = $('#mPass').value;
+    if (signup) {
+        const name = $('#mName').value.trim();
+        if (!name) return showErr(t('auth.errNameRequired'));
+        if (!email) return showErr(t('auth.errEmailRequired'));
+        if (pass.length < 4) return showErr(t('auth.errPassShort'));
+    } else {
+        if (!email) return showErr(t('auth.errUserRequired'));
+        if (pass.length < 4) return showErr(t('auth.errPassShort'));
+    }
+
     btn.disabled = true;
-    btn.textContent = t('auth.authenticating');
+    btn.textContent = signup ? t('auth.signingUp') : t('auth.authenticating');
     try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(signup ? '/api/auth/signup' : '/api/auth/login', {
             method: 'POST',
             credentials: 'include',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ username: email, password: pass }),
+            body: JSON.stringify(
+                signup ? { name, email, password: pass } : { username: email, password: pass },
+            ),
         });
         const data = await res.json();
         if (!res.ok) {
-            return showErr(data.error === 'banned' ? t('auth.errBanned') : t('auth.errInvalid'));
+            return showErr(mapAuthApiError(data));
         }
         signIn(data.user);
         clearDraft();
@@ -561,7 +578,7 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         showErr(t('auth.errFailed'));
     } finally {
         btn.disabled = false;
-        btn.textContent = t('auth.submitLogin');
+        btn.textContent = signup ? t('auth.submitSignup') : t('auth.submitLogin');
     }
 });
 

@@ -72,6 +72,33 @@ export async function handlePublicAuth(request, env) {
         });
     }
 
+    if (url.pathname === '/api/auth/signup' && request.method === 'POST') {
+        const body = await request.json();
+        const sim = await fetchSim(env, '/api/lobby/auth/signup', { method: 'POST', body });
+        if (!sim.ok) return json(sim.data || { error: 'signup_failed' }, sim.status || 400);
+        const user = sim.data?.user;
+        if (!user) return json({ error: 'signup_failed' }, 500);
+        const secret = String(env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ error: 'jwt_not_configured' }, 503);
+        const token = await signJwt(
+            {
+                sub: user.userId,
+                username: user.username,
+                displayName: user.displayName,
+                role: user.role,
+                banned: user.banned,
+            },
+            secret,
+            60 * 60 * 24 * 7,
+        );
+        const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
+        return json(
+            { ok: true, user: { name: user.displayName, handle: `@${user.username}`, role: user.role } },
+            201,
+            { 'set-cookie': cookie },
+        );
+    }
+
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
         if (!session) return json({ user: null });

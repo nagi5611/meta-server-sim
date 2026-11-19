@@ -11,6 +11,7 @@ import {
     listStudentsSqlite,
     listTeachersSqlite,
     registerStudentSqlite,
+    registerLobbyStudentSqlite,
     registerTeacherSqlite,
     sqliteUsersDbExists,
     updateStudentSqlite,
@@ -187,6 +188,74 @@ export async function registerTeacher(username, password, displayName) {
         () => registerTeacherD1(username, password, displayName),
         () => registerTeacherSqlite(username, password, displayName)
     );
+}
+
+/**
+ * @param {string} email
+ * @param {string} password
+ * @param {string} displayName
+ */
+export async function registerLobbyStudent(email, password, displayName) {
+    return withUsersBackend(
+        () => registerLobbyStudentD1(email, password, displayName),
+        () => registerLobbyStudentSqlite(email, password, displayName)
+    );
+}
+
+async function lobbyLoginEmailTakenD1(email) {
+    const e = email.trim();
+    for (const table of ['students', 'teachers']) {
+        const row = await d1First(
+            `SELECT id FROM ${table} WHERE lower(username) = lower(?) OR (COALESCE(email,'') != '' AND lower(email) = lower(?)) LIMIT 1`,
+            [e, e],
+        );
+        if (row) return true;
+    }
+    return false;
+}
+
+async function registerLobbyStudentD1(email, password, displayName) {
+    const bcrypt = await import('bcryptjs');
+    const { validateUserPassword } = await import('../lib/password-policy.js');
+    const check = validateUserPassword(password);
+    if (!check.ok) {
+        const err = new Error(check.error);
+        err.code = 'PASSWORD_POLICY';
+        err.minLength = check.minLength;
+        throw err;
+    }
+    const e = String(email || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        const err = new Error('invalid_email');
+        err.code = 'INVALID_EMAIL';
+        throw err;
+    }
+    const d = String(displayName || e).trim().slice(0, 64);
+    if (!d) {
+        const err = new Error('name_required');
+        err.code = 'NAME_REQUIRED';
+        throw err;
+    }
+    if (await lobbyLoginEmailTakenD1(e)) {
+        const err = new Error('email_exists');
+        err.code = 'EMAIL_EXISTS';
+        throw err;
+    }
+    const hash = bcrypt.default.hashSync(password, 10);
+    try {
+        const result = await d1Run(
+            'INSERT INTO students (username, password_hash, display_name, email, lobby_role) VALUES (?, ?, ?, ?, ?)',
+            [e, hash, d, e, 'user'],
+        );
+        return { id: result.lastInsertRowid, username: e, displayName: d, email: e };
+    } catch (insertErr) {
+        if (String(insertErr.message).includes('UNIQUE')) {
+            const err = new Error('email_exists');
+            err.code = 'EMAIL_EXISTS';
+            throw err;
+        }
+        throw insertErr;
+    }
 }
 
 async function registerStudentD1(username, password, displayName) {

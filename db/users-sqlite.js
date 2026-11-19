@@ -159,6 +159,61 @@ export function registerStudentSqlite(username, password, displayName) {
     return { id: Number(result.lastInsertRowid), username: u, displayName: d };
 }
 
+function lobbyLoginEmailTakenSqlite(email) {
+    const e = email.trim();
+    const sql = `SELECT id FROM %s WHERE lower(username) = lower(?) OR (email != '' AND lower(email) = lower(?)) LIMIT 1`;
+    for (const table of ['students', 'teachers']) {
+        const row = requireDb()
+            .prepare(sql.replace('%s', table))
+            .get(e, e);
+        if (row) return true;
+    }
+    return false;
+}
+
+/**
+ * Public lobby signup — email as username with dedicated email column for login lookup.
+ * @param {string} email
+ * @param {string} password
+ * @param {string} displayName
+ */
+export function registerLobbyStudentSqlite(email, password, displayName) {
+    assertPasswordPolicy(password);
+    const e = String(email || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        const err = new Error('invalid_email');
+        err.code = 'INVALID_EMAIL';
+        throw err;
+    }
+    const d = String(displayName || e).trim().slice(0, 64);
+    if (!d) {
+        const err = new Error('name_required');
+        err.code = 'NAME_REQUIRED';
+        throw err;
+    }
+    if (lobbyLoginEmailTakenSqlite(e)) {
+        const err = new Error('email_exists');
+        err.code = 'EMAIL_EXISTS';
+        throw err;
+    }
+    const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
+    try {
+        const result = requireDb()
+            .prepare(
+                'INSERT INTO students (username, password_hash, display_name, email, lobby_role) VALUES (?, ?, ?, ?, ?)',
+            )
+            .run(e, hash, d, e, 'user');
+        return { id: Number(result.lastInsertRowid), username: e, displayName: d, email: e };
+    } catch (insertErr) {
+        if (String(insertErr.message).includes('UNIQUE')) {
+            const err = new Error('email_exists');
+            err.code = 'EMAIL_EXISTS';
+            throw err;
+        }
+        throw insertErr;
+    }
+}
+
 export function registerTeacherSqlite(username, password, displayName) {
     assertPasswordPolicy(password);
     const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
