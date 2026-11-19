@@ -1,4 +1,5 @@
-import { getPublicSession, isLobbySessionBanned, resolveLobbyViewer } from './auth-api.js';
+import { getPublicSession, resolveLobbyViewer } from './auth-api.js';
+import { resolveLobbySessionBan } from './lobby-ban-guard.js';
 
 const LIVE_KEY = 'live';
 
@@ -80,7 +81,8 @@ export async function handleJoinByCodeRequest(request, env) {
 
     const kv = /** @type {KVNamespace} */ (env.LOBBY_KV);
     const session = await getPublicSession(request, env);
-    if (isLobbySessionBanned(session)) {
+    const ban = await resolveLobbySessionBan(session, env);
+    if (ban.banned) {
         return json({ error: 'banned', message: 'banned' }, 403);
     }
 

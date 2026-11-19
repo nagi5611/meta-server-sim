@@ -1,5 +1,7 @@
 import { LobbyPoller } from './lobby-poller.js';
-import { getPublicSession, handlePublicAuth, isLobbySessionBanned, resolveLobbyViewer } from './auth-api.js';
+import { getPublicSession, handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
+import { resolveLobbySessionBan } from './lobby-ban-guard.js';
+import { handleJoinWorldRequest } from './join-world-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
 import { handleAssetGet } from './lobby-assets.js';
 import { handleProfileAvatarGet } from './lobby-profile-assets.js';
@@ -94,9 +96,13 @@ async function handleApi(request, env) {
     const joinByCodeRes = await handleJoinByCodeRequest(request, env);
     if (joinByCodeRes) return joinByCodeRes;
 
+    const joinWorldRes = await handleJoinWorldRequest(request, env);
+    if (joinWorldRes) return joinWorldRes;
+
     if (url.pathname === '/api/metaverses' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
-        if (isLobbySessionBanned(session)) {
+        const ban = await resolveLobbySessionBan(session, env);
+        if (ban.banned) {
             return json({
                 updatedAt: null,
                 metaverses: [],

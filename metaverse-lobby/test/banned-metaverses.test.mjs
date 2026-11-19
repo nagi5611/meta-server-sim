@@ -7,6 +7,7 @@ import worker from '../src/index.js';
 import { signJwt } from '../src/jwt.js';
 import { isLobbySessionBanned } from '../src/auth-api.js';
 import { handleJoinByCodeRequest, normalizeJoinCode } from '../src/join-by-code-api.js';
+import { resolveLobbySessionBan } from '../src/lobby-ban-guard.js';
 
 const SECRET = '0123456789abcdef0123456789abcdef';
 
@@ -72,6 +73,37 @@ test('GET /api/metaverses returns empty list for banned session', async () => {
     assert.equal(data.banned, true);
     assert.deepEqual(data.metaverses, []);
     assert.equal(data.viewer, 'banned');
+});
+
+test('GET /api/metaverses hides catalog when sim reports ban on stale JWT', async () => {
+    const prev = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({ banned: true }), { status: 200 });
+    const token = await signJwt(
+        { sub: 'student-9', username: 'user', displayName: 'User', role: 'member', banned: false },
+        SECRET,
+        3600,
+    );
+    const env = {
+        LOBBY_JWT_SECRET: SECRET,
+        LOBBY_SIM_ORIGIN: 'https://sim.test',
+        LOBBY_SIM_SERVICE_TOKEN: 'tok',
+        LOBBY_KV: mockKv({
+            metaverses: [{ id: 'world-a', name: 'W', entryUrl: 'https://example.com/a', audience: 'all' }],
+        }),
+    };
+    try {
+        const res = await worker.fetch(
+            new Request('https://lobby.test/api/metaverses', {
+                headers: { cookie: `lobby_session=${encodeURIComponent(token)}` },
+            }),
+            env,
+        );
+        const data = await res.json();
+        assert.equal(data.banned, true);
+        assert.deepEqual(data.metaverses, []);
+    } finally {
+        globalThis.fetch = prev;
+    }
 });
 
 test('GET /api/metaverses returns catalog for guest without session', async () => {
