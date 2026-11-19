@@ -33,3 +33,13 @@ test('sourceOnlyAnnouncementI18n stores source locale only', () => {
     const map = sourceOnlyAnnouncementI18n('en', 'Hi', 'Body');
     assert.deepEqual(map, { en: { title: 'Hi', body: 'Body' } });
 });
+
+test('translateAnnouncementFields title-only stores empty body in i18n', async () => {
+    const result = await translateAnnouncementFields({
+        sourceLocale: 'ja',
+        title: 'タイトルのみ',
+        body: '',
+    });
+    assert.equal(result.translated, false);
+    assert.deepEqual(result.i18n, sourceOnlyAnnouncementI18n('ja', 'タイトルのみ', ''));
+});

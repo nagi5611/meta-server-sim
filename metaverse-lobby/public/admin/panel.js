@@ -554,14 +554,11 @@
     const rows = store.announcements || [];
     const list = rows.length
       ? rows.map((a) => {
-          const body = String(a.body || "");
-          const preview = body.length > 120 ? `${body.slice(0, 120)}…` : body;
           const dateRaw = a.createdAt || a.updatedAt;
           return `<div class="ann-row" data-ann="${esc(a.id)}" role="button" tabindex="0">
             <span class="ann-row-date num">${esc(fmtLobbyDate(dateRaw))}</span>
             <span class="ann-row-main">
               <span class="ann-row-title">${esc(a.title)}${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</span>
-              <span class="ann-row-preview dim">${esc(preview)}</span>
             </span>
             <span class="ann-row-del"><button type="button" class="txt-btn" data-ann-del="${esc(a.id)}">${esc(tr("admin.announcementsDelete"))}</button></span>
           </div>`;
@@ -593,10 +590,6 @@
         <div class="field">
           <label for="fAnnTitle">${esc(tr("admin.announcementsColTitle"))}</label>
           <input id="fAnnTitle" class="inp" type="text" maxlength="120" value="${esc(a.title)}" required autocomplete="off">
-        </div>
-        <div class="field">
-          <label for="fAnnBody">${esc(tr("admin.announcementsColBody"))}</label>
-          <textarea id="fAnnBody" class="inp" rows="8" maxlength="4000">${esc(a.body)}</textarea>
         </div>
         <div class="field">
           <label for="fAnnLocale">${esc(tr("admin.announcementsSourceLocale"))}</label>
@@ -881,7 +874,6 @@
     state.annEditing = {
       id: "",
       title: "",
-      body: "",
       published: true,
       sourceLocale: window.LobbyI18n?.getLocale?.() || "ja",
     };
@@ -902,16 +894,15 @@
     const a = state.annEditing;
     if (!a) return;
     const title = ($("#fAnnTitle")?.value || "").trim();
-    const body = ($("#fAnnBody")?.value || "").trim();
     const published = Boolean($("#fAnnPub")?.checked);
     const err = $("#annErr");
-    if (!title || !body) {
+    if (!title) {
       if (err) err.textContent = tr("admin.announcementsValidation");
       return;
     }
     if (err) err.textContent = "";
     const sourceLocale = ($("#fAnnLocale")?.value || window.LobbyI18n?.getLocale?.() || "ja").trim();
-    const payload = { title, body, published, sourceLocale };
+    const payload = { title, published, sourceLocale };
     const p = state.isNewAnn
       ? store.createAnnouncement(payload)
       : store.updateAnnouncement(a.id, payload);

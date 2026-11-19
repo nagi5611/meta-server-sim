@@ -295,8 +295,8 @@ export async function handleAdminApi(request, env, kv) {
         if (!db) return json({ error: 'db_not_configured' }, 503);
         const body = await request.json();
         const title = String(body.title || '').trim();
-        const bodyText = String(body.body || '').trim();
-        if (!title || !bodyText) return json({ error: 'title_and_body_required' }, 400);
+        const bodyText = body.body === undefined || body.body === null ? '' : String(body.body).trim();
+        if (!title) return json({ error: 'title_required' }, 400);
         const sourceLocale = normalizeAnnouncementLocale(
             String(body.sourceLocale || body.source_language || 'ja'),
         );
@@ -332,7 +332,7 @@ export async function handleAdminApi(request, env, kv) {
         const body = await request.json();
         const title = body.title !== undefined ? String(body.title).trim() : undefined;
         const bodyText = body.body !== undefined ? String(body.body).trim() : undefined;
-        if (title === '' || bodyText === '') return json({ error: 'title_and_body_required' }, 400);
+        if (title === '') return json({ error: 'title_required' }, 400);
         const sourceLocale =
             body.sourceLocale !== undefined || body.source_language !== undefined
                 ? normalizeAnnouncementLocale(String(body.sourceLocale || body.source_language || 'ja'))
@@ -347,7 +347,7 @@ export async function handleAdminApi(request, env, kv) {
             const resolvedTitle = title !== undefined ? title : prev?.title || '';
             const resolvedBody = bodyText !== undefined ? bodyText : prev?.body || '';
             const resolvedLocale = sourceLocale ?? prev?.sourceLocale ?? 'ja';
-            if (resolvedTitle && resolvedBody) {
+            if (resolvedTitle) {
                 const built = await buildAnnouncementI18n(env, {
                     sourceLocale: resolvedLocale,
                     title: resolvedTitle,

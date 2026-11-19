@@ -24,7 +24,7 @@
         "test:e2e:world-edit": "playwright test e2e/tenant-world-edit.spec.js",
         "test:e2e:agent": "playwright test e2e/agent-metaverse-smoke.spec.js",
         "test:e2e:agent:headed": "playwright test e2e/agent-metaverse-smoke.spec.js --headed",
-        "test:unit": "node --test test/*.test.js",
+        "test:unit": "node --test test/*.test.js metaverse-lobby/test/*.test.mjs",
         "migrate:r2": "node scripts/migrate-tenant-assets-to-r2.mjs",
         "export:fds-smoke": "python scripts/export-fds-smoke.py",
         "export:fugaku-prod01-smoke": "python scripts/export-fugaku-phase-a-smoke.py --zip"

@@ -61,40 +61,52 @@ export async function translateAnnouncementFields(params) {
     const modelName =
         String(model || DEFAULT_ANNOUNCEMENT_GEMINI_MODEL).trim() || DEFAULT_ANNOUNCEMENT_GEMINI_MODEL;
     const targetList = targets.map((l) => `${l} (${LOCALE_LABEL[l]})`).join(', ');
+    const titleOnly = !trimmedBody;
 
-    const systemInstruction = `You translate lobby announcement title and body text.
+    const systemInstruction = titleOnly
+        ? `You translate lobby announcement titles (single line, no body text).
+Source language locale code: ${sourceLocale}.
+Target locale codes: ${targetList}.
+Output JSON only, matching the response schema.
+For each target locale, provide a natural title translation. Do not add disclaimers. Keep proper nouns unchanged.`
+        : `You translate lobby announcement title and body text.
 Source language locale code: ${sourceLocale}.
 Target locale codes: ${targetList}.
 Output JSON only, matching the response schema.
 For each target locale, provide natural translations preserving tone and line breaks in body.
 Do not add disclaimers. Keep proper nouns and URLs unchanged.`;
 
-    const userText = JSON.stringify({
-        sourceLocale,
-        title: trimmedTitle,
-        body: trimmedBody,
-        targetLocales: targets,
-    });
+    const userText = JSON.stringify(
+        titleOnly
+            ? { sourceLocale, title: trimmedTitle, targetLocales: targets }
+            : { sourceLocale, title: trimmedTitle, body: trimmedBody, targetLocales: targets },
+    );
+
+    const localeSchema = (code) =>
+        titleOnly
+            ? {
+                  type: 'OBJECT',
+                  properties: { title: { type: 'STRING' } },
+                  required: ['title'],
+              }
+            : {
+                  type: 'OBJECT',
+                  properties: {
+                      title: { type: 'STRING' },
+                      body: { type: 'STRING' },
+                  },
+                  required: ['title', 'body'],
+              };
 
     const responseSchema = {
         type: 'OBJECT',
         properties: {
             translations: {
                 type: 'OBJECT',
-                description: 'Keys are locale codes; values hold title and body in that language.',
-                properties: Object.fromEntries(
-                    targets.map((code) => [
-                        code,
-                        {
-                            type: 'OBJECT',
-                            properties: {
-                                title: { type: 'STRING' },
-                                body: { type: 'STRING' },
-                            },
-                            required: ['title', 'body'],
-                        },
-                    ]),
-                ),
+                description: titleOnly
+                    ? 'Keys are locale codes; values hold title in that language.'
+                    : 'Keys are locale codes; values hold title and body in that language.',
+                properties: Object.fromEntries(targets.map((code) => [code, localeSchema(code)])),
                 required: targets,
             },
         },
@@ -162,10 +174,13 @@ Do not add disclaimers. Keep proper nouns and URLs unchanged.`;
             const part = translations[code];
             const tTitle =
                 typeof part?.title === 'string' && part.title.trim() ? part.title.trim() : trimmedTitle;
-            const tBody =
-                typeof part?.body === 'string' && part.body.trim() ? part.body.trim() : trimmedBody;
+            const tBody = titleOnly
+                ? ''
+                : typeof part?.body === 'string' && part.body.trim()
+                  ? part.body.trim()
+                  : trimmedBody;
             i18n[code] = { title: tTitle, body: tBody };
-            if (tTitle !== trimmedTitle || tBody !== trimmedBody) anyTranslated = true;
+            if (tTitle !== trimmedTitle || (!titleOnly && tBody !== trimmedBody)) anyTranslated = true;
         }
         return { i18n, translated: anyTranslated };
     } catch (err) {

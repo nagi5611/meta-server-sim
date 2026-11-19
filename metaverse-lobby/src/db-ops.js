@@ -1,3 +1,5 @@
+import { normalizeAnnouncementLocale, parseAnnouncementI18nJson } from './announcement-i18n.js';
+
 const METRICS_1H = `INSERT INTO metrics_presence_1h (world_id, bucket_at, peak, avg, sample_count)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(world_id, bucket_at) DO UPDATE SET
@@ -40,6 +42,10 @@ function mapAnnouncementRow(row) {
         sortOrder: Number(row.sort_order) || 0,
         createdAt: String(row.created_at || ''),
         updatedAt: String(row.updated_at || ''),
+        sourceLocale: normalizeAnnouncementLocale(
+            row.source_locale != null ? String(row.source_locale) : 'ja',
+        ),
+        i18n: parseAnnouncementI18nJson(row.i18n_json),
     };
 }
 
@@ -65,27 +71,37 @@ export async function listAnnouncements(db, opts = {}) {
  */
 export async function insertAnnouncement(db, id, input) {
     const now = new Date().toISOString();
+    const body = input.body === undefined || input.body === null ? '' : String(input.body).trim();
+    const sourceLocale = normalizeAnnouncementLocale(
+        input.sourceLocale != null ? String(input.sourceLocale) : 'ja',
+    );
+    const i18nJson = input.i18n ? JSON.stringify(input.i18n) : null;
     await db
         .prepare(
-            `INSERT INTO announcements (id, title, body, published, sort_order, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO announcements (
+               id, title, body, published, sort_order, created_at, updated_at, source_locale, i18n_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
             id,
             input.title,
-            input.body,
+            body,
             input.published === false ? 0 : 1,
             Number(input.sortOrder) || 0,
             now,
             now,
+            sourceLocale,
+            i18nJson,
         )
         .run();
     return mapAnnouncementRow({
         id,
         title: input.title,
-        body: input.body,
+        body,
         published: input.published === false ? 0 : 1,
         sort_order: Number(input.sortOrder) || 0,
+        source_locale: sourceLocale,
+        i18n_json: i18nJson,
         created_at: now,
         updated_at: now,
     });

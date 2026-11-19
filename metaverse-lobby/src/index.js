@@ -2,6 +2,7 @@ import { LobbyPoller } from './lobby-poller.js';
 import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
 import { handleAssetGet } from './lobby-assets.js';
+import { handleProfileAvatarGet } from './lobby-profile-assets.js';
 import { pickAnnouncementText, resolveClientLocale } from './announcement-i18n.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 
@@ -89,6 +90,9 @@ async function handleApi(request, env) {
     const url = new URL(request.url);
     const kv = /** @type {KVNamespace} */ (env.LOBBY_KV);
 
+    const profileAssetRes = await handleProfileAvatarGet(request, env);
+    if (profileAssetRes) return profileAssetRes;
+
     const assetRes = await handleAssetGet(request, env);
     if (assetRes) return assetRes;
 
@@ -121,14 +125,13 @@ async function handleApi(request, env) {
         const locale = resolveClientLocale(request, url);
         const rows = db ? await listAnnouncements(db, { publishedOnly: true, limit: 3 }) : [];
         const announcements = rows.map((a) => {
-            const { title, body } = pickAnnouncementText(a.i18n, locale, {
+            const { title } = pickAnnouncementText(a.i18n, locale, {
                 title: a.title,
                 body: a.body,
             });
             return {
                 id: a.id,
                 title,
-                body,
                 createdAt: a.createdAt,
                 updatedAt: a.updatedAt,
             };

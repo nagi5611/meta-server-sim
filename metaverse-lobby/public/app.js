@@ -1,4 +1,5 @@
 import { formatLobbyDate, formatLobbyLocalTime, parseLobbyInstant } from './lobby-time.js';
+import { cropProfileImageFile } from './profile-avatar.js';
 
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
@@ -10,14 +11,21 @@ const hint = $('#refresh-hint');
 const annPanel = $('#announcements-panel');
 const annList = $('#announcement-list');
 const annEmpty = $('#announcement-empty');
-/** @type {Array<{ id: string, title: string, body: string, createdAt?: string, updatedAt?: string }>} */
+/** @type {Array<{ id: string, title: string, createdAt?: string, updatedAt?: string }>} */
 let announcements = [];
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
 const authScrim = $('#auth-scrim');
-const profileScrim = $('#profile-scrim');
+const profileMenu = $('#profileMenu');
+const profileDrop = $('#profileDrop');
 const profileInput = $('#pName');
+const profileAvatarFile = $('#profileAvatarFile');
+const profileAvatarPick = $('#profileAvatarPick');
+const profileAvatarPreview = $('#profileAvatarPreview');
+const profileAvatarPlaceholder = $('#profileAvatarPlaceholder');
+let pendingAvatarBlob = null;
+let pendingAvatarPreviewUrl = null;
 const displayInput = $('#display-name');
 const joinCodeInput = $('#join-code');
 const codeCount = $('#codeCount');
@@ -298,7 +306,7 @@ function canViewWorld(world) {
     if (audience === 'all') return true;
     if (!authState.user) return false;
     if (audience === 'signed') return true;
-    return authState.user.role === 'admin';
+    return isLobbyAdminUser();
 }
 
 function paintRefreshHint(at = lastListUpdatedAt) {
@@ -428,28 +436,93 @@ function hideAuthModal() {
     authScrim.hidden = true;
 }
 
-function openProfileModal() {
-    if (!authState.user?.name) return;
-    const err = $('#profileErr');
-    if (err) {
-        err.textContent = '';
-        err.classList.remove('on');
+function clearPendingAvatar() {
+    if (pendingAvatarPreviewUrl) {
+        URL.revokeObjectURL(pendingAvatarPreviewUrl);
+        pendingAvatarPreviewUrl = null;
     }
-    const dn = (localStorage.getItem('lobbyDisplayName') || authState.user.name).slice(0, 16);
-    if (profileInput) {
-        profileInput.value = dn;
-        profileInput.classList.remove('bad');
-    }
-    const pc = $('#pCount');
-    if (pc) pc.textContent = `${dn.length}/16`;
-    profileScrim.hidden = false;
-    profileScrim.classList.add('on');
-    setTimeout(() => profileInput?.focus(), 60);
+    pendingAvatarBlob = null;
 }
 
-function hideProfileModal() {
-    profileScrim.classList.remove('on');
-    profileScrim.hidden = true;
+function syncProfileAvatarPreview() {
+    const url =
+        pendingAvatarPreviewUrl ||
+        (authState.user?.avatarUrl ? String(authState.user.avatarUrl) : '');
+  const initial = authState.user?.name?.slice(0, 1).toUpperCase() || '?';
+  if (profileAvatarPlaceholder) {
+    profileAvatarPlaceholder.textContent = initial;
+    profileAvatarPlaceholder.hidden = Boolean(url);
+  }
+  if (profileAvatarPreview) {
+    if (url) {
+      profileAvatarPreview.src = url;
+      profileAvatarPreview.hidden = false;
+    } else {
+      profileAvatarPreview.removeAttribute('src');
+      profileAvatarPreview.hidden = true;
+    }
+  }
+}
+
+function syncHeaderAvatar() {
+  const url = authState.user?.avatarUrl ? String(authState.user.avatarUrl) : '';
+  const initialEl = $('#avInitial');
+  const imgEl = $('#avImg');
+  const initial = authState.user?.name?.slice(0, 1).toUpperCase() || '?';
+  if (initialEl) {
+    initialEl.textContent = initial;
+    initialEl.hidden = Boolean(url);
+  }
+  if (imgEl) {
+    if (url) {
+      imgEl.src = url;
+      imgEl.hidden = false;
+    } else {
+      imgEl.removeAttribute('src');
+      imgEl.hidden = true;
+    }
+  }
+}
+
+function populateProfileForm() {
+  if (!authState.user?.name) return;
+  const err = $('#profileErr');
+  if (err) {
+    err.textContent = '';
+    err.classList.remove('on');
+  }
+  clearPendingAvatar();
+  const dn = (localStorage.getItem('lobbyDisplayName') || authState.user.name).slice(0, 16);
+  if (profileInput) {
+    profileInput.value = dn;
+    profileInput.classList.remove('bad');
+  }
+  const pc = $('#pCount');
+  if (pc) pc.textContent = `${dn.length}/16`;
+  syncProfileAvatarPreview();
+}
+
+function closeProfileDrop() {
+  if (!profileDrop) return;
+  profileDrop.hidden = true;
+  profileMenu?.classList.remove('is-open');
+  const trigger = $('#openProfile');
+  trigger?.setAttribute('aria-expanded', 'false');
+}
+
+function toggleProfileDrop() {
+  if (!authState.user?.name || !profileDrop) return;
+  const isOpen = !profileDrop.hidden;
+  if (isOpen) {
+    closeProfileDrop();
+    return;
+  }
+  populateProfileForm();
+  profileDrop.hidden = false;
+  profileMenu?.classList.add('is-open');
+  const trigger = $('#openProfile');
+  trigger?.setAttribute('aria-expanded', 'true');
+  setTimeout(() => profileInput?.focus(), 40);
 }
 
 function mapProfileApiError(data) {
@@ -458,18 +531,29 @@ function mapProfileApiError(data) {
     if (code === 'invalid_name_chars') return t('join.errDisplayChars');
     if (code === 'name_too_long') return t('join.errDisplayRequired');
     if (code === 'unauthorized') return t('auth.errInvalid');
+    if (code === 'invalid_type') return t('profile.errAvatarType');
+    if (code === 'file_too_large' || code === 'empty_file') return t('profile.errAvatarLarge');
+    if (code === 'file_required') return t('profile.errAvatar');
     return t('profile.errFailed');
 }
 
-function applyDisplayNameLocally(name) {
-    const dn = name.slice(0, 16);
-    localStorage.setItem('mnm.name', dn);
-    localStorage.setItem('lobbyDisplayName', dn);
-    if (authState.user) {
-        authState.user = { ...authState.user, name: name.slice(0, 32) };
-        saveAuthState();
-        renderAuthHeader();
+function applyUserLocally(patch) {
+    if (!authState.user) return;
+    const next = { ...authState.user, ...patch };
+    if (patch.name) {
+        const dn = String(patch.name).slice(0, 16);
+        localStorage.setItem('mnm.name', dn);
+        localStorage.setItem('lobbyDisplayName', dn);
+        next.name = String(patch.name).slice(0, 32);
     }
+    authState.user = next;
+    saveAuthState();
+    renderAuthHeader();
+}
+
+function applyDisplayNameLocally(name) {
+    applyUserLocally({ name });
+    const dn = name.slice(0, 16);
     if (joinScrim.classList.contains('on') && displayInput) {
         displayInput.value = dn;
         const jc = $('#jCount');
@@ -484,18 +568,25 @@ function handleTo(name) {
         .slice(0, 16)}`;
 }
 
+function isLobbyAdminUser() {
+    return authState.user?.role === 'admin';
+}
+
 function renderAuthHeader() {
     const guest = $('#hdrGuest');
     const userHdr = $('#hdrUser');
+    const adminLink = $('#hdrAdminLink');
     if (authState.user?.name) {
         guest.style.display = 'none';
         userHdr.classList.add('on');
         $('#acctName').textContent = authState.user.name;
         $('#acctId').textContent = authState.user.handle;
-        $('#avInitial').textContent = authState.user.name.slice(0, 1).toUpperCase();
+        syncHeaderAvatar();
+        if (adminLink) adminLink.hidden = !isLobbyAdminUser();
     } else {
         userHdr.classList.remove('on');
         guest.style.display = 'flex';
+        if (adminLink) adminLink.hidden = true;
     }
 }
 
@@ -503,7 +594,16 @@ function signIn(user, opts = {}) {
     const name = String(user?.name || user?.displayName || '').trim().slice(0, 32);
     if (!name) return;
     const handle = user?.handle || handleTo(user?.username || name);
-    authState.user = { name, handle, role: user?.role || 'member' };
+    const avatarUrl =
+        user?.avatarUrl !== undefined
+            ? String(user.avatarUrl || '')
+            : authState.user?.avatarUrl || '';
+    authState.user = {
+        name,
+        handle,
+        role: user?.role || 'member',
+        ...(avatarUrl ? { avatarUrl } : {}),
+    };
     saveAuthState();
     renderAuthHeader();
     const dn = name.slice(0, 16);
@@ -695,8 +795,48 @@ $('#authForm')?.addEventListener('submit', async (e) => {
 
 $('#logoutBtn')?.addEventListener('click', signOut);
 
-$('#openProfile')?.addEventListener('click', openProfileModal);
-$('#closeProfile')?.addEventListener('click', hideProfileModal);
+$('#openProfile')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    toggleProfileDrop();
+});
+
+document.addEventListener('click', (ev) => {
+    if (!profileDrop || profileDrop.hidden) return;
+  const t = /** @type {HTMLElement} */ (ev.target);
+  if (t.closest?.('#profileMenu')) return;
+  closeProfileDrop();
+});
+
+profileAvatarPick?.addEventListener('click', () => profileAvatarFile?.click());
+
+profileAvatarFile?.addEventListener('change', async () => {
+    const file = profileAvatarFile.files?.[0];
+    profileAvatarFile.value = '';
+    if (!file) return;
+    const err = $('#profileErr');
+    const showErr = (msg) => {
+        if (!err) return;
+        err.textContent = msg;
+        err.classList.add('on');
+    };
+    try {
+        if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) {
+            return showErr(t('profile.errAvatarType'));
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            return showErr(t('profile.errAvatarLarge'));
+        }
+        err?.classList.remove('on');
+        if (err) err.textContent = '';
+        const blob = await cropProfileImageFile(file);
+        clearPendingAvatar();
+        pendingAvatarBlob = blob;
+        pendingAvatarPreviewUrl = URL.createObjectURL(blob);
+        syncProfileAvatarPreview();
+    } catch {
+        showErr(t('profile.errAvatar'));
+    }
+});
 
 profileInput?.addEventListener('input', () => {
     profileInput.classList.remove('bad');
@@ -728,6 +868,23 @@ $('#profileForm')?.addEventListener('submit', async (e) => {
     const prev = btn.textContent;
     btn.textContent = t('profile.saving');
     try {
+        if (pendingAvatarBlob) {
+            const fd = new FormData();
+            fd.append('file', pendingAvatarBlob, 'avatar.webp');
+            const up = await fetch('/api/auth/profile/avatar', {
+                method: 'POST',
+                credentials: 'include',
+                body: fd,
+            });
+            const upData = await up.json();
+            if (!up.ok) return showErr(mapProfileApiError(upData));
+            if (upData.user) {
+                signIn(upData.user, { quiet: true, syncDisplayName: false });
+            } else if (upData.avatarUrl) {
+                applyUserLocally({ avatarUrl: upData.avatarUrl });
+            }
+            clearPendingAvatar();
+        }
         const res = await fetch('/api/auth/profile', {
             method: 'PATCH',
             credentials: 'include',
@@ -738,7 +895,7 @@ $('#profileForm')?.addEventListener('submit', async (e) => {
         if (!res.ok) return showErr(mapProfileApiError(data));
         if (data.user) signIn(data.user, { quiet: true, syncDisplayName: true });
         else applyDisplayNameLocally(v.value);
-        hideProfileModal();
+        closeProfileDrop();
         showToast(t('toast.profileOk'));
     } catch {
         showErr(t('profile.errFailed'));
@@ -752,6 +909,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (joinScrim?.classList.contains('on')) closeJoin();
     if (authScrim?.classList.contains('on')) hideAuthModal();
+    if (profileDrop && !profileDrop.hidden) closeProfileDrop();
 });
 
 let mqTimer;
@@ -781,6 +939,7 @@ window.addEventListener('lobby:locale-change', () => {
     window.LobbyI18n?.applyDom();
     syncAuthModal();
     refresh();
+    if (profileDrop && !profileDrop.hidden) populateProfileForm();
 });
 
 bootstrapAuth();
