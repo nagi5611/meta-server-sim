@@ -68,6 +68,7 @@ test('moderateLobbyDisplayName skips without API key', async () => {
     });
     assert.equal(result.allowed, true);
     assert.equal(result.skipped, true);
+    assert.equal(result.moderation_stage, 'disabled');
 });
 
 test('moderateLobbyDisplayName fails open on Jev HTTP error', async () => {
@@ -83,4 +84,48 @@ test('moderateLobbyDisplayName fails open on Jev HTTP error', async () => {
 
 test('parseJevNoulAnswer reads should_reject', () => {
     assert.equal(parseJevNoulAnswer({ answers: { should_reject: { noul: 0.3 } } }), 0.3);
+});
+
+test('moderateLobbyDisplayName uses Gemini when only GEMINI_TRANSLATION_API_KEY is set', async () => {
+    const fetchMock = async (url) => {
+        if (String(url).includes('generativelanguage.googleapis.com')) {
+            return new Response(
+                JSON.stringify({
+                    candidates: [
+                        {
+                            content: {
+                                parts: [
+                                    {
+                                        text: JSON.stringify({
+                                            inappropriate: true,
+                                            absolute_broadcast_block: false,
+                                            reason_ja: 'NG',
+                                        }),
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                }),
+                { status: 200, headers: { 'content-type': 'application/json' } },
+            );
+        }
+        return new Response('unexpected', { status: 500 });
+    };
+    const result = await moderateLobbyDisplayName({
+        env: { GEMINI_TRANSLATION_API_KEY: 'g-key' },
+        displayName: 'Bad',
+        fetchImpl: fetchMock,
+    });
+    assert.equal(result.allowed, false);
+    assert.equal(result.moderation_stage, 'gemini_reject');
+});
+
+test('moderateLobbyDisplayName Gemini-only skips without API key', async () => {
+    const result = await moderateLobbyDisplayName({
+        env: {},
+        displayName: 'Player',
+    });
+    assert.equal(result.allowed, true);
+    assert.equal(result.skipped, true);
 });

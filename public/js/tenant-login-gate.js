@@ -92,18 +92,48 @@ export async function runTenantLoginGate() {
     document.body.classList.add('tenant-login-gate-open');
 
     await new Promise((resolve) => {
-        const finish = () => {
+        const finish = async () => {
             const name = String(nameInput?.value || '').trim();
-            if (name) localStorage.setItem(lsNameKey, name);
+            if (!name) {
+                nameInput?.focus();
+                return;
+            }
+            if (enterBtn) enterBtn.disabled = true;
+            try {
+                const modRes = await fetch(`${apiBase}/moderate-display-name`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ displayName: name }),
+                });
+                const modData = await modRes.json().catch(() => ({}));
+                if (!modRes.ok) {
+                    const msg =
+                        modData.error === 'display_name_rejected'
+                            ? 'この表示名は利用できません。別の名前を入力してください。'
+                            : '表示名を確認できませんでした。しばらくしてから再度お試しください。';
+                    window.alert(msg);
+                    nameInput?.focus();
+                    return;
+                }
+                localStorage.setItem(lsNameKey, name);
+            } catch {
+                window.alert('表示名を確認できませんでした。しばらくしてから再度お試しください。');
+                return;
+            } finally {
+                if (enterBtn) enterBtn.disabled = false;
+            }
             const avatarId = String(avatarSelect?.value || '').trim();
             if (avatarId) localStorage.setItem(lsAvatarKey, avatarId);
             gate.hidden = true;
             document.body.classList.remove('tenant-login-gate-open');
             resolve();
         };
-        enterBtn?.addEventListener('click', finish, { once: true });
+        enterBtn?.addEventListener('click', () => {
+            void finish();
+        }, { once: true });
         nameInput?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') finish();
+            if (e.key === 'Enter') void finish();
         });
     });
 }
