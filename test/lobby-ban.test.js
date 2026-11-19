@@ -4,7 +4,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
-import { banLifecycleState, isBanActive, normalizeBanExpiresAt } from '../lib/lobby-ban.js';
+import {
+    banLifecycleState,
+    buildLobbyBanNotificationText,
+    formatBanExpiryLabelJa,
+    isBanActive,
+    normalizeBanExpiresAt,
+} from '../lib/lobby-ban.js';
 import {
     initSqliteUsersDb,
     patchLobbyUserFlagsSqlite,
@@ -22,6 +28,20 @@ test('lobby-ban helpers', () => {
     const past = new Date(Date.now() - 60_000).toISOString();
     assert.equal(isBanActive(true, past), false);
     assert.equal(banLifecycleState(1, past), 'expired');
+});
+
+test('ban notification copy uses expiry label and contact', () => {
+    assert.equal(formatBanExpiryLabelJa(null), '無期限');
+    assert.equal(formatBanExpiryLabelJa(''), '無期限');
+    const iso = '2026-06-15T06:30:00.000Z';
+    assert.match(formatBanExpiryLabelJa(iso), /2026/);
+    const text = buildLobbyBanNotificationText(null);
+    assert.equal(
+        text,
+        'あなたはバンされました。予定解除日は無期限です。問い合わせ先は developer@mmh-virtual.jp まで',
+    );
+    assert.match(buildLobbyBanNotificationText(iso), /予定解除日は/);
+    assert.match(buildLobbyBanNotificationText(iso), /developer@mmh-virtual\.jp/);
 });
 
 async function withBanDb(fn) {
@@ -71,6 +91,49 @@ test('timed ban expires on read and records history', async () => {
         const history = listBanHistorySqlite('student', student.id);
         assert.ok(history.some((h) => h.action === 'ban'));
         assert.ok(history.some((h) => h.action === 'expire'));
+    });
+});
+
+test('PATCH ban sends Resend notification with Japanese body', async () => {
+    await withBanDb(async ({ base, token }) => {
+        const prevKey = process.env.RESEND_API_KEY;
+        process.env.RESEND_API_KEY = 'test-resend-key';
+        const captured = [];
+        const origFetch = globalThis.fetch;
+        globalThis.fetch = async (url, init) => {
+            const href = typeof url === 'string' ? url : url?.url || String(url);
+            if (href.includes('api.resend.com')) {
+                captured.push(JSON.parse(String(init?.body || '{}')));
+                return new Response(JSON.stringify({ id: 'email_1' }), { status: 200 });
+            }
+            return origFetch(url, init);
+        };
+        try {
+            const student = registerLobbyStudentSqlite(
+                'bannotify@example.com',
+                'WelcomePass8',
+                'Notify',
+            );
+            const res = await fetch(`${base}/service/users/student/${student.id}`, {
+                method: 'PATCH',
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({ banned: true, banExpiresAt: null, actor: 'admin' }),
+            });
+            assert.equal(res.status, 200);
+            assert.equal(captured.length, 1);
+            assert.deepEqual(captured[0].to, ['bannotify@example.com']);
+            assert.match(
+                captured[0].text,
+                /あなたはバンされました。予定解除日は無期限です。問い合わせ先は developer@mmh-virtual\.jp まで/,
+            );
+        } finally {
+            globalThis.fetch = origFetch;
+            if (prevKey === undefined) delete process.env.RESEND_API_KEY;
+            else process.env.RESEND_API_KEY = prevKey;
+        }
     });
 });
 
