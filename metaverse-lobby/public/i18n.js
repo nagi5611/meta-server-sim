@@ -5,10 +5,23 @@
   const SUPPORTED = ['ja', 'zh-CN', 'zh-TW', 'en'];
   const LOCALE_LABELS = {
     ja: '日本語',
-    'zh-CN': '简体中文',
-    'zh-TW': '繁體中文',
+    'zh-CN': '中文',
+    'zh-TW': '中文（台湾）',
     en: 'English',
   };
+  const LOCALE_CODES = {
+    ja: 'JA',
+    'zh-CN': 'ZH-CN',
+    'zh-TW': 'ZH-TW',
+    en: 'EN',
+  };
+
+  /** @param {string} code */
+  function localeOptionLabel(code) {
+    const name = LOCALE_LABELS[code] || code;
+    const tag = LOCALE_CODES[code] || code.toUpperCase();
+    return `${name} / ${tag}`;
+  }
   const LOCALE_FLAGS = {
     ja: '🇯🇵',
     'zh-CN': '🇨🇳',
@@ -155,7 +168,7 @@
     menu.setAttribute('role', 'listbox');
     menu.hidden = true;
     menu.innerHTML = SUPPORTED.map((code) => {
-      const label = LOCALE_LABELS[code] || code;
+      const label = localeOptionLabel(code);
       const flag = LOCALE_FLAGS[code] || '';
       return (
         `<li class="locale-select__option" role="option" data-locale="${code}" ` +
@@ -221,7 +234,7 @@
       const flagEl = root.querySelector('.locale-select__flag');
       const labelEl = root.querySelector('.locale-select__label');
       if (flagEl) flagEl.textContent = LOCALE_FLAGS[locale] || '';
-      if (labelEl) labelEl.textContent = LOCALE_LABELS[locale] || locale;
+      if (labelEl) labelEl.textContent = localeOptionLabel(locale);
       root.querySelectorAll('.locale-select__option').forEach((opt) => {
         const code = opt.getAttribute('data-locale');
         const selected = code === locale;
