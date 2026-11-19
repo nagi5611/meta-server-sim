@@ -317,13 +317,25 @@ export async function handleAdminLoginSuper(request, env, kv) {
         } catch (err) {
             await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
             const codeName = /** @type {{ code?: string }} */ (err).code;
-            if (codeName === 'SNS_NOT_CONFIGURED' || codeName === 'ADMIN_PHONE_INVALID') {
+            if (codeName === 'ADMIN_PHONE_INVALID') {
+                return { status: 503, body: { error: 'admin_phone_invalid' } };
+            }
+            if (codeName === 'SNS_NOT_CONFIGURED') {
                 return { status: 503, body: { error: 'otp_sms_not_configured' } };
+            }
+            if (codeName === 'SNS_SEND_FAILED') {
+                return { status: 502, body: { error: 'otp_sms_send_failed' } };
             }
             if (codeName === 'RESEND_NOT_CONFIGURED') {
                 return { status: 503, body: { error: 'otp_mail_not_configured' } };
             }
-            return { status: 502, body: { error: 'otp_send_failed' } };
+            if (codeName === 'RESEND_SEND_FAILED') {
+                return { status: 502, body: { error: 'otp_email_send_failed' } };
+            }
+            return {
+                status: 502,
+                body: { error: channel === 'sms' ? 'otp_sms_send_failed' : 'otp_email_send_failed' },
+            };
         }
         return {
             status: 200,

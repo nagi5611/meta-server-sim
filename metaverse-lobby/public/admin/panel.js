@@ -116,9 +116,13 @@
               ? "admin.gateSessionNotConfigured"
               : code === "otp_invalid" || code === "otp_expired" || code === "otp_locked"
                 ? "admin.gateOtpInvalid"
-                : code === "otp_sms_not_configured"
+                : code === "admin_phone_invalid" ||
+                    code === "otp_sms_not_configured" ||
+                    code === "otp_sms_send_failed"
                   ? "admin.gateOtpSmsFail"
-                  : code === "otp_mail_not_configured" || code === "otp_send_failed"
+                  : code === "otp_mail_not_configured" ||
+                      code === "otp_email_send_failed" ||
+                      code === "otp_send_failed"
                     ? "admin.gateOtpMailFail"
                   : "admin.gateErr";
       $("#gateErr").textContent = tr(key);
