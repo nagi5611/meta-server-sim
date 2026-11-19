@@ -24,6 +24,8 @@ import {
     getUserForPasswordResetSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
+    completeLobbyGoogleAuthSqlite,
+    peekLobbyGoogleAuthSqlite,
     closeSqliteUsersDb,
     listLobbyWorldFavoritesSqlite,
     setLobbyWorldFavoriteSqlite,
@@ -134,12 +136,14 @@ export function resetUsersDbStateForTests() {
 const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(banned, 0) AS banned, ban_expires_at,
                         COALESCE(lobby_role, 'user') AS lobby_role,
-                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM students`;
+                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url,
+                        COALESCE(google_sub, '') AS google_sub FROM students`;
 
 const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(banned, 0) AS banned, ban_expires_at,
                         COALESCE(lobby_role, 'admin') AS lobby_role,
-                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM teachers`;
+                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url,
+                        COALESCE(google_sub, '') AS google_sub FROM teachers`;
 
 function mapVerifiedUserRow(row, kind, overrides = {}) {
     const banned =
@@ -273,6 +277,141 @@ export async function registerLobbyStudent(email, password, displayName) {
     return withUsersBackend(
         () => registerLobbyStudentD1(email, password, displayName),
         () => registerLobbyStudentSqlite(email, password, displayName)
+    );
+}
+
+/**
+ * @param {string} googleSub
+ * @param {string} email
+ */
+async function peekLobbyGoogleAuthD1(googleSub, email) {
+    const sub = String(googleSub || '').trim();
+    const e = String(email || '').trim();
+    if (!sub || !e) return { action: 'create' };
+    for (const kind of ['student', 'teacher']) {
+        const table = kind === 'teacher' ? 'teachers' : 'students';
+        const row = await d1First(`SELECT id FROM ${table} WHERE google_sub = ?`, [sub]);
+        if (row) return { action: 'login', kind };
+    }
+    if (await findUserLoginRowD1('student', e)) return { action: 'link', kind: 'student' };
+    if (await findUserLoginRowD1('teacher', e)) return { action: 'link', kind: 'teacher' };
+    return { action: 'create' };
+}
+
+export async function peekLobbyGoogleAuth(googleSub, email) {
+    return withUsersBackend(
+        () => peekLobbyGoogleAuthD1(googleSub, email),
+        () => peekLobbyGoogleAuthSqlite(googleSub, email),
+    );
+}
+
+/**
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ */
+async function completeLobbyGoogleAuthD1(input) {
+    const sub = String(input.googleSub || '').trim();
+    const e = String(input.email || '').trim();
+    if (!sub) {
+        const err = new Error('google_sub_required');
+        err.code = 'GOOGLE_SUB_REQUIRED';
+        throw err;
+    }
+    if (!input.emailVerified) {
+        const err = new Error('email_not_verified');
+        err.code = 'EMAIL_NOT_VERIFIED';
+        throw err;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        const err = new Error('invalid_email');
+        err.code = 'INVALID_EMAIL';
+        throw err;
+    }
+
+    for (const kind of ['student', 'teacher']) {
+        const table = kind === 'teacher' ? TEACHER_LOGIN_SELECT : STUDENT_LOGIN_SELECT;
+        const row = await d1First(`${table} WHERE google_sub = ?`, [sub]);
+        if (row) {
+            const user = await materializeUserBanD1(kind, row);
+            if (user.banned) {
+                const err = new Error('banned');
+                err.code = 'BANNED';
+                throw err;
+            }
+            return { kind, user, created: false };
+        }
+    }
+
+    let kind = null;
+    let row = await findUserLoginRowD1('student', e);
+    if (row) kind = 'student';
+    else {
+        row = await findUserLoginRowD1('teacher', e);
+        if (row) kind = 'teacher';
+    }
+
+    if (row && kind) {
+        const existingSub = String(row.google_sub || '').trim();
+        if (existingSub && existingSub !== sub) {
+            const err = new Error('google_sub_mismatch');
+            err.code = 'GOOGLE_SUB_MISMATCH';
+            throw err;
+        }
+        const tableName = kind === 'teacher' ? 'teachers' : 'students';
+        await d1Run(`UPDATE ${tableName} SET google_sub = ? WHERE id = ?`, [sub, row.id]);
+        if (!String(row.email || '').trim()) {
+            await d1Run(`UPDATE ${tableName} SET email = ? WHERE id = ?`, [e, row.id]);
+        }
+        const fresh = await d1First(
+            `${kind === 'teacher' ? TEACHER_LOGIN_SELECT : STUDENT_LOGIN_SELECT} WHERE id = ?`,
+            [row.id],
+        );
+        const user = await materializeUserBanD1(kind, fresh);
+        if (user.banned) {
+            const err = new Error('banned');
+            err.code = 'BANNED';
+            throw err;
+        }
+        return { kind, user, created: false };
+    }
+
+    const d = String(input.displayName || e).trim().slice(0, 64);
+    if (!d) {
+        const err = new Error('name_required');
+        err.code = 'NAME_REQUIRED';
+        throw err;
+    }
+    if (await lobbyLoginEmailTakenD1(e)) {
+        const err = new Error('email_exists');
+        err.code = 'EMAIL_EXISTS';
+        throw err;
+    }
+    const bcrypt = await import('bcryptjs');
+    const placeholder = crypto.randomBytes(32).toString('base64url');
+    const hash = bcrypt.default.hashSync(placeholder, 10);
+    try {
+        const result = await d1Run(
+            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub) VALUES (?, ?, ?, ?, ?, ?)',
+            [e, hash, d, e, 'user', sub],
+        );
+        const newRow = await d1First(`${STUDENT_LOGIN_SELECT} WHERE id = ?`, [result.lastInsertRowid]);
+        return { kind: 'student', user: await materializeUserBanD1('student', newRow), created: true };
+    } catch (insertErr) {
+        if (String(insertErr.message).includes('UNIQUE')) {
+            const err = new Error('email_exists');
+            err.code = 'EMAIL_EXISTS';
+            throw err;
+        }
+        throw insertErr;
+    }
+}
+
+/**
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ */
+export async function completeLobbyGoogleAuth(input) {
+    return withUsersBackend(
+        () => completeLobbyGoogleAuthD1(input),
+        () => completeLobbyGoogleAuthSqlite(input),
     );
 }
 

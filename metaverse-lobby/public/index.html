@@ -227,6 +227,13 @@
       <button type="button" class="am-x" id="closeModal" data-i18n-aria="common.close">×</button>
     </div>
     <form id="authForm" novalidate>
+      <div class="auth-oauth" id="authGoogleBlock" hidden>
+        <a class="btn btn-google btn-block" id="authGoogleBtn" href="/api/auth/google/start" data-i18n="auth.googleSignup">Google で登録</a>
+        <p class="auth-oauth-or"><span data-i18n="auth.orDivider">または</span></p>
+      </div>
+      <p class="auth-oauth-login" id="authGoogleLoginLink" hidden>
+        <a href="/api/auth/google/start" data-i18n="auth.googleLogin">Google でログイン</a>
+      </p>
       <div class="fld" id="fldName" hidden>
         <label for="mName" data-i18n="auth.displayName">表示名</label>
         <input id="mName" type="text" placeholder="example user" autocomplete="username">

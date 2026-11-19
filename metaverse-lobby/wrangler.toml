@@ -33,6 +33,10 @@ crons = ["* * * * *"]
 [vars]
 LOBBY_PUBLIC_POLL_MS = "10000"
 LOBBY_SIM_ORIGIN = "https://sim.mmh-virtual.jp"
+LOBBY_PUBLIC_ORIGIN = "https://m.mmh-virtual.jp"
+# Google OAuth (public client id; secret via wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET)
+GOOGLE_OAUTH_CLIENT_ID = ""
+GOOGLE_OAUTH_REDIRECT_URI = "https://m.mmh-virtual.jp/api/auth/google/callback"
 # Optional Gemini announcement translation model (empty = gemini-3.1-flash-lite in Worker)
 GEMINI_TRANSLATION_MODEL = ""
 # Lobby join display-name moderation (Jev / TypeSafe — API key is Wrangler secret LOBBY_JEV_API_KEY)

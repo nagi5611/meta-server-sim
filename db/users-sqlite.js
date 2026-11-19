@@ -90,6 +90,17 @@ function ensureLobbyUserColumns(database) {
         addCol(table, `ALTER TABLE ${table} ADD COLUMN email TEXT DEFAULT ''`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN avatar_url TEXT DEFAULT ''`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN ban_expires_at TEXT`);
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN google_sub TEXT DEFAULT ''`);
+    }
+    try {
+        database.exec(`
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_students_google_sub ON students (google_sub)
+                WHERE google_sub IS NOT NULL AND google_sub != '';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_teachers_google_sub ON teachers (google_sub)
+                WHERE google_sub IS NOT NULL AND google_sub != '';
+        `);
+    } catch {
+        /* index exists */
     }
 }
 
@@ -199,14 +210,14 @@ function findStudentLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM students WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub FROM students WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url
+            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub
              FROM students WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -217,14 +228,14 @@ function findTeacherLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM teachers WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub FROM teachers WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url
+            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub
              FROM teachers WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -308,6 +319,135 @@ export function registerLobbyStudentSqlite(email, password, displayName) {
         }
         throw insertErr;
     }
+}
+
+/**
+ * @param {string} googleSub
+ * @param {string} email
+ * @returns {{ action: 'login' | 'link' | 'create', kind?: 'student' | 'teacher' }}
+ */
+export function peekLobbyGoogleAuthSqlite(googleSub, email) {
+    const sub = String(googleSub || '').trim();
+    const e = String(email || '').trim();
+    if (!sub || !e) return { action: 'create' };
+    for (const { table, kind } of [
+        { table: 'students', kind: 'student' },
+        { table: 'teachers', kind: 'teacher' },
+    ]) {
+        const row = requireDb()
+            .prepare(`SELECT id FROM ${table} WHERE google_sub = ?`)
+            .get(sub);
+        if (row) return { action: 'login', kind };
+    }
+    if (findStudentLoginRowSqlite(e)) return { action: 'link', kind: 'student' };
+    if (findTeacherLoginRowSqlite(e)) return { action: 'link', kind: 'teacher' };
+    return { action: 'create' };
+}
+
+/**
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ */
+export function completeLobbyGoogleAuthSqlite(input) {
+    const sub = String(input.googleSub || '').trim();
+    const e = String(input.email || '').trim();
+    if (!sub) {
+        const err = new Error('google_sub_required');
+        err.code = 'GOOGLE_SUB_REQUIRED';
+        throw err;
+    }
+    if (!input.emailVerified) {
+        const err = new Error('email_not_verified');
+        err.code = 'EMAIL_NOT_VERIFIED';
+        throw err;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        const err = new Error('invalid_email');
+        err.code = 'INVALID_EMAIL';
+        throw err;
+    }
+
+    for (const { table, kind } of [
+        { table: 'students', kind: 'student' },
+        { table: 'teachers', kind: 'teacher' },
+    ]) {
+        const row = requireDb()
+            .prepare(
+                `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub
+                 FROM ${table} WHERE google_sub = ?`,
+            )
+            .get(sub);
+        if (row) {
+            const user = materializeUserBanSqlite(kind, row);
+            if (user.banned) {
+                const err = new Error('banned');
+                err.code = 'BANNED';
+                throw err;
+            }
+            return { kind, user, created: false };
+        }
+    }
+
+    let kind = null;
+    let row = findStudentLoginRowSqlite(e);
+    if (row) kind = 'student';
+    else {
+        row = findTeacherLoginRowSqlite(e);
+        if (row) kind = 'teacher';
+    }
+
+    if (row && kind) {
+        const existingSub = String(row.google_sub || '').trim();
+        if (existingSub && existingSub !== sub) {
+            const err = new Error('google_sub_mismatch');
+            err.code = 'GOOGLE_SUB_MISMATCH';
+            throw err;
+        }
+        const table = kind === 'teacher' ? 'teachers' : 'students';
+        requireDb().prepare(`UPDATE ${table} SET google_sub = ? WHERE id = ?`).run(sub, row.id);
+        if (!String(row.email || '').trim()) {
+            requireDb().prepare(`UPDATE ${table} SET email = ? WHERE id = ?`).run(e, row.id);
+        }
+        const fresh = requireDb()
+            .prepare(
+                `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub
+                 FROM ${table} WHERE id = ?`,
+            )
+            .get(row.id);
+        const user = materializeUserBanSqlite(kind, fresh);
+        if (user.banned) {
+            const err = new Error('banned');
+            err.code = 'BANNED';
+            throw err;
+        }
+        return { kind, user, created: false };
+    }
+
+    const d = String(input.displayName || e).trim().slice(0, 64);
+    if (!d) {
+        const err = new Error('name_required');
+        err.code = 'NAME_REQUIRED';
+        throw err;
+    }
+    if (lobbyLoginEmailTakenSqlite(e)) {
+        const err = new Error('email_exists');
+        err.code = 'EMAIL_EXISTS';
+        throw err;
+    }
+    const placeholder = crypto.randomBytes(32).toString('base64url');
+    const hash = bcrypt.hashSync(placeholder, BCRYPT_ROUNDS);
+    const result = requireDb()
+        .prepare(
+            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub) VALUES (?, ?, ?, ?, ?, ?)',
+        )
+        .run(e, hash, d, e, 'user', sub);
+    const id = Number(result.lastInsertRowid);
+    const newRow = requireDb()
+        .prepare(
+            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url, google_sub
+             FROM students WHERE id = ?`,
+        )
+        .get(id);
+    return { kind: 'student', user: materializeUserBanSqlite('student', newRow), created: true };
 }
 
 export function registerTeacherSqlite(username, password, displayName) {

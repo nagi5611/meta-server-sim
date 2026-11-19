@@ -4,6 +4,7 @@ import { insertJoinEvent } from './db-ops.js';
 import { handleProfileAvatarUpload } from './lobby-profile-assets.js';
 import { resolveLobbySessionBan } from './lobby-ban-guard.js';
 import { moderateLobbyDisplayName } from './display-name-moderator.js';
+import { handleGoogleOAuthApi } from './google-oauth.js';
 
 const PUBLIC_COOKIE = 'lobby_session';
 
@@ -94,6 +95,9 @@ async function issueSessionResponse(session, simUser, secret) {
  */
 export async function handlePublicAuth(request, env) {
     const url = new URL(request.url);
+
+    const googleRes = await handleGoogleOAuthApi(request, env);
+    if (googleRes) return googleRes;
 
     if (url.pathname === '/api/auth/login' && request.method === 'POST') {
         const body = await request.json();

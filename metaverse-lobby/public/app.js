@@ -768,6 +768,7 @@ async function refresh() {
 
 /* ---------- auth UI ---------- */
 let authTab = authState.mode || 'login';
+let googleOAuthEnabled = false;
 
 function syncAuthModal() {
     const signup = authTab === 'signup';
@@ -777,6 +778,10 @@ function syncAuthModal() {
     $('#switchLead').textContent = signup ? t('auth.switchToLoginLead') : t('auth.switchToSignupLead');
     $('#switchTab').textContent = signup ? t('auth.switchToLogin') : t('auth.switchToSignup');
     $('#mPass').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+    const block = $('#authGoogleBlock');
+    const loginLink = $('#authGoogleLoginLink');
+    if (block) block.hidden = !googleOAuthEnabled || !signup;
+    if (loginLink) loginLink.hidden = !googleOAuthEnabled || signup;
 }
 
 function saveDraft() {
@@ -1369,7 +1374,60 @@ if (joinCodeInput) {
     if (codeCount) codeCount.textContent = `${savedCode.length}/12`;
 }
 
+function mapGoogleAuthQueryError(code) {
+    const c = String(code || '');
+    if (c === 'banned') return t('auth.errBanned');
+    if (c === 'email_exists' || c === 'google_sub_mismatch') return t('auth.errEmailExists');
+    if (c === 'display_name_rejected') return t('join.errDisplayRejected');
+    if (c === 'email_not_verified') return t('auth.errGoogleEmailUnverified');
+    return t('auth.errGoogle');
+}
+
+async function handleGoogleAuthReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('google_auth');
+    if (!mode) return;
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete('google_auth');
+    clean.searchParams.delete('google_error');
+    window.history.replaceState({}, '', clean.pathname + clean.search + clean.hash);
+    if (mode === 'ok') {
+        try {
+            const res = await fetch('/api/auth/me', { credentials: 'include' });
+            const data = await res.json();
+            if (data.banned) {
+                applyBannedCatalogState(true);
+                return;
+            }
+            if (data.user) {
+                signIn(data.user);
+                await syncFavoritesFromServer();
+                refresh();
+            }
+        } catch {
+            showToast(t('auth.errGoogle'));
+        }
+        return;
+    }
+    if (mode === 'error') {
+        showToast(mapGoogleAuthQueryError(params.get('google_error')));
+    }
+}
+
+async function loadGoogleOAuthStatus() {
+    try {
+        const res = await fetch('/api/auth/google/status');
+        const data = await res.json();
+        googleOAuthEnabled = Boolean(data?.enabled);
+    } catch {
+        googleOAuthEnabled = false;
+    }
+    syncAuthModal();
+}
+
 async function bootstrapAuth() {
+    await loadGoogleOAuthStatus();
+    await handleGoogleAuthReturn();
     try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         const data = await res.json();

@@ -10,3 +10,8 @@ GEMINI_TRANSLATION_API_KEY=
 # Optional: lobby join / profile display-name moderation (Jev). Do not reuse GEMINI_TRANSLATION_API_KEY.
 # LOBBY_JEV_API_KEY=
 # Or alias: JEV_API_KEY= / TYPESAFE_API_KEY=
+
+# Optional: Google OAuth (scopes: openid email profile). LOBBY_JWT_SECRET required for /api/auth/google/start.
+# GOOGLE_OAUTH_CLIENT_ID=   # or LOBBY_GOOGLE_CLIENT_ID
+# GOOGLE_OAUTH_CLIENT_SECRET=   # or LOBBY_GOOGLE_CLIENT_SECRET — never commit
+# GOOGLE_OAUTH_REDIRECT_URI=http://127.0.0.1:8787/api/auth/google/callback

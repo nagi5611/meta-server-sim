@@ -67,6 +67,12 @@ jobs:
           JEV_API_KEY: ${{ secrets.JEV_API_KEY }}
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
           LOBBY_CUSTOM_HOSTNAME: ${{ vars.LOBBY_CUSTOM_HOSTNAME || 'm.mmh-virtual.jp' }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          LOBBY_GOOGLE_CLIENT_ID: ${{ secrets.LOBBY_GOOGLE_CLIENT_ID }}
+          LOBBY_GOOGLE_CLIENT_SECRET: ${{ secrets.LOBBY_GOOGLE_CLIENT_SECRET }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         run: |
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
             echo "::notice::CLOUDFLARE_API_TOKEN is not set in repository secrets; skipping deploy."

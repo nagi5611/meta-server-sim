@@ -4,6 +4,7 @@
 # 任意: CLOUDFLARE_ACCOUNT_ID, LOBBY_KV_NAMESPACE_ID, LOBBY_WORKERS_DEV_SUBDOMAIN,
 #       LOBBY_PRESENCE_SECRET, LOBBY_WORKER_SYNC_SECRET, LOBBY_CUSTOM_HOSTNAME,
 #       LOBBY_PAGES_PROJECT_NAME
+#       GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (or LOBBY_GOOGLE_* / legacy GOOGLE_OAUTH_CLIENT_* )
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -398,6 +399,18 @@ elif [[ -n "${JEV_API_KEY:-}" ]]; then
   printf '%s' "$JEV_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
 elif [[ -n "${TYPESAFE_API_KEY:-}" ]]; then
   printf '%s' "$TYPESAFE_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
+fi
+
+LOBBY_GOOGLE_ID="${LOBBY_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}"
+LOBBY_GOOGLE_SECRET="${LOBBY_GOOGLE_CLIENT_SECRET:-${GOOGLE_OAUTH_CLIENT_SECRET:-}}"
+if [[ -n "$LOBBY_GOOGLE_ID" ]]; then
+  esc="${LOBBY_GOOGLE_ID//\\/\\\\}"
+  esc="${esc//\"/\\\"}"
+  sed -i "s|^GOOGLE_OAUTH_CLIENT_ID = .*|GOOGLE_OAUTH_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML" 2>/dev/null || true
+fi
+if [[ -n "$LOBBY_GOOGLE_SECRET" ]]; then
+  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET
+  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put LOBBY_GOOGLE_CLIENT_SECRET
 fi
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
