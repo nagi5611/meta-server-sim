@@ -142,8 +142,14 @@
     fmtDateTime(iso) {
       const d = new Date(iso);
       if (isNaN(d)) return "—";
-      const p = (n) => String(n).padStart(2, "0");
-      return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+      return new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(d);
     },
     fmtDur(min) {
       if (!min) return "—";

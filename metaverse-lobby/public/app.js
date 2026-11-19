@@ -1,6 +1,14 @@
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
 
+const jstTimeFmt = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+});
+
 const grid = $('#world-grid');
 const hint = $('#refresh-hint');
 const joinScrim = $('#join-scrim');
@@ -297,7 +305,7 @@ async function refresh() {
         render();
         if (hint) {
             const t = data.updatedAt ? new Date(data.updatedAt) : new Date();
-            hint.textContent = `更新 ${t.toLocaleTimeString('ja-JP')}`;
+            hint.textContent = `更新 ${jstTimeFmt.format(t)}`;
         }
     } catch {
         if (hint) hint.textContent = '取得失敗';
