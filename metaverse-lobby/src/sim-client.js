@@ -1,7 +1,7 @@
 /**
  * @param {Record<string, unknown>} env
  * @param {string} path
- * @param {{ method?: string, body?: unknown }} [opts]
+ * @param {{ method?: string, body?: unknown, headers?: Record<string, string> }} [opts]
  */
 export async function fetchSim(env, path, opts = {}) {
     const base = String(env.LOBBY_SIM_ORIGIN || '').trim().replace(/\/$/, '');
@@ -13,6 +13,7 @@ export async function fetchSim(env, path, opts = {}) {
     const headers = {
         authorization: `Bearer ${token}`,
         accept: 'application/json',
+        ...(opts.headers || {}),
     };
     /** @type {RequestInit} */
     const init = { method, headers };
