@@ -1,8 +1,7 @@
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
 
-const jstTimeFmt = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: 'Asia/Tokyo',
+const localTimeFmt = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -305,7 +304,7 @@ async function refresh() {
         render();
         if (hint) {
             const t = data.updatedAt ? new Date(data.updatedAt) : new Date();
-            hint.textContent = `更新 ${jstTimeFmt.format(t)}`;
+            hint.textContent = `更新 ${localTimeFmt.format(t)}`;
         }
     } catch {
         if (hint) hint.textContent = '取得失敗';

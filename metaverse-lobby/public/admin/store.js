@@ -142,8 +142,7 @@
     fmtDateTime(iso) {
       const d = new Date(iso);
       if (isNaN(d)) return "—";
-      return new Intl.DateTimeFormat("ja-JP", {
-        timeZone: "Asia/Tokyo",
+      return new Intl.DateTimeFormat(undefined, {
         month: "numeric",
         day: "numeric",
         hour: "2-digit",
