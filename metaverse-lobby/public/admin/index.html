@@ -29,6 +29,12 @@
         <input class="inp" id="gPass" type="password" autocomplete="current-password">
       </div>
     </div>
+    <div class="field" id="gateOtpField" hidden>
+      <label for="gOtp" data-i18n="admin.gateOtpLabel">確認コード（メール）</label>
+      <input class="inp" id="gOtp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" spellcheck="false">
+      <p class="meta-line" id="gateOtpHint" style="margin-top:8px"></p>
+    </div>
+    <p class="gate-audit" id="gateAudit" hidden></p>
     <p class="gate-err" id="gateErr" role="alert"></p>
     <button class="btn btn-primary btn-block" type="submit" id="gateBtn" style="height:40px" data-i18n="admin.gateLogin">ログイン</button>
   </form>
@@ -53,6 +59,7 @@
       <div class="locale-select locale-select--block" data-locale-select aria-labelledby="langLblSide"></div>
       <span id="langLblSide" class="sr-only" data-i18n="common.language">言語</span>
       <a class="side-link" href="/" target="_blank" rel="noopener" data-i18n="admin.openPublic">公開ページを開く ↗</a>
+      <p class="side-audit" id="superLoginAudit" hidden></p>
       <div class="side-user">
         <span class="av">A</span>
         <span class="who"><b id="whoUser">admin</b><span data-i18n="admin.roleAdmin">管理者</span></span>

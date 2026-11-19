@@ -4,6 +4,12 @@ LOBBY_ADMIN_PASSWORD=change-me
 LOBBY_ADMIN_SESSION_SECRET=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 LOBBY_SIM_SERVICE_TOKEN=unused-local
 
+# Super-admin OTP 2FA (Worker secrets in production — never commit real values)
+# ADMIN_EMAIL=you@example.com
+# ADMIN_OTP_SECRET=optional-hmac-key-fallback-is-LOBBY_ADMIN_SESSION_SECRET
+# RESEND_API_KEY=
+# RESEND_FROM_EMAIL=みんなでメタ <noreply@mmh-virtual.jp>
+
 # Optional: announcement auto-translation (also: wrangler secret put GEMINI_TRANSLATION_API_KEY)
 GEMINI_TRANSLATION_API_KEY=
 

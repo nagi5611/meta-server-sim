@@ -40,6 +40,9 @@ test('handleAdminLogin: static LOBBY_ADMIN_PASSWORD still works', async () => {
     assert.ok(token);
     const session = await verifyJwt(token, SECRET);
     assert.equal(session?.sub, 'admin');
+    assert.equal(session?.superAdmin, true);
+    const body = await res.json();
+    assert.equal(body.user.superAdmin, true);
 });
 
 test('handleAdminLogin: sim teacher via email issues admin session', async () => {
@@ -66,6 +69,11 @@ test('handleAdminLogin: sim teacher via email issues admin session', async () =>
         assert.equal(res?.status, 200);
         const data = await res.json();
         assert.equal(data.user.username, 'sensei');
+        assert.equal(data.user.superAdmin, false);
+        const setCookie = res.headers.get('set-cookie') || '';
+        const token = setCookie.match(/lobby_admin_session=([^;]+)/)?.[1];
+        const session = token ? await verifyJwt(token, SECRET) : null;
+        assert.equal(session?.superAdmin, false);
     } finally {
         sim.close();
     }

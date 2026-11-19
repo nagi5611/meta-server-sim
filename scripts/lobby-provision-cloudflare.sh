@@ -5,6 +5,7 @@
 #       LOBBY_PRESENCE_SECRET, LOBBY_WORKER_SYNC_SECRET, LOBBY_CUSTOM_HOSTNAME,
 #       LOBBY_PAGES_PROJECT_NAME
 #       GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (or LOBBY_GOOGLE_* / legacy GOOGLE_OAUTH_CLIENT_* )
+#       ADMIN_EMAIL, ADMIN_OTP_SECRET (super-admin OTP 2FA), RESEND_API_KEY (Worker OTP mail)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -425,6 +426,15 @@ if [[ -n "${LOBBY_JWT_SECRET:-}" ]]; then
 fi
 if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
+fi
+if [[ -n "${ADMIN_EMAIL:-}" ]]; then
+  printf '%s' "$ADMIN_EMAIL" | npx wrangler secret put ADMIN_EMAIL
+fi
+if [[ -n "${ADMIN_OTP_SECRET:-}" ]]; then
+  printf '%s' "$ADMIN_OTP_SECRET" | npx wrangler secret put ADMIN_OTP_SECRET
+fi
+if [[ -n "${RESEND_API_KEY:-}" ]]; then
+  printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY
 fi
 if [[ -n "${GEMINI_TRANSLATION_API_KEY:-}" ]]; then
   printf '%s' "$GEMINI_TRANSLATION_API_KEY" | npx wrangler secret put GEMINI_TRANSLATION_API_KEY

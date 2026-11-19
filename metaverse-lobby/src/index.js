@@ -46,7 +46,7 @@ async function handleApi(request, env) {
     const assetRes = await handleAssetGet(request, env);
     if (assetRes) return assetRes;
 
-    const loginRes = await handleAdminLogin(request, env);
+    const loginRes = await handleAdminLogin(request, env, kv);
     if (loginRes) return loginRes;
 
     const publicAuth = await handlePublicAuth(request, env);

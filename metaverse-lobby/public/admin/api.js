@@ -74,8 +74,13 @@
   window.LobbyAdminApi = {
     login: (login, password) =>
       request("/login", { method: "POST", body: { login, password, username: login, email: login } }),
+    verifyOtp: (challengeId, code) =>
+      request("/login/verify-otp", { method: "POST", body: { challengeId, code } }),
+    superLoginAudit: (limit) =>
+      request(`/super-login-audit${limit ? `?limit=${limit}` : ""}`),
     bootstrapFromLobby: () => request("/bootstrap-from-lobby", { method: "POST", body: {} }),
     logout: () => request("/logout", { method: "POST", body: {} }),
+    session: () => request("/session"),
     getCatalog: () => request("/catalog"),
     putCatalog: (worlds) => request("/catalog", { method: "PUT", body: { worlds } }),
     overview: () => request("/overview"),

@@ -18,11 +18,48 @@
 
   /* ================= 認証 ================= */
   const gate = $("#gate"), app = $("#app");
+  const otpState = { challengeId: null, pending: false };
+
+  function resetOtpGate() {
+    otpState.challengeId = null;
+    otpState.pending = false;
+    const otpField = $("#gateOtpField");
+    const otp = $("#gOtp");
+    const hint = $("#gateOtpHint");
+    const audit = $("#gateAudit");
+    if (otpField) otpField.hidden = true;
+    if (otp) otp.value = "";
+    if (hint) hint.textContent = "";
+    if (audit) { audit.hidden = true; audit.textContent = ""; }
+    const btn = $("#gateBtn");
+    if (btn) btn.textContent = tr("admin.gateLogin");
+  }
+
+  function showSuperLoginAudit() {
+    const strip = $("#superLoginAudit");
+    if (!strip) return;
+    const last = store.superLoginAudit?.lastSuccess;
+    if (store.superAdmin && last?.eventAtJst) {
+      strip.hidden = false;
+      strip.textContent = tr("admin.superLoginLast", {
+        ip: last.clientIp || "—",
+        at: last.eventAtJst,
+      });
+    } else {
+      strip.hidden = true;
+      strip.textContent = "";
+    }
+  }
+
   async function enter() {
     $("#gateErr").textContent = "";
     $("#gateBtn").disabled = true;
     try {
       await store.refresh();
+      const who = $("#whoUser");
+      if (who && store.adminUsername) who.textContent = store.adminUsername;
+      resetOtpGate();
+      showSuperLoginAudit();
       gate.hidden = true;
       app.hidden = false;
       render();
@@ -36,9 +73,37 @@
   }
   $("#gateForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-  $("#gateErr").textContent = "";
+    $("#gateErr").textContent = "";
+    $("#gateBtn").disabled = true;
     try {
-      await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
+      if (otpState.pending && otpState.challengeId) {
+        const code = $("#gOtp")?.value?.trim() || "";
+        await window.LobbyAdminApi.verifyOtp(otpState.challengeId, code);
+        await enter();
+        return;
+      }
+      const data = await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
+      if (data?.otpRequired && data.challengeId) {
+        otpState.challengeId = data.challengeId;
+        otpState.pending = true;
+        const otpField = $("#gateOtpField");
+        const hint = $("#gateOtpHint");
+        const audit = $("#gateAudit");
+        if (otpField) otpField.hidden = false;
+        if (hint) {
+          hint.textContent = tr("admin.gateOtpSent", { mask: data.otpSentTo || "email" });
+        }
+        if (audit && data.clientIp && data.attemptedAtJst) {
+          audit.hidden = false;
+          audit.textContent = tr("admin.gateAttemptAudit", {
+            ip: data.clientIp,
+            at: data.attemptedAtJst,
+          });
+        }
+        $("#gateBtn").textContent = tr("admin.gateOtpSubmit");
+        setTimeout(() => $("#gOtp")?.focus(), 50);
+        return;
+      }
       await enter();
     } catch (err) {
       const code = err?.data?.error;
@@ -49,18 +114,31 @@
             ? "admin.gateAdminRequired"
             : code === "session_not_configured"
               ? "admin.gateSessionNotConfigured"
-              : "admin.gateErr";
+              : code === "otp_invalid" || code === "otp_expired" || code === "otp_locked"
+                ? "admin.gateOtpInvalid"
+                : code === "otp_mail_not_configured" || code === "otp_send_failed"
+                  ? "admin.gateOtpMailFail"
+                  : "admin.gateErr";
       $("#gateErr").textContent = tr(key);
-      $("#gPass").select();
+      if (otpState.pending) $("#gOtp")?.select();
+      else $("#gPass").select();
+    } finally {
+      $("#gateBtn").disabled = false;
     }
   });
   $("#logoutBtn").addEventListener("click", async () => {
     try { await window.LobbyAdminApi.logout(); } catch { /* ignore */ }
     app.hidden = true; gate.hidden = false;
+    resetOtpGate();
     $("#gPass").value = ""; $("#gUser").focus();
+    const strip = $("#superLoginAudit");
+    if (strip) { strip.hidden = true; strip.textContent = ""; }
   });
   (async function trySession() {
     async function openApp() {
+      const who = $("#whoUser");
+      if (who && store.adminUsername) who.textContent = store.adminUsername;
+      showSuperLoginAudit();
       gate.hidden = true;
       app.hidden = false;
       render();
@@ -504,9 +582,11 @@
     btn.classList.add("act");
 
     const items = [
-      u.role === "admin"
-        ? { k: "role", label: "管理者から外す", desc: "一般ユーザーに戻す" }
-        : { k: "role", label: "管理者にする", desc: "管理画面へアクセスできる" },
+      store.superAdmin
+        ? (u.role === "admin"
+          ? { k: "role", label: "管理者から外す", desc: "一般ユーザーに戻す" }
+          : { k: "role", label: "管理者にする", desc: "管理画面へアクセスできる" })
+        : null,
       u.banned
         ? { k: "ban", label: "BAN を解除", desc: "サインインを許可する" }
         : { k: "ban", label: "BAN する", desc: "サインインと参加を停止", danger: true },
@@ -544,9 +624,16 @@
     const u = store.user(id);
     if (!u) return;
     if (k === "role") {
+      if (!store.superAdmin) {
+        toast(tr("admin.superAdminRequired"));
+        return;
+      }
       const to = u.role === "admin" ? "member" : "admin";
       store.patchUser(id, { role: to }).then(() => {
         render(); toast(to === "admin" ? `${u.name} を管理者にしました` : `${u.name} を一般ユーザーに戻しました`);
+      }).catch((err) => {
+        if (err?.data?.error === "super_admin_required") toast(tr("admin.superAdminRequired"));
+        else toast(tr("admin.userPatchFail"));
       });
       return;
     }
@@ -804,9 +891,21 @@
 
   /* ================= 設定 ================= */
   function viewSettings() {
+    const auditRows = (state.superLoginEvents || []).map((r) => {
+      const outcome = tr(`admin.superLoginOutcome.${r.outcome}`) || r.outcome;
+      return `<tr><td class="num dim">${esc(r.eventAtJst)}</td><td class="num">${esc(r.clientIp || "—")}</td><td>${esc(outcome)}</td></tr>`;
+    }).join("");
+    const auditBlock = store.superAdmin
+      ? `<div class="set-row"><h3 data-i18n="admin.superLoginAuditTitle">スーパー管理者ログイン</h3><div>
+        <p data-i18n="admin.superLoginAuditDesc">パスワード承認・OTP・セッション開始を IP と JST 時刻で記録します。</p>
+        ${state._superAuditLoading ? `<p>${esc(tr("common.syncing"))}</p>` : ""}
+        ${auditRows ? `<table class="mini-log"><thead><tr><th>時刻 (JST)</th><th>IP</th><th>結果</th></tr></thead><tbody>${auditRows}</tbody></table>` : `<p class="dim">${esc(tr("admin.superLoginAuditEmpty"))}</p>`}
+      </div></div>`
+      : "";
     return head("設定") + `<div class="sheet set">
       <div class="set-row"><h3>管理ログイン</h3><div>
-        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。カタログは sim 本番 JSON が正本です。</p></div></div>
+        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。スーパー管理者は <code>ADMIN_EMAIL</code> 宛 OTP 2FA（Secrets: <code>ADMIN_EMAIL</code>, <code>ADMIN_OTP_SECRET</code>, Worker <code>RESEND_API_KEY</code>）。カタログは sim 本番 JSON が正本です。</p></div></div>
+      ${auditBlock}
       <div class="set-row"><h3>パスワード再設定メール</h3><div>
         <p>Resend で再設定リンクを送信します。sim の <code>RESEND_API_KEY</code> と <code>RESEND_FROM_EMAIL</code>、任意で <code>LOBBY_PASSWORD_RESET_URL</code> を設定してください。</p></div></div>
     </div>`;
@@ -835,6 +934,16 @@
       v === "editor" && state.editing ? viewEditor() :
       v === "users" ? viewUsers() : v === "announcements" ? viewAnnouncements() :
       v === "logs" ? viewLogs() : v === "settings" ? viewSettings() : viewWorlds();
+    if (v === "settings" && store.superAdmin && !state.superLoginEvents && !state._superAuditLoading) {
+      state._superAuditLoading = true;
+      window.LobbyAdminApi.superLoginAudit(25).then((data) => {
+        state.superLoginEvents = data.events || [];
+        state._superAuditLoading = false;
+        if (state.view === "settings") render();
+      }).catch(() => {
+        state._superAuditLoading = false;
+      });
+    }
     if (v === "worlds") {
       drawChart(true);
       pullChartMetrics();

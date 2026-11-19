@@ -23,9 +23,19 @@
     users: [],
     announcements: [],
     overview: null,
+    superAdmin: false,
+    adminUsername: "",
+    superLoginAudit: null,
     async refresh() {
       if (!API) throw new Error("api_unavailable");
-      const [cat, users] = await Promise.all([API.getCatalog(), API.getUsers()]);
+      const [cat, users, sess] = await Promise.all([
+        API.getCatalog(),
+        API.getUsers(),
+        API.session().catch(() => null),
+      ]);
+      this.superAdmin = Boolean(sess?.user?.superAdmin);
+      this.adminUsername = sess?.user?.username || "";
+      this.superLoginAudit = sess?.superLoginAudit || null;
       this.worlds = cat.worlds || [];
       this.users = users.users || [];
       try {

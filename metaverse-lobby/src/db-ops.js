@@ -26,6 +26,9 @@ export async function ensureLobbyOpsSchema(db) {
     await db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY, actor TEXT, action TEXT, target_type TEXT, target_id TEXT,
       detail TEXT, created_at TEXT)`);
+    await db.exec(`CREATE TABLE IF NOT EXISTS super_admin_login_events (
+      id TEXT PRIMARY KEY, client_ip TEXT, event_at_jst TEXT NOT NULL, event_at_utc TEXT NOT NULL,
+      outcome TEXT NOT NULL, detail TEXT)`);
     await db.exec(`CREATE TABLE IF NOT EXISTS announcements (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
       published INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
@@ -250,4 +253,50 @@ export async function insertAuditLog(db, row) {
             row.created_at,
         )
         .run();
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {Record<string, unknown>} row
+ */
+export async function insertSuperAdminLoginEvent(db, row) {
+    if (!db) return;
+    await db
+        .prepare(
+            `INSERT INTO super_admin_login_events (id, client_ip, event_at_jst, event_at_utc, outcome, detail)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+            row.id,
+            row.client_ip || null,
+            row.event_at_jst,
+            row.event_at_utc,
+            row.outcome,
+            row.detail ? JSON.stringify(row.detail) : null,
+        )
+        .run();
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {number} [limit]
+ */
+export async function listSuperAdminLoginEvents(db, limit = 20) {
+    if (!db) return [];
+    const cap = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const rows = await db
+        .prepare(
+            `SELECT id, client_ip, event_at_jst, event_at_utc, outcome, detail
+             FROM super_admin_login_events ORDER BY event_at_utc DESC LIMIT ?`,
+        )
+        .bind(cap)
+        .all();
+    return (rows.results || []).map((r) => ({
+        id: String(r.id),
+        clientIp: r.client_ip ? String(r.client_ip) : '',
+        eventAtJst: String(r.event_at_jst || ''),
+        eventAtUtc: String(r.event_at_utc || ''),
+        outcome: String(r.outcome || ''),
+        detail: r.detail ? JSON.parse(String(r.detail)) : null,
+    }));
 }

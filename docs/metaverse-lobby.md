@@ -50,6 +50,20 @@ Google Cloud Console の OAuth クライアントで **承認済みリダイレ�
 
 `LOBBY_JWT_SECRET` も OAuth フロー（state JWT）に必須です（既存のロビー JWT と同じ Worker secret）。
 
+### スーパー管理者（LOBBY_ADMIN）ログイン hardening
+
+Worker 静的アカウント `LOBBY_ADMIN_USER` / `LOBBY_ADMIN_PASSWORD` は JWT に `superAdmin: true` を付与します（ロビー内 `lobbyRole: admin` の教師・学生とは別系統）。
+
+| 保存先 | 名前 | 用途 |
+|--------|------|------|
+| **GitHub Actions** secrets | `ADMIN_EMAIL` | OTP 送信先（未設定時はローカル向けに OTP をスキップして従来どおり即セッション） |
+| **GitHub Actions** secrets | `ADMIN_OTP_SECRET` | 任意。OTP HMAC 用（未設定時は `LOBBY_ADMIN_SESSION_SECRET`） |
+| **GitHub Actions** secrets | `RESEND_API_KEY` | Worker から OTP メール送信（sim の Resend と同じキーで可） |
+| **Worker** var | `RESEND_FROM_EMAIL` | 任意。未設定時 `みんなでメタ <noreply@mmh-virtual.jp>` |
+| **Worker** secrets | 上記 3 つ | `scripts/lobby-provision-cloudflare.sh` が投入 |
+
+試行は D1 `super_admin_login_events` に **クライアント IP + JST 時刻** を記録します。管理 UI のゲート（OTP 手順）と設定画面の監査表、サイドバーの「前回ログイン」に表示します。OTP は KV（TTL 10 分）にハッシュ保存します。
+
 有効化確認: `GET /api/auth/google/status` → `{ "enabled": true }`。`/api/auth/google/start` は 302 で `accounts.google.com` へリダイレクト（未設定時 503 `google_oauth_not_configured`）。
 
 カタログ本体: `data/platform/lobby-catalog.json`

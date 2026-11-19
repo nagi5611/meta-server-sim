@@ -42,6 +42,7 @@ jobs:
           test -f public/admin/panel.js
           test -f functions/admin/api/'[[path]]'.js
           test -f migrations/0001_lobby_ops.sql
+          test -f migrations/0004_super_admin_login_audit.sql
 
   deploy:
     needs: validate
@@ -65,6 +66,9 @@ jobs:
           LOBBY_ADMIN_PASSWORD: ${{ secrets.LOBBY_ADMIN_PASSWORD }}
           LOBBY_JWT_SECRET: ${{ secrets.LOBBY_JWT_SECRET }}
           LOBBY_ADMIN_SESSION_SECRET: ${{ secrets.LOBBY_ADMIN_SESSION_SECRET }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_OTP_SECRET: ${{ secrets.ADMIN_OTP_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           LOBBY_SIM_SERVICE_TOKEN: ${{ secrets.LOBBY_SIM_SERVICE_TOKEN }}
           GEMINI_TRANSLATION_API_KEY: ${{ secrets.GEMINI_TRANSLATION_API_KEY }}
           LOBBY_JEV_API_KEY: ${{ secrets.LOBBY_JEV_API_KEY }}

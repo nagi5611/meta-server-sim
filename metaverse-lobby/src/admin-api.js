@@ -20,6 +20,8 @@ import {
     updateAnnouncement,
 } from './db-ops.js';
 import { handleThumbnailUpload } from './lobby-assets.js';
+import { isLobbySuperAdmin } from './lobby-super-admin.js';
+import { getSuperAdminLoginAudit, handleAdminLoginSuper } from './admin-super-login.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
@@ -63,52 +65,13 @@ async function verifyAdmin(request, env) {
 /**
  * @param {Request} request
  * @param {Record<string, unknown>} env
+ * @param {KVNamespace} [kv]
  */
-export async function handleAdminLogin(request, env) {
-    if (request.method !== 'POST') return null;
-    const url = new URL(request.url);
-    if (url.pathname !== '/api/admin/login') return null;
-    const body = await request.json();
-    const login = String(body.login || body.username || body.email || '').trim();
-    const pass = String(body.password || '');
-    const expectUser = String(env.LOBBY_ADMIN_USER || 'admin').trim();
-    const expectPass = String(env.LOBBY_ADMIN_PASSWORD || '').trim();
-
-    /** @type {string} */
-    let sessionUser = login;
-    let authenticated = false;
-    /** @type {{ ok: boolean, status: number, data: Record<string, unknown> | null }} | null */
-    let simResult = null;
-
-    if (expectPass && login === expectUser && pass === expectPass) {
-        authenticated = true;
-        sessionUser = expectUser;
-    } else {
-        simResult = await fetchSim(env, '/service/lobby/admin-login', {
-            method: 'POST',
-            body: { login, password: pass },
-        });
-        if (simResult.ok && simResult.data?.user) {
-            authenticated = true;
-            sessionUser = String(simResult.data.user.username || login);
-        }
-    }
-
-    if (!authenticated) {
-        const simError = String(simResult?.data?.error || '').trim();
-        if (simError === 'banned') return json({ error: 'banned' }, 403);
-        if (simError === 'admin_required') return json({ error: 'admin_required' }, 403);
-        if (simError === 'login_and_password_required') {
-            return json({ error: 'login_and_password_required' }, 400);
-        }
-        const status = simResult && !simResult.ok && simResult.status >= 400 ? simResult.status : 401;
-        return json({ error: simError || 'invalid_credentials' }, status === 403 ? 403 : 401);
-    }
-    const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
-    if (!secret) return json({ error: 'session_not_configured' }, 503);
-    const token = await signJwt({ sub: sessionUser, role: 'admin', admin: true }, secret, 60 * 60 * 12);
-    const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
-    return json({ ok: true, user: { username: sessionUser, role: 'admin' } }, 200, { 'set-cookie': cookie });
+export async function handleAdminLogin(request, env, kv) {
+    const kvStore = kv || /** @type {KVNamespace} */ ({ get: async () => null, put: async () => {}, delete: async () => {} });
+    const result = await handleAdminLoginSuper(request, env, kvStore);
+    if (!result) return null;
+    return json(result.body, result.status, result.headers || {});
 }
 
 /**
@@ -134,9 +97,17 @@ export async function handleAdminApi(request, env, kv) {
         const secret = String(env.LOBBY_ADMIN_SESSION_SECRET || env.LOBBY_JWT_SECRET || '').trim();
         if (!secret) return json({ error: 'session_not_configured' }, 503);
         const sessionUser = String(publicSession.username || publicSession.sub || 'admin');
-        const token = await signJwt({ sub: sessionUser, role: 'admin', admin: true }, secret, 60 * 60 * 12);
+        const token = await signJwt(
+            { sub: sessionUser, role: 'admin', admin: true, superAdmin: false },
+            secret,
+            60 * 60 * 12,
+        );
         const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
-        return json({ ok: true, user: { username: sessionUser, role: 'admin' } }, 200, { 'set-cookie': cookie });
+        return json(
+            { ok: true, user: { username: sessionUser, role: 'admin', superAdmin: false } },
+            200,
+            { 'set-cookie': cookie },
+        );
     }
 
     const session = await verifyAdmin(request, env);
@@ -146,6 +117,41 @@ export async function handleAdminApi(request, env, kv) {
 
     const thumbUpload = await handleThumbnailUpload(request, env);
     if (thumbUpload) return thumbUpload;
+
+    if (url.pathname === '/api/admin/session' && request.method === 'GET') {
+        const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+        const superAdmin = isLobbySuperAdmin(session);
+        const payload = {
+            ok: true,
+            user: {
+                username: String(session?.sub || ''),
+                role: 'admin',
+                superAdmin,
+            },
+        };
+        if (superAdmin && db) {
+            const audit = await getSuperAdminLoginAudit(db, 1);
+            if (audit.lastSuccess) {
+                payload.superLoginAudit = {
+                    lastSuccess: {
+                        clientIp: audit.lastSuccess.clientIp,
+                        eventAtJst: audit.lastSuccess.eventAtJst,
+                    },
+                };
+            }
+        }
+        return json(payload);
+    }
+
+    if (url.pathname === '/api/admin/super-login-audit' && request.method === 'GET') {
+        if (!isLobbySuperAdmin(session)) {
+            return json({ error: 'super_admin_required' }, 403);
+        }
+        const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+        const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 50);
+        const audit = await getSuperAdminLoginAudit(db, limit);
+        return json({ ok: true, ...audit });
+    }
 
     if (url.pathname === '/api/admin/catalog' && request.method === 'GET') {
         const sim = await fetchSim(env, '/service/lobby-catalog');
@@ -276,9 +282,24 @@ export async function handleAdminApi(request, env, kv) {
         if (body.banPermanent === true) patch.banExpiresAt = null;
         patch.actor = String(session?.sub || 'admin');
         if (body.email !== undefined) patch.email = String(body.email).trim();
-        if (body.role === 'admin' || body.lobbyRole === 'admin') patch.lobbyRole = 'admin';
-        if (body.role === 'member' || body.lobbyRole === 'user') patch.lobbyRole = 'user';
-        const sim = await fetchSim(env, `/service/users/${kind}/${rawId}`, { method: 'PATCH', body: patch });
+        const wantsRoleChange =
+            body.role === 'admin' ||
+            body.lobbyRole === 'admin' ||
+            body.role === 'member' ||
+            body.lobbyRole === 'user';
+        if (wantsRoleChange) {
+            if (!isLobbySuperAdmin(session)) {
+                return json({ error: 'super_admin_required' }, 403);
+            }
+            if (body.role === 'admin' || body.lobbyRole === 'admin') patch.lobbyRole = 'admin';
+            if (body.role === 'member' || body.lobbyRole === 'user') patch.lobbyRole = 'user';
+        }
+        const simHeaders = wantsRoleChange ? { 'x-lobby-super-admin': '1' } : undefined;
+        const sim = await fetchSim(env, `/service/users/${kind}/${rawId}`, {
+            method: 'PATCH',
+            body: patch,
+            headers: simHeaders,
+        });
         if (!sim.ok) return json(sim.data || { error: 'patch_failed' }, sim.status);
         const db = env.LOBBY_DB;
         if (db) {
