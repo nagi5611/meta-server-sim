@@ -117,11 +117,11 @@ export function getUsersDbStatus() {
 
 const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
-                        COALESCE(email, '') AS email FROM students`;
+                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM students`;
 
 const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
-                        COALESCE(email, '') AS email FROM teachers`;
+                        COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM teachers`;
 
 /**
  * @param {'student'|'teacher'} kind
@@ -146,6 +146,7 @@ function rowToVerifiedUser(row, kind) {
         banned: Boolean(row.banned),
         lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
         email: String(row.email || ''),
+        avatarUrl: String(row.avatar_url || ''),
         kind,
     };
 }
@@ -421,13 +422,15 @@ export async function updateTeacher(id, fields) {
     );
 }
 
-async function updateStudentD1(id, { username, displayName, password } = {}) {
+async function updateStudentD1(id, { username, displayName, avatarUrl, password } = {}) {
     const bcrypt = await import('bcryptjs');
     const { validateUserPassword } = await import('../lib/password-policy.js');
-    const row = await d1First('SELECT id, username, display_name FROM students WHERE id = ?', [id]);
+    const row = await d1First('SELECT id, username, display_name, avatar_url FROM students WHERE id = ?', [id]);
     if (!row) return null;
     const u = username !== undefined ? String(username).trim() : String(row.username);
     const d = displayName !== undefined ? String(displayName).trim() : String(row.display_name);
+    const av =
+        avatarUrl !== undefined ? String(avatarUrl || '').trim() : String(row.avatar_url || '');
     if (password !== undefined && password !== null && String(password).length > 0) {
         const check = validateUserPassword(password);
         if (!check.ok) {
@@ -437,22 +440,29 @@ async function updateStudentD1(id, { username, displayName, password } = {}) {
         }
         const hash = bcrypt.default.hashSync(password, 10);
         await d1Run(
-            'UPDATE students SET username = ?, display_name = ?, password_hash = ? WHERE id = ?',
-            [u, d, hash, id]
+            'UPDATE students SET username = ?, display_name = ?, avatar_url = ?, password_hash = ? WHERE id = ?',
+            [u, d, av, hash, id]
         );
     } else {
-        await d1Run('UPDATE students SET username = ?, display_name = ? WHERE id = ?', [u, d, id]);
+        await d1Run('UPDATE students SET username = ?, display_name = ?, avatar_url = ? WHERE id = ?', [
+            u,
+            d,
+            av,
+            id,
+        ]);
     }
-    return { id, username: u, displayName: d };
+    return { id, username: u, displayName: d, avatarUrl: av };
 }
 
-async function updateTeacherD1(id, { username, displayName, password } = {}) {
+async function updateTeacherD1(id, { username, displayName, avatarUrl, password } = {}) {
     const bcrypt = await import('bcryptjs');
     const { validateUserPassword } = await import('../lib/password-policy.js');
-    const row = await d1First('SELECT id, username, display_name FROM teachers WHERE id = ?', [id]);
+    const row = await d1First('SELECT id, username, display_name, avatar_url FROM teachers WHERE id = ?', [id]);
     if (!row) return null;
     const u = username !== undefined ? String(username).trim() : String(row.username);
     const d = displayName !== undefined ? String(displayName).trim() : String(row.display_name);
+    const av =
+        avatarUrl !== undefined ? String(avatarUrl || '').trim() : String(row.avatar_url || '');
     if (password !== undefined && password !== null && String(password).length > 0) {
         const check = validateUserPassword(password);
         if (!check.ok) {
@@ -462,13 +472,18 @@ async function updateTeacherD1(id, { username, displayName, password } = {}) {
         }
         const hash = bcrypt.default.hashSync(password, 10);
         await d1Run(
-            'UPDATE teachers SET username = ?, display_name = ?, password_hash = ? WHERE id = ?',
-            [u, d, hash, id]
+            'UPDATE teachers SET username = ?, display_name = ?, avatar_url = ?, password_hash = ? WHERE id = ?',
+            [u, d, av, hash, id]
         );
     } else {
-        await d1Run('UPDATE teachers SET username = ?, display_name = ? WHERE id = ?', [u, d, id]);
+        await d1Run('UPDATE teachers SET username = ?, display_name = ?, avatar_url = ? WHERE id = ?', [
+            u,
+            d,
+            av,
+            id,
+        ]);
     }
-    return { id, username: u, displayName: d };
+    return { id, username: u, displayName: d, avatarUrl: av };
 }
 
 export async function deleteStudent(id) {

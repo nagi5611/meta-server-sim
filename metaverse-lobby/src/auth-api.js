@@ -1,6 +1,7 @@
 import { fetchSim } from './sim-client.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
 import { insertJoinEvent } from './db-ops.js';
+import { handleProfileAvatarUpload } from './lobby-profile-assets.js';
 
 const PUBLIC_COOKIE = 'lobby_session';
 
@@ -41,6 +42,44 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 /**
+ * @param {{ username: string, displayName: string, role?: string, avatarUrl?: string }} simUser
+ * @param {string} [roleOverride]
+ */
+function toPublicUser(simUser, roleOverride) {
+    const avatarUrl = String(simUser.avatarUrl || '').trim();
+    const out = {
+        name: simUser.displayName,
+        handle: `@${simUser.username}`,
+        role: roleOverride || simUser.role || 'member',
+    };
+    if (avatarUrl) out.avatarUrl = avatarUrl;
+    return out;
+}
+
+/**
+ * @param {Record<string, unknown>} session
+ * @param {{ username: string, displayName: string, avatarUrl?: string }} simUser
+ * @param {string} secret
+ */
+async function issueSessionResponse(session, simUser, secret) {
+    const avatarUrl = String(simUser.avatarUrl || session.avatarUrl || '').trim();
+    const token = await signJwt(
+        {
+            sub: session.sub,
+            username: simUser.username,
+            displayName: simUser.displayName,
+            role: session.role,
+            banned: session.banned,
+            ...(avatarUrl ? { avatarUrl } : {}),
+        },
+        secret,
+        60 * 60 * 24 * 7,
+    );
+    const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
+    return { cookie, user: toPublicUser({ ...simUser, avatarUrl }, session.role) };
+}
+
+/**
  * @param {Request} request
  * @param {Record<string, unknown>} env
  */
@@ -55,6 +94,7 @@ export async function handlePublicAuth(request, env) {
         if (!user) return json({ error: 'login_failed' }, 401);
         const secret = String(env.LOBBY_JWT_SECRET || '').trim();
         if (!secret) return json({ error: 'jwt_not_configured' }, 503);
+        const avatarUrl = String(user.avatarUrl || '').trim();
         const token = await signJwt(
             {
                 sub: user.userId,
@@ -62,12 +102,13 @@ export async function handlePublicAuth(request, env) {
                 displayName: user.displayName,
                 role: user.role,
                 banned: user.banned,
+                ...(avatarUrl ? { avatarUrl } : {}),
             },
             secret,
             60 * 60 * 24 * 7,
         );
         const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
-        return json({ ok: true, user: { name: user.displayName, handle: `@${user.username}`, role: user.role } }, 200, {
+        return json({ ok: true, user: toPublicUser(user, user.role) }, 200, {
             'set-cookie': cookie,
         });
     }
@@ -92,29 +133,49 @@ export async function handlePublicAuth(request, env) {
             60 * 60 * 24 * 7,
         );
         const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
-        return json(
-            { ok: true, user: { name: user.displayName, handle: `@${user.username}`, role: user.role } },
-            201,
-            { 'set-cookie': cookie },
-        );
+        return json({ ok: true, user: toPublicUser(user, user.role) }, 201, {
+            'set-cookie': cookie,
+        });
     }
 
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
         if (!session) return json({ user: null });
-        return json({
-            user: {
-                name: session.displayName || session.username,
-                handle: `@${session.username}`,
-                role: session.role,
-            },
-        });
+        const avatarUrl = String(session.avatarUrl || '').trim();
+        const user = {
+            name: session.displayName || session.username,
+            handle: `@${session.username}`,
+            role: session.role,
+        };
+        if (avatarUrl) user.avatarUrl = avatarUrl;
+        return json({ user });
     }
 
     if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
         return json({ ok: true }, 200, {
             'set-cookie': setCookieHeader(PUBLIC_COOKIE, '', 0, '/'),
         });
+    }
+
+    if (url.pathname === '/api/auth/profile/avatar' && request.method === 'POST') {
+        const session = await getPublicSession(request, env);
+        if (!session?.sub) return json({ error: 'unauthorized' }, 401);
+        const uploadRes = await handleProfileAvatarUpload(request, env, String(session.sub));
+        if (!uploadRes || uploadRes.status >= 400) return uploadRes;
+        const uploadJson = await uploadRes.json();
+        const avatarUrl = String(uploadJson.avatarUrl || '').trim();
+        if (!avatarUrl) return json({ error: 'avatar_upload_failed' }, 500);
+        const sim = await fetchSim(env, '/service/lobby/user-profile', {
+            method: 'PATCH',
+            body: { userRef: session.sub, avatarUrl },
+        });
+        if (!sim.ok) return json(sim.data || { error: 'profile_update_failed' }, sim.status || 400);
+        const user = sim.data?.user;
+        if (!user) return json({ error: 'profile_update_failed' }, 500);
+        const secret = String(env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ error: 'jwt_not_configured' }, 503);
+        const issued = await issueSessionResponse(session, user, secret);
+        return json({ ok: true, avatarUrl, user: issued.user }, 200, { 'set-cookie': issued.cookie });
     }
 
     if (url.pathname === '/api/auth/profile' && request.method === 'PATCH') {
@@ -136,23 +197,8 @@ export async function handlePublicAuth(request, env) {
         if (!user) return json({ error: 'profile_update_failed' }, 500);
         const secret = String(env.LOBBY_JWT_SECRET || '').trim();
         if (!secret) return json({ error: 'jwt_not_configured' }, 503);
-        const token = await signJwt(
-            {
-                sub: session.sub,
-                username: user.username,
-                displayName: user.displayName,
-                role: session.role,
-                banned: session.banned,
-            },
-            secret,
-            60 * 60 * 24 * 7,
-        );
-        const cookie = setCookieHeader(PUBLIC_COOKIE, token, 60 * 60 * 24 * 7, '/');
-        return json(
-            { ok: true, user: { name: user.displayName, handle: `@${user.username}`, role: session.role } },
-            200,
-            { 'set-cookie': cookie },
-        );
+        const issued = await issueSessionResponse(session, user, secret);
+        return json({ ok: true, user: issued.user }, 200, { 'set-cookie': issued.cookie });
     }
 
     if (url.pathname === '/api/auth/reset-password' && request.method === 'POST') {

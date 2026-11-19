@@ -5,6 +5,8 @@ ALTER TABLE students ADD COLUMN email TEXT DEFAULT '';
 ALTER TABLE teachers ADD COLUMN banned INTEGER DEFAULT 0;
 ALTER TABLE teachers ADD COLUMN lobby_role TEXT DEFAULT 'admin';
 ALTER TABLE teachers ADD COLUMN email TEXT DEFAULT '';
+ALTER TABLE students ADD COLUMN avatar_url TEXT DEFAULT '';
+ALTER TABLE teachers ADD COLUMN avatar_url TEXT DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     token_hash TEXT PRIMARY KEY,

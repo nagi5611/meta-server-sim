@@ -78,6 +78,7 @@ function ensureLobbyUserColumns(database) {
         addCol(table, `ALTER TABLE ${table} ADD COLUMN banned INTEGER DEFAULT 0`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN lobby_role TEXT DEFAULT 'user'`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN email TEXT DEFAULT ''`);
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN avatar_url TEXT DEFAULT ''`);
     }
 }
 
@@ -94,6 +95,7 @@ function rowToLobbyUser(row, kind) {
         banned: Boolean(row.banned),
         lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
         email: String(row.email || ''),
+        avatarUrl: String(row.avatar_url || ''),
         kind,
     };
 }
@@ -103,14 +105,14 @@ function findStudentLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM students WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url FROM students WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, lobby_role, email
+            `SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url
              FROM students WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -121,14 +123,14 @@ function findTeacherLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM teachers WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url FROM teachers WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, lobby_role, email
+            `SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url
              FROM teachers WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -291,56 +293,58 @@ export function patchLobbyUserFlagsSqlite(kind, id, patch) {
         .run(...params);
     const out = requireDb()
         .prepare(
-            `SELECT id, username, display_name, banned, lobby_role, email FROM ${table} WHERE id = ?`,
+            `SELECT id, username, display_name, banned, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
         )
         .get(id);
     return rowToLobbyUser(out, kind);
 }
 
-export function updateStudentSqlite(id, { username, displayName, password } = {}) {
+export function updateStudentSqlite(id, { username, displayName, avatarUrl, password } = {}) {
     const row = requireDb()
-        .prepare('SELECT id, username, display_name FROM students WHERE id = ?')
+        .prepare('SELECT id, username, display_name, avatar_url FROM students WHERE id = ?')
         .get(id);
     if (!row) return null;
     const u = username !== undefined ? String(username).trim() : row.username;
     const d = displayName !== undefined ? String(displayName).trim() : row.display_name;
+    const av = avatarUrl !== undefined ? String(avatarUrl || '').trim() : String(row.avatar_url || '');
     if (password !== undefined && password !== null && String(password).length > 0) {
         assertPasswordPolicy(password);
         const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
         requireDb()
             .prepare(
-                'UPDATE students SET username = ?, display_name = ?, password_hash = ? WHERE id = ?'
+                'UPDATE students SET username = ?, display_name = ?, avatar_url = ?, password_hash = ? WHERE id = ?',
             )
-            .run(u, d, hash, id);
+            .run(u, d, av, hash, id);
     } else {
         requireDb()
-            .prepare('UPDATE students SET username = ?, display_name = ? WHERE id = ?')
-            .run(u, d, id);
+            .prepare('UPDATE students SET username = ?, display_name = ?, avatar_url = ? WHERE id = ?')
+            .run(u, d, av, id);
     }
-    return { id, username: u, displayName: d };
+    return { id, username: u, displayName: d, avatarUrl: av };
 }
 
-export function updateTeacherSqlite(id, { username, displayName, password } = {}) {
+export function updateTeacherSqlite(id, { username, displayName, avatarUrl, password } = {}) {
     const row = requireDb()
-        .prepare('SELECT id, username, display_name FROM teachers WHERE id = ?')
+        .prepare('SELECT id, username, display_name, avatar_url FROM teachers WHERE id = ?')
         .get(id);
     if (!row) return null;
     const u = username !== undefined ? String(username).trim() : row.username;
     const d = displayName !== undefined ? String(displayName).trim() : row.display_name;
+    const av = avatarUrl !== undefined ? String(avatarUrl || '').trim() : String(row.avatar_url || '');
     if (password !== undefined && password !== null && String(password).length > 0) {
         assertPasswordPolicy(password);
         const hash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
         requireDb()
             .prepare(
-                'UPDATE teachers SET username = ?, display_name = ?, password_hash = ? WHERE id = ?'
+                'UPDATE teachers SET username = ?, display_name = ?, avatar_url = ?, password_hash = ? WHERE id = ?',
             )
-            .run(u, d, hash, id);
+            .run(u, d, av, hash, id);
     } else {
         requireDb()
-            .prepare('UPDATE teachers SET username = ?, display_name = ? WHERE id = ?')
-            .run(u, d, id);
+            .prepare('UPDATE teachers SET username = ?, display_name = ?, avatar_url = ? WHERE id = ?')
+            .run(u, d, av, id);
     }
-    return { id, username: u, displayName: d };
+    return { id, username: u, displayName: d, avatarUrl: av };
 }
 
 export function deleteStudentSqlite(id) {
