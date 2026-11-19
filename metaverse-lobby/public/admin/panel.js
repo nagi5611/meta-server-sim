@@ -568,6 +568,95 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDD(); });
 
   /* ================= お知らせ ================= */
+  const ANN_LOCALE_CODES = ["ja", "zh-CN", "zh-TW", "en"];
+  const ANN_LOCALE_LABEL = {
+    ja: "admin.announcementsLocaleJa",
+    "zh-CN": "admin.announcementsLocaleZhCN",
+    "zh-TW": "admin.announcementsLocaleZhTW",
+    en: "admin.announcementsLocaleEn",
+  };
+
+  function annInputDomId(code) {
+    return "fAnnT_" + String(code).replace(/[^a-zA-Z0-9]/g, "_");
+  }
+
+  function ensureAnnI18n(a) {
+    const src = a.sourceLocale || window.LobbyI18n?.getLocale?.() || "ja";
+    const i18n = a.i18n && typeof a.i18n === "object" ? JSON.parse(JSON.stringify(a.i18n)) : {};
+    for (const code of ANN_LOCALE_CODES) {
+      const hit = i18n[code];
+      const t = typeof hit?.title === "string" ? hit.title : "";
+      i18n[code] = {
+        title: t || (code === src ? String(a.title || "") : ""),
+        body: "",
+      };
+    }
+    a.i18n = i18n;
+    a.title = String(i18n[src]?.title || a.title || "").trim();
+    return i18n;
+  }
+
+  function annTitleForLocale(a, code) {
+    return String(ensureAnnI18n(a)[code]?.title || "").trim();
+  }
+
+  function collectAnnI18nFromForm() {
+    /** @type {Record<string, { title: string, body: string }>} */
+    const out = {};
+    for (const code of ANN_LOCALE_CODES) {
+      const inp = document.getElementById(annInputDomId(code));
+      out[code] = { title: (inp?.value || "").trim(), body: "" };
+    }
+    return out;
+  }
+
+  function syncAnnEditingFromForm() {
+    const a = state.annEditing;
+    if (!a) return;
+    a.sourceLocale = ($("#fAnnLocale")?.value || a.sourceLocale || "ja").trim();
+    a.i18n = collectAnnI18nFromForm();
+    a.title = annTitleForLocale(a, a.sourceLocale);
+    a.published = Boolean($("#fAnnPub")?.checked);
+  }
+
+  function refreshAnnRowPreviews() {
+    const a = state.annEditing;
+    if (!a || state.view !== "annEditor") return;
+    syncAnnEditingFromForm();
+    const dateRaw = a.createdAt || a.updatedAt || new Date().toISOString();
+    const dateStr = fmtLobbyDate(dateRaw);
+    for (const code of ANN_LOCALE_CODES) {
+      const title = annTitleForLocale(a, code) || "—";
+      const row = $$(`.ann-locale-row`, $("#main")).find((el) => el.dataset.annLocale === code);
+      if (!row) continue;
+      const prevTitle = $(".ann-prev-title", row);
+      const prevDate = $(".ann-prev-date", row);
+      if (prevTitle) prevTitle.textContent = title;
+      if (prevDate) prevDate.textContent = dateStr;
+    }
+    refreshAnnLobbyPreview();
+  }
+
+  function refreshAnnLobbyPreview() {
+    const list = $("#annPvList");
+    if (!list || !state.annEditing) return;
+    syncAnnEditingFromForm();
+    const a = state.annEditing;
+    const dateRaw = a.createdAt || a.updatedAt || new Date().toISOString();
+    const dateStr = fmtLobbyDate(dateRaw);
+    const items = ANN_LOCALE_CODES.map((code) => {
+      const title = annTitleForLocale(a, code);
+      if (!title) return "";
+      return `<li class="ann-prev-item">
+        <div class="ann-head">
+          <time class="ann-date">${esc(dateStr)}</time>
+          <h3 class="ann-title"><span class="ann-pv-lbl">${esc(tr(ANN_LOCALE_LABEL[code] || code))}</span>${esc(title)}</h3>
+        </div>
+      </li>`;
+    }).filter(Boolean).join("");
+    list.innerHTML = items || `<li class="ann-prev-empty">${esc(tr("admin.announcementsPreviewEmpty"))}</li>`;
+  }
+
   function viewAnnouncements() {
     const rows = store.announcements || [];
     const list = rows.length
@@ -599,32 +688,73 @@
   function viewAnnEditor() {
     const a = state.annEditing;
     if (!a) return "";
-  const localeOpts = (window.LobbyI18n?.supportedLocales || ["ja", "zh-CN", "zh-TW", "en"])
-      .map(
-        (code) =>
-          `<option value="${esc(code)}"${(a.sourceLocale || window.LobbyI18n?.getLocale?.() || "ja") === code ? " selected" : ""}>${esc(code)}</option>`,
-      )
-      .join("");
+    ensureAnnI18n(a);
+    const srcLoc = a.sourceLocale || "ja";
+    const localeOpts = ANN_LOCALE_CODES.map(
+      (code) =>
+        `<option value="${esc(code)}"${srcLoc === code ? " selected" : ""}>${esc(tr(ANN_LOCALE_LABEL[code] || code))}</option>`,
+    ).join("");
+    const dateRaw = a.createdAt || a.updatedAt || new Date().toISOString();
+    const dateStr = fmtLobbyDate(dateRaw);
+    const localeRows = ANN_LOCALE_CODES.map((code) => {
+      const isSource = srcLoc === code;
+      const title = annTitleForLocale(a, code);
+      const previewTitle = title || "—";
+      return `<div class="ann-locale-row${isSource ? " is-source" : ""}" data-ann-locale="${esc(code)}">
+        <div class="ann-locale-prev" aria-hidden="true">
+          <div class="ann-locale-prev-h">
+            <span class="ann-locale-code">${esc(tr(ANN_LOCALE_LABEL[code] || code))}</span>
+            ${isSource ? `<span class="tag ann-src-tag">${esc(tr("admin.announcementsSourceBadge"))}</span>` : ""}
+          </div>
+          <div class="ann-prev-item">
+            <div class="ann-head">
+              <time class="ann-prev-date ann-date">${esc(dateStr)}</time>
+              <h3 class="ann-prev-title ann-title">${esc(previewTitle)}</h3>
+            </div>
+          </div>
+        </div>
+        <div class="field ann-locale-field">
+          <label for="${annInputDomId(code)}">${esc(tr("admin.announcementsColTitle"))}</label>
+          <input id="${annInputDomId(code)}" class="inp" type="text" data-ann-locale-inp="${esc(code)}" maxlength="120" value="${esc(title)}" autocomplete="off">
+        </div>
+      </div>`;
+    }).join("");
     return head(
       state.isNewAnn ? tr("admin.announcementsAdd") : tr("admin.announcementsEdit"),
       `<button class="btn btn-primary" data-act="ann-save">${esc(tr("admin.save"))}</button>`,
       tr("admin.announcementsTitle"),
-    ) + `<div class="sheet ann-editor">
-      <form id="annForm" class="ann-form" onsubmit="return false">
-        <div class="field">
-          <label for="fAnnTitle">${esc(tr("admin.announcementsColTitle"))}</label>
-          <input id="fAnnTitle" class="inp" type="text" maxlength="120" value="${esc(a.title)}" required autocomplete="off">
+    ) + `<div class="ed ann-ed">
+      <div class="sheet ann-editor">
+        <form id="annForm" class="ann-form" onsubmit="return false">
+          <div class="ann-locale-toolbar">
+            <div class="field ann-src-locale">
+              <label for="fAnnLocale">${esc(tr("admin.announcementsSourceLocale"))}</label>
+              <select id="fAnnLocale" class="inp">${localeOpts}</select>
+            </div>
+            <button type="button" class="btn btn-quiet ann-retranslate-btn" data-act="ann-retranslate">${esc(tr("admin.announcementsRetranslate"))}</button>
+          </div>
+          <p class="ann-i18n-hint">${esc(tr("admin.announcementsI18nHint"))}</p>
+          <div class="ann-locale-grid">${localeRows}</div>
+          <label class="ann-pub">
+            <input id="fAnnPub" type="checkbox" ${a.published ? "checked" : ""}>
+            <span>${esc(tr("admin.announcementsPublished"))}</span>
+          </label>
+          <p class="msg" id="annErr" role="alert"></p>
+        </form>
+      </div>
+      <div class="pv-wrap ann-pv-wrap">
+        <div class="pv-bar"><h2>${esc(tr("admin.announcementsPreview"))}</h2></div>
+        <div class="pv-stage ann-pv-stage">
+          <div>
+            <div class="pv-cap">${esc(tr("lobby.announcements"))}</div>
+            <section class="panel announcements ann-pv-panel" aria-labelledby="annPvTitle">
+              <h2 class="sr-only" id="annPvTitle">${esc(tr("admin.announcementsPreview"))}</h2>
+              <ul class="ann-list ann-prev-list" id="annPvList"></ul>
+            </section>
+          </div>
         </div>
-        <div class="field">
-          <label for="fAnnLocale">${esc(tr("admin.announcementsSourceLocale"))}</label>
-          <select id="fAnnLocale" class="inp">${localeOpts}</select>
-        </div>
-        <label class="ann-pub">
-          <input id="fAnnPub" type="checkbox" ${a.published ? "checked" : ""}>
-          <span>${esc(tr("admin.announcementsPublished"))}</span>
-        </label>
-        <p class="msg" id="annErr" role="alert"></p>
-      </form>
+        <p class="pv-note">${esc(tr("admin.announcementsPreviewNote"))}</p>
+      </div>
     </div>`;
   }
 
@@ -681,6 +811,7 @@
       pullChartMetrics();
     }
     if (v === "editor" && state.editing) bindThumbUpload();
+    if (v === "annEditor" && state.annEditing) refreshAnnLobbyPreview();
   }
 
   function setThumbPreview(url) {
@@ -818,7 +949,8 @@
       if (act === "delete") return askDelete(id);
       if (act === "preview") return openPreview(id);
       if (act === "ann-new") return startNewAnn();
-      if (act === "ann-save") return saveAnn();
+      if (act === "ann-save") return saveAnn(false);
+      if (act === "ann-retranslate") return saveAnn(true);
     }
     const annDel = t.closest("[data-ann-del]");
     if (annDel) {
@@ -847,6 +979,10 @@
 
   main.addEventListener("input", (e) => {
     const t = e.target, w = state.editing;
+    if (t.dataset?.annLocaleInp && state.annEditing) {
+      refreshAnnRowPreviews();
+      return;
+    }
     if (t.id === "q") {
       state.q = t.value; render();
       const q = $("#q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); return;
@@ -901,6 +1037,15 @@
       void toggleAnnPublished(t.dataset.annPub, t.checked);
       return;
     }
+    if (t.id === "fAnnLocale" && state.annEditing) {
+      syncAnnEditingFromForm();
+      render();
+      return;
+    }
+    if (t.id === "fAnnPub" && state.annEditing) {
+      state.annEditing.published = Boolean(t.checked);
+      return;
+    }
     const w = state.editing;
     if (!w || t.type !== "radio") return;
     const key = t.name === "st" ? "status" : "audience";
@@ -937,42 +1082,60 @@
     }).catch(() => toast("保存に失敗しました"));
   }
   function startNewAnn() {
+    const src = window.LobbyI18n?.getLocale?.() || "ja";
     state.annEditing = {
       id: "",
       title: "",
       published: true,
-      sourceLocale: window.LobbyI18n?.getLocale?.() || "ja",
+      sourceLocale: src,
+      i18n: Object.fromEntries(ANN_LOCALE_CODES.map((c) => [c, { title: "", body: "" }])),
     };
     state.isNewAnn = true;
     state.view = "annEditor";
     render();
-    setTimeout(() => $("#fAnnTitle") && $("#fAnnTitle").focus(), 30);
+    const focusId = annInputDomId(src);
+    setTimeout(() => document.getElementById(focusId)?.focus(), 30);
   }
   function startEditAnn(id) {
     const a = (store.announcements || []).find((x) => x.id === id);
     if (!a) return;
     state.annEditing = JSON.parse(JSON.stringify(a));
+    ensureAnnI18n(state.annEditing);
     state.isNewAnn = false;
     state.view = "annEditor";
     render();
   }
-  function saveAnn() {
+  function saveAnn(retranslate) {
     const a = state.annEditing;
     if (!a) return;
-    const title = ($("#fAnnTitle")?.value || "").trim();
-    const published = Boolean($("#fAnnPub")?.checked);
+    syncAnnEditingFromForm();
+    const published = Boolean(a.published);
+    const sourceLocale = a.sourceLocale || "ja";
+    const i18n = collectAnnI18nFromForm();
+    const title = (i18n[sourceLocale]?.title || "").trim();
     const err = $("#annErr");
+    const srcInp = document.getElementById(annInputDomId(sourceLocale));
     if (!title) {
       if (err) err.textContent = tr("admin.announcementsValidation");
+      srcInp?.classList.add("bad");
       return;
     }
+    srcInp?.classList.remove("bad");
     if (err) err.textContent = "";
-    const sourceLocale = ($("#fAnnLocale")?.value || window.LobbyI18n?.getLocale?.() || "ja").trim();
-    const payload = { title, published, sourceLocale };
+    const payload = { title, published, sourceLocale, i18n, retranslate: Boolean(retranslate) };
+    const stayOnEditor = Boolean(retranslate);
     const p = state.isNewAnn
       ? store.createAnnouncement(payload)
       : store.updateAnnouncement(a.id, payload);
-    p.then(() => {
+    p.then((saved) => {
+      if (stayOnEditor && saved) {
+        state.annEditing = JSON.parse(JSON.stringify(saved));
+        ensureAnnI18n(state.annEditing);
+        state.isNewAnn = false;
+        render();
+        toast(tr("admin.announcementsRetranslated"));
+        return;
+      }
       state.view = "announcements";
       state.annEditing = null;
       state.isNewAnn = false;

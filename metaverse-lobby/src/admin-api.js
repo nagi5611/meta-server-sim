@@ -2,7 +2,12 @@ import { fetchSim } from './sim-client.js';
 import { getPublicSession } from './auth-api.js';
 import { entryToWorld, worldToEntry } from './catalog-map.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
-import { normalizeAnnouncementLocale } from './announcement-i18n.js';
+import {
+    mergeAnnouncementI18nOverrides,
+    normalizeAnnouncementLocale,
+    parseAdminAnnouncementI18n,
+    parseAnnouncementI18nJson,
+} from './announcement-i18n.js';
 import {
     DEFAULT_ANNOUNCEMENT_GEMINI_MODEL,
     translateAnnouncementFields,
@@ -317,17 +322,22 @@ export async function handleAdminApi(request, env, kv) {
     if (annList && request.method === 'POST') {
         if (!db) return json({ error: 'db_not_configured' }, 503);
         const body = await request.json();
-        const title = String(body.title || '').trim();
         const bodyText = body.body === undefined || body.body === null ? '' : String(body.body).trim();
-        if (!title) return json({ error: 'title_required' }, 400);
         const sourceLocale = normalizeAnnouncementLocale(
             String(body.sourceLocale || body.source_language || 'ja'),
         );
-        const { i18n } = await buildAnnouncementI18n(env, {
+        const adminI18n = parseAdminAnnouncementI18n(body.i18n);
+        const titleFromBody = String(body.title || '').trim();
+        const sourceTitle =
+            (adminI18n && adminI18n[sourceLocale]?.title) || titleFromBody;
+        if (!sourceTitle) return json({ error: 'title_required' }, 400);
+        const { i18n: autoI18n } = await buildAnnouncementI18n(env, {
             sourceLocale,
-            title,
+            title: sourceTitle,
             body: bodyText,
         });
+        const i18n = mergeAnnouncementI18nOverrides(autoI18n, adminI18n);
+        const title = i18n[sourceLocale]?.title || sourceTitle;
         const id = crypto.randomUUID();
         const item = await insertAnnouncement(db, id, {
             title,
@@ -360,27 +370,40 @@ export async function handleAdminApi(request, env, kv) {
             body.sourceLocale !== undefined || body.source_language !== undefined
                 ? normalizeAnnouncementLocale(String(body.sourceLocale || body.source_language || 'ja'))
                 : undefined;
-        const shouldTranslate = title !== undefined || bodyText !== undefined || sourceLocale !== undefined;
+        const adminI18n = parseAdminAnnouncementI18n(body.i18n);
+        const retranslate = Boolean(body.retranslate);
+        const prev = (await listAnnouncements(db, { publishedOnly: false, limit: 100 })).find(
+            (a) => a.id === id,
+        );
+        if (!prev) return json({ error: 'not_found' }, 404);
+        const resolvedLocale = sourceLocale ?? prev.sourceLocale ?? 'ja';
+        const resolvedTitle =
+            (adminI18n && adminI18n[resolvedLocale]?.title) ||
+            (title !== undefined ? title : prev.title) ||
+            '';
+        const shouldAutoTranslate =
+            retranslate || title !== undefined || bodyText !== undefined || sourceLocale !== undefined;
         /** @type {Record<string, { title: string, body: string }> | undefined} */
         let i18n;
-        if (shouldTranslate) {
-            const prev = (await listAnnouncements(db, { publishedOnly: false, limit: 100 })).find(
-                (a) => a.id === id,
-            );
-            const resolvedTitle = title !== undefined ? title : prev?.title || '';
-            const resolvedBody = bodyText !== undefined ? bodyText : prev?.body || '';
-            const resolvedLocale = sourceLocale ?? prev?.sourceLocale ?? 'ja';
+        let resolvedTitleForRow = title !== undefined ? title : prev.title;
+        if (shouldAutoTranslate) {
+            const resolvedBody = bodyText !== undefined ? bodyText : prev.body || '';
             if (resolvedTitle) {
                 const built = await buildAnnouncementI18n(env, {
                     sourceLocale: resolvedLocale,
                     title: resolvedTitle,
                     body: resolvedBody,
                 });
-                i18n = built.i18n;
+                i18n = mergeAnnouncementI18nOverrides(built.i18n, adminI18n);
+                resolvedTitleForRow = i18n[resolvedLocale]?.title || resolvedTitle;
             }
+        } else if (adminI18n) {
+            const prevI18n = prev.i18n || parseAnnouncementI18nJson(prev.i18n_json);
+            i18n = mergeAnnouncementI18nOverrides(prevI18n, adminI18n);
+            resolvedTitleForRow = i18n[resolvedLocale]?.title || resolvedTitleForRow;
         }
         const item = await updateAnnouncement(db, id, {
-            title,
+            title: resolvedTitleForRow,
             body: bodyText,
             published: body.published,
             sortOrder: body.sortOrder,

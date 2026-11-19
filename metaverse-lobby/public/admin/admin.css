@@ -507,7 +507,31 @@ tr.row:hover td.ops .txt-btn,td.ops .txt-btn:focus-visible{opacity:1}
 .ann-row-del .txt-btn{opacity:0;transition:opacity .1s;font-size:12px}
 .ann-row:hover .ann-row-del .txt-btn,.ann-row-del .txt-btn:focus-visible{opacity:1}
 
-.ann-editor{max-width:36rem;padding:20px 22px 24px}
+.ed.ann-ed{grid-template-columns:minmax(0,1fr) minmax(280px,360px)}
+.ann-editor{max-width:none;padding:20px 22px 24px}
+.ann-locale-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;margin-bottom:8px}
+.ann-src-locale{flex:1;min-width:12rem;margin:0}
+.ann-retranslate-btn{flex:none;height:38px;margin-bottom:0}
+.ann-i18n-hint{margin:0 0 14px;font-size:12.5px;line-height:1.45;color:var(--faint)}
+.ann-locale-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:8px}
+.ann-locale-row{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 16px;
+  padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--color-surface-muted);
+}
+.ann-locale-row.is-source{border-color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 6%,var(--color-surface-muted))}
+.ann-locale-prev-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
+.ann-locale-code{font-size:12px;font-weight:600;color:var(--ink)}
+.ann-src-tag{font-size:10px;padding:2px 6px}
+.ann-prev-item .ann-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ann-prev-item .ann-title{font-size:13px;font-weight:600;margin:0;line-height:1.35;color:var(--ink)}
+.ann-prev-item .ann-date{font-size:11px;color:var(--faint);white-space:nowrap}
+.ann-locale-field{margin:0}
+.ann-pv-wrap .ann-pv-panel{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--sheet)}
+.ann-prev-list{list-style:none;margin:0;padding:8px 14px 12px}
+.ann-prev-item{padding:6px 0;border-top:1px solid var(--line)}
+.ann-prev-item:first-child{border-top:0}
+.ann-prev-empty{padding:12px 4px;font-size:13px;color:var(--faint)}
+.ann-pv-lbl{display:block;font-size:10px;font-weight:600;color:var(--faint);margin-bottom:2px}
 .ann-form .field{margin-bottom:16px}
 .ann-form .field:last-of-type{margin-bottom:12px}
 .ann-pub{
@@ -517,6 +541,10 @@ tr.row:hover td.ops .txt-btn,td.ops .txt-btn:focus-visible{opacity:1}
 .ann-pub input{margin:4px 0 0;accent-color:var(--color-primary);flex:none}
 .ann-form .msg{margin:12px 0 0;font-size:13px;color:var(--danger)}
 
+@media (max-width:900px){
+  .ed.ann-ed{grid-template-columns:1fr}
+  .ann-locale-row{grid-template-columns:1fr}
+}
 @media (max-width:760px){
   .ann-row{grid-template-columns:1fr auto auto;gap:6px}
   .ann-row-date{grid-column:1/-1}

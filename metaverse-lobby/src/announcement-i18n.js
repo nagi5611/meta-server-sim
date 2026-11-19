@@ -69,3 +69,58 @@ export function parseAnnouncementI18nJson(raw) {
         return null;
     }
 }
+
+/**
+ * @param {Record<string, { title?: string, body?: string }> | null | undefined} base
+ * @param {Record<string, { title?: string, body?: string }> | null | undefined} overrides
+ * @returns {Record<string, { title: string, body: string }>}
+ */
+export function mergeAnnouncementI18nOverrides(base, overrides) {
+    /** @type {Record<string, { title: string, body: string }>} */
+    const out = {};
+    const seed = base && typeof base === 'object' ? base : {};
+    for (const code of ANNOUNCEMENT_LOCALES) {
+        const hit = seed[code];
+        out[code] = {
+            title: typeof hit?.title === 'string' ? hit.title.trim() : '',
+            body: '',
+        };
+    }
+    if (!overrides || typeof overrides !== 'object') return out;
+    for (const [loc, val] of Object.entries(overrides)) {
+        if (!val || typeof val !== 'object') continue;
+        const norm = normalizeAnnouncementLocale(loc);
+        if (!ANNOUNCEMENT_LOCALES.includes(norm)) continue;
+        const t = String(/** @type {{ title?: unknown }} */ (val).title ?? '').trim();
+        if (t) out[norm] = { title: t, body: '' };
+    }
+    return out;
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {Record<string, { title: string, body: string }> | null}
+ */
+export function parseAdminAnnouncementI18n(raw) {
+    if (raw == null) return null;
+    let parsed = raw;
+    if (typeof raw === 'string') {
+        try {
+            parsed = JSON.parse(raw);
+        } catch {
+            return null;
+        }
+    }
+    if (!parsed || typeof parsed !== 'object') return null;
+    /** @type {Record<string, { title: string, body: string }>} */
+    const out = {};
+    for (const [loc, val] of Object.entries(/** @type {Record<string, unknown>} */ (parsed))) {
+        if (!val || typeof val !== 'object') continue;
+        const norm = normalizeAnnouncementLocale(loc);
+        if (!ANNOUNCEMENT_LOCALES.includes(norm)) continue;
+        const v = /** @type {Record<string, unknown>} */ (val);
+        if (v.title === undefined) continue;
+        out[norm] = { title: String(v.title || '').trim(), body: '' };
+    }
+    return Object.keys(out).length ? out : null;
+}
