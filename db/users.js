@@ -18,6 +18,7 @@ import {
     updateTeacherSqlite,
     patchLobbyUserFlagsSqlite,
     getLobbyUserByIdSqlite,
+    listBanHistorySqlite,
     consumePasswordResetTokenSqlite,
     createPasswordResetTokenSqlite,
     getUserForPasswordResetSqlite,
@@ -29,6 +30,8 @@ import {
     toggleLobbyWorldFavoriteSqlite,
 } from './users-sqlite.js';
 import { getPlatformUsersDbPath } from './users-path.js';
+import { banLifecycleState, isBanActive, normalizeBanExpiresAt } from '../lib/lobby-ban.js';
+import crypto from 'node:crypto';
 
 /** @type {'d1' | 'sqlite' | null} */
 let primaryBackend = null;
@@ -129,12 +132,78 @@ export function resetUsersDbStateForTests() {
 }
 
 const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
-                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
+                        COALESCE(banned, 0) AS banned, ban_expires_at,
+                        COALESCE(lobby_role, 'user') AS lobby_role,
                         COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM students`;
 
 const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
-                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
+                        COALESCE(banned, 0) AS banned, ban_expires_at,
+                        COALESCE(lobby_role, 'admin') AS lobby_role,
                         COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url FROM teachers`;
+
+function mapVerifiedUserRow(row, kind, overrides = {}) {
+    const banned =
+        overrides.banned !== undefined ? Boolean(overrides.banned) : Boolean(row.banned);
+    const banExpiresAt =
+        overrides.banExpiresAt !== undefined
+            ? overrides.banExpiresAt
+            : row.ban_expires_at != null && String(row.ban_expires_at).trim() !== ''
+              ? String(row.ban_expires_at)
+              : null;
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        banned,
+        banExpiresAt: banned ? banExpiresAt : null,
+        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        email: String(row.email || ''),
+        avatarUrl: String(row.avatar_url || ''),
+        kind,
+    };
+}
+
+async function insertBanHistoryD1(entry) {
+    await d1Run(
+        `INSERT INTO lobby_ban_history (id, user_kind, user_id, actor, action, started_at, ends_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+            crypto.randomUUID(),
+            String(entry.userKind),
+            Number(entry.userId),
+            entry.actor != null ? String(entry.actor) : null,
+            String(entry.action),
+            String(entry.startedAt),
+            entry.endsAt != null && String(entry.endsAt).trim() !== '' ? String(entry.endsAt) : null,
+        ],
+    );
+}
+
+async function liftExpiredBanD1(kind, id, prevExpires) {
+    const table = kind === 'teacher' ? 'teachers' : 'students';
+    await d1Run(`UPDATE ${table} SET banned = 0, ban_expires_at = NULL WHERE id = ?`, [id]);
+    await insertBanHistoryD1({
+        userKind: kind,
+        userId: id,
+        actor: 'system',
+        action: 'expire',
+        startedAt: new Date().toISOString(),
+        endsAt: prevExpires || null,
+    });
+}
+
+async function materializeUserBanD1(kind, row) {
+    const state = banLifecycleState(row.banned, row.ban_expires_at);
+    if (state === 'expired') {
+        await liftExpiredBanD1(kind, Number(row.id), String(row.ban_expires_at || ''));
+        return mapVerifiedUserRow({ ...row, banned: 0, ban_expires_at: null }, kind, {
+            banned: false,
+            banExpiresAt: null,
+        });
+    }
+    const banned = isBanActive(row.banned, row.ban_expires_at);
+    return mapVerifiedUserRow(row, kind, { banned, banExpiresAt: row.ban_expires_at || null });
+}
 
 /**
  * @param {'student'|'teacher'} kind
@@ -152,16 +221,7 @@ async function findUserLoginRowD1(kind, login) {
 }
 
 function rowToVerifiedUser(row, kind) {
-    return {
-        id: Number(row.id),
-        username: String(row.username),
-        displayName: String(row.display_name),
-        banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || 'user'),
-        email: String(row.email || ''),
-        avatarUrl: String(row.avatar_url || ''),
-        kind,
-    };
+    return mapVerifiedUserRow(row, kind);
 }
 
 export async function verifyStudent(username, password) {
@@ -171,7 +231,7 @@ export async function verifyStudent(username, password) {
             if (!row) return null;
             const bcrypt = await import('bcryptjs');
             if (!bcrypt.default.compareSync(password, String(row.password_hash))) return null;
-            return rowToVerifiedUser(row, 'student');
+            return materializeUserBanD1('student', row);
         },
         () => verifyStudentSqlite(username, password)
     );
@@ -184,7 +244,7 @@ export async function verifyTeacher(username, password) {
             if (!row) return null;
             const bcrypt = await import('bcryptjs');
             if (!bcrypt.default.compareSync(password, String(row.password_hash))) return null;
-            return rowToVerifiedUser(row, 'teacher');
+            return materializeUserBanD1('teacher', row);
         },
         () => verifyTeacherSqlite(username, password)
     );
@@ -330,28 +390,32 @@ async function registerTeacherD1(username, password, displayName) {
     }
 }
 
-function mapStudentRow(row) {
+async function mapStudentRow(row) {
+    const u = await materializeUserBanD1('student', row);
     return {
-        id: Number(row.id),
-        username: String(row.username),
-        displayName: String(row.display_name),
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
         createdAt: row.created_at,
-        banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || 'user'),
-        email: String(row.email || ''),
+        banned: u.banned,
+        banExpiresAt: u.banExpiresAt,
+        lobbyRole: u.lobbyRole,
+        email: u.email,
         kind: 'student',
     };
 }
 
-function mapTeacherRow(row) {
+async function mapTeacherRow(row) {
+    const u = await materializeUserBanD1('teacher', row);
     return {
-        id: Number(row.id),
-        username: String(row.username),
-        displayName: String(row.display_name),
+        id: u.id,
+        username: u.username,
+        displayName: u.displayName,
         createdAt: row.created_at,
-        banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || 'user'),
-        email: String(row.email || ''),
+        banned: u.banned,
+        banExpiresAt: u.banExpiresAt,
+        lobbyRole: u.lobbyRole,
+        email: u.email,
         kind: 'teacher',
     };
 }
@@ -361,10 +425,13 @@ export async function listStudents() {
         async () => {
             const rows = await d1All(
                 `SELECT id, username, display_name, created_at,
-                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'user') AS lobby_role,
+                        COALESCE(banned,0) AS banned, ban_expires_at,
+                        COALESCE(lobby_role,'user') AS lobby_role,
                         COALESCE(email,'') AS email FROM students ORDER BY id`,
             );
-            return rows.map(mapStudentRow);
+            const out = [];
+            for (const row of rows) out.push(await mapStudentRow(row));
+            return out;
         },
         () => listStudentsSqlite()
     );
@@ -375,40 +442,29 @@ export async function listTeachers() {
         async () => {
             const rows = await d1All(
                 `SELECT id, username, display_name, created_at,
-                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'user') AS lobby_role,
+                        COALESCE(banned,0) AS banned, ban_expires_at,
+                        COALESCE(lobby_role,'admin') AS lobby_role,
                         COALESCE(email,'') AS email FROM teachers ORDER BY id`,
             );
-            return rows.map(mapTeacherRow);
+            const out = [];
+            for (const row of rows) out.push(await mapTeacherRow(row));
+            return out;
         },
         () => listTeachersSqlite()
     );
 }
 
-/**
- * @param {'student'|'teacher'} kind
- * @param {number} id
- * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
- */
-/**
- * @param {'student'|'teacher'} kind
- * @param {number} id
- */
 export async function getLobbyUserByKindId(kind, id) {
     return withUsersBackend(
         async () => {
             const table = kind === 'teacher' ? 'teachers' : 'students';
             const row = await d1First(
-                `SELECT id, username, display_name, banned, lobby_role, email, avatar_url
+                `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email, avatar_url
                  FROM ${table} WHERE id = ?`,
                 [id],
             );
             if (!row) return null;
-            return kind === 'teacher'
-                ? { ...mapTeacherRow({ ...row, created_at: null }), avatarUrl: String(row.avatar_url || '') }
-                : {
-                      ...mapStudentRow({ ...row, created_at: null }),
-                      avatarUrl: String(row.avatar_url || ''),
-                  };
+            return materializeUserBanD1(kind, row);
         },
         () => getLobbyUserByIdSqlite(kind, id),
     );
@@ -418,11 +474,49 @@ export async function patchLobbyUserFlags(kind, id, patch) {
     return withUsersBackend(
         async () => {
             const table = kind === 'teacher' ? 'teachers' : 'students';
+            const full = await d1First(
+                `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!full) return null;
             const sets = [];
             const params = [];
+            const nowIso = new Date().toISOString();
             if (patch.banned !== undefined) {
+                const ban = Boolean(patch.banned);
                 sets.push('banned = ?');
-                params.push(patch.banned ? 1 : 0);
+                params.push(ban ? 1 : 0);
+                if (ban) {
+                    const normalized =
+                        patch.banExpiresAt !== undefined
+                            ? normalizeBanExpiresAt(patch.banExpiresAt)
+                            : undefined;
+                    const expires =
+                        normalized === undefined ? full.ban_expires_at || null : normalized;
+                    sets.push('ban_expires_at = ?');
+                    params.push(expires);
+                    await insertBanHistoryD1({
+                        userKind: kind,
+                        userId: id,
+                        actor: patch.actor,
+                        action: 'ban',
+                        startedAt: nowIso,
+                        endsAt: expires,
+                    });
+                } else {
+                    sets.push('ban_expires_at = NULL');
+                    await insertBanHistoryD1({
+                        userKind: kind,
+                        userId: id,
+                        actor: patch.actor,
+                        action: 'unban',
+                        startedAt: nowIso,
+                        endsAt: null,
+                    });
+                }
+            } else if (patch.banExpiresAt !== undefined) {
+                sets.push('ban_expires_at = ?');
+                params.push(normalizeBanExpiresAt(patch.banExpiresAt));
             }
             if (patch.lobbyRole !== undefined) {
                 sets.push('lobby_role = ?');
@@ -432,17 +526,44 @@ export async function patchLobbyUserFlags(kind, id, patch) {
                 sets.push('email = ?');
                 params.push(String(patch.email));
             }
-            if (!sets.length) return null;
+            if (!sets.length) return materializeUserBanD1(kind, full);
             params.push(id);
             await d1Run(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`, params);
             const row = await d1First(
-                `SELECT id, username, display_name, banned, lobby_role, email FROM ${table} WHERE id = ?`,
+                `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
                 [id],
             );
             if (!row) return null;
-            return kind === 'teacher' ? mapTeacherRow({ ...row, created_at: null }) : mapStudentRow({ ...row, created_at: null });
+            return materializeUserBanD1(kind, row);
         },
         () => patchLobbyUserFlagsSqlite(kind, id, patch),
+    );
+}
+
+export async function listLobbyBanHistory(kind, id, limit = 50) {
+    return withUsersBackend(
+        async () => {
+            const rows = await d1All(
+                `SELECT id, user_kind AS userKind, user_id AS userId, actor, action,
+                        started_at AS startedAt, ends_at AS endsAt, created_at AS createdAt
+                 FROM lobby_ban_history
+                 WHERE user_kind = ? AND user_id = ?
+                 ORDER BY created_at DESC
+                 LIMIT ?`,
+                [kind, id, limit],
+            );
+            return rows.map((r) => ({
+                id: String(r.id),
+                userKind: String(r.userKind),
+                userId: Number(r.userId),
+                actor: r.actor != null ? String(r.actor) : null,
+                action: String(r.action),
+                startedAt: String(r.startedAt),
+                endsAt: r.endsAt != null ? String(r.endsAt) : null,
+                createdAt: String(r.createdAt),
+            }));
+        },
+        () => listBanHistorySqlite(kind, id, limit),
     );
 }
 

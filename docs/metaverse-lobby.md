@@ -65,7 +65,6 @@ D1 / ローカル `users.db` に次を適用します。
 
 ```bash
 npx wrangler d1 execute metaverse-sim --remote --file=./migrations/lobby_users_ban_duration.sql
-npx wrangler d1 execute metaverse-sim --remote --file=./migrations/lobby_world_favorites.sql
 ```
 
 - カラム: `students.ban_expires_at`, `teachers.ban_expires_at`（`NULL` = 永久 BAN）

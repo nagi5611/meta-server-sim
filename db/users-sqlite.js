@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { validateUserPassword } from '../lib/password-policy.js';
+import { banLifecycleState, isBanActive, normalizeBanExpiresAt } from '../lib/lobby-ban.js';
 import { ensurePlatformUsersDbDir, getPlatformUsersDbPath } from './users-path.js';
 
 const BCRYPT_ROUNDS = 10;
@@ -49,6 +50,7 @@ export function initSqliteUsersDb(dbPath = getPlatformUsersDbPath()) {
         );
     `);
     ensureLobbyUserColumns(db);
+    ensureBanHistoryTable(db);
     db.exec(`
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             token_hash TEXT PRIMARY KEY,
@@ -87,7 +89,25 @@ function ensureLobbyUserColumns(database) {
         addCol(table, `ALTER TABLE ${table} ADD COLUMN lobby_role TEXT DEFAULT 'user'`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN email TEXT DEFAULT ''`);
         addCol(table, `ALTER TABLE ${table} ADD COLUMN avatar_url TEXT DEFAULT ''`);
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN ban_expires_at TEXT`);
     }
+}
+
+function ensureBanHistoryTable(database) {
+    database.exec(`
+        CREATE TABLE IF NOT EXISTS lobby_ban_history (
+            id TEXT PRIMARY KEY,
+            user_kind TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            actor TEXT,
+            action TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ends_at TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_lobby_ban_history_user
+            ON lobby_ban_history (user_kind, user_id, created_at DESC);
+    `);
 }
 
 function requireDb() {
@@ -107,17 +127,71 @@ export function closeSqliteUsersDb() {
     }
 }
 
-function rowToLobbyUser(row, kind) {
+function rowToLobbyUser(row, kind, overrides = {}) {
+    const banned =
+        overrides.banned !== undefined ? Boolean(overrides.banned) : Boolean(row.banned);
+    const banExpiresAt =
+        overrides.banExpiresAt !== undefined
+            ? overrides.banExpiresAt
+            : row.ban_expires_at != null && String(row.ban_expires_at).trim() !== ''
+              ? String(row.ban_expires_at)
+              : null;
     return {
         id: row.id,
         username: row.username,
         displayName: row.display_name,
-        banned: Boolean(row.banned),
-        lobbyRole: String(row.lobby_role || 'user'),
+        banned,
+        banExpiresAt: banned ? banExpiresAt : null,
+        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
         email: String(row.email || ''),
         avatarUrl: String(row.avatar_url || ''),
         kind,
     };
+}
+
+function insertBanHistorySqlite(entry) {
+    requireDb()
+        .prepare(
+            `INSERT INTO lobby_ban_history (id, user_kind, user_id, actor, action, started_at, ends_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+            crypto.randomUUID(),
+            String(entry.userKind),
+            Number(entry.userId),
+            entry.actor != null ? String(entry.actor) : null,
+            String(entry.action),
+            String(entry.startedAt),
+            entry.endsAt != null && String(entry.endsAt).trim() !== '' ? String(entry.endsAt) : null,
+        );
+}
+
+function liftExpiredBanSqlite(kind, id, prevExpires) {
+    const table = kind === 'teacher' ? 'teachers' : 'students';
+    requireDb()
+        .prepare(`UPDATE ${table} SET banned = 0, ban_expires_at = NULL WHERE id = ?`)
+        .run(id);
+    insertBanHistorySqlite({
+        userKind: kind,
+        userId: id,
+        actor: 'system',
+        action: 'expire',
+        startedAt: new Date().toISOString(),
+        endsAt: prevExpires || null,
+    });
+}
+
+function materializeUserBanSqlite(kind, row) {
+    const state = banLifecycleState(row.banned, row.ban_expires_at);
+    if (state === 'expired') {
+        liftExpiredBanSqlite(kind, Number(row.id), String(row.ban_expires_at || ''));
+        return rowToLobbyUser({ ...row, banned: 0, ban_expires_at: null }, kind, {
+            banned: false,
+            banExpiresAt: null,
+        });
+    }
+    const banned = isBanActive(row.banned, row.ban_expires_at);
+    return rowToLobbyUser(row, kind, { banned, banExpiresAt: row.ban_expires_at || null });
 }
 
 function findStudentLoginRowSqlite(login) {
@@ -125,14 +199,14 @@ function findStudentLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url FROM students WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM students WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url
+            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url
              FROM students WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -143,14 +217,14 @@ function findTeacherLoginRowSqlite(login) {
     if (!key) return null;
     const byUser = requireDb()
         .prepare(
-            'SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url FROM teachers WHERE username = ?',
+            'SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM teachers WHERE username = ?',
         )
         .get(key);
     if (byUser) return byUser;
     if (!key.includes('@')) return null;
     return requireDb()
         .prepare(
-            `SELECT id, username, password_hash, display_name, banned, lobby_role, email, avatar_url
+            `SELECT id, username, password_hash, display_name, banned, ban_expires_at, lobby_role, email, avatar_url
              FROM teachers WHERE email != '' AND lower(email) = lower(?)`,
         )
         .get(key);
@@ -160,14 +234,14 @@ export function verifyStudentSqlite(username, password) {
     const row = findStudentLoginRowSqlite(username);
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
-    return rowToLobbyUser(row, 'student');
+    return materializeUserBanSqlite('student', row);
 }
 
 export function verifyTeacherSqlite(username, password) {
     const row = findTeacherLoginRowSqlite(username);
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
-    return rowToLobbyUser(row, 'teacher');
+    return materializeUserBanSqlite('teacher', row);
 }
 
 export function registerStudentSqlite(username, password, displayName) {
@@ -250,53 +324,96 @@ export function registerTeacherSqlite(username, password, displayName) {
 export function listStudentsSqlite() {
     return requireDb()
         .prepare(
-            'SELECT id, username, display_name, created_at, banned, lobby_role, email FROM students ORDER BY id',
+            'SELECT id, username, display_name, created_at, banned, ban_expires_at, lobby_role, email FROM students ORDER BY id',
         )
         .all()
-        .map((row) => ({
-            id: row.id,
-            username: row.username,
-            displayName: row.display_name,
-            createdAt: row.created_at,
-            banned: Boolean(row.banned),
-            lobbyRole: String(row.lobby_role || 'user'),
-            email: String(row.email || ''),
-            kind: 'student',
-        }));
+        .map((row) => {
+            const u = materializeUserBanSqlite('student', row);
+            return {
+                id: u.id,
+                username: u.username,
+                displayName: u.displayName,
+                createdAt: row.created_at,
+                banned: u.banned,
+                banExpiresAt: u.banExpiresAt,
+                lobbyRole: u.lobbyRole,
+                email: u.email,
+                kind: 'student',
+            };
+        });
 }
 
 export function listTeachersSqlite() {
     return requireDb()
         .prepare(
-            'SELECT id, username, display_name, created_at, banned, lobby_role, email FROM teachers ORDER BY id',
+            'SELECT id, username, display_name, created_at, banned, ban_expires_at, lobby_role, email FROM teachers ORDER BY id',
         )
         .all()
-        .map((row) => ({
-            id: row.id,
-            username: row.username,
-            displayName: row.display_name,
-            createdAt: row.created_at,
-            banned: Boolean(row.banned),
-            lobbyRole: String(row.lobby_role || 'admin'),
-            email: String(row.email || ''),
-            kind: 'teacher',
-        }));
+        .map((row) => {
+            const u = materializeUserBanSqlite('teacher', row);
+            return {
+                id: u.id,
+                username: u.username,
+                displayName: u.displayName,
+                createdAt: row.created_at,
+                banned: u.banned,
+                banExpiresAt: u.banExpiresAt,
+                lobbyRole: u.lobbyRole,
+                email: u.email,
+                kind: 'teacher',
+            };
+        });
 }
 
 /**
  * @param {'student'|'teacher'} kind
  * @param {number} id
- * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
+ * @param {{ banned?: boolean, banExpiresAt?: string | null, lobbyRole?: string, email?: string, actor?: string }} patch
  */
 export function patchLobbyUserFlagsSqlite(kind, id, patch) {
     const table = kind === 'teacher' ? 'teachers' : 'students';
-    const row = requireDb().prepare(`SELECT id FROM ${table} WHERE id = ?`).get(id);
-    if (!row) return null;
+    const full = requireDb()
+        .prepare(
+            `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
+        )
+        .get(id);
+    if (!full) return null;
     const sets = [];
     const params = [];
+    const nowIso = new Date().toISOString();
     if (patch.banned !== undefined) {
+        const ban = Boolean(patch.banned);
         sets.push('banned = ?');
-        params.push(patch.banned ? 1 : 0);
+        params.push(ban ? 1 : 0);
+        if (ban) {
+            const normalized =
+                patch.banExpiresAt !== undefined ? normalizeBanExpiresAt(patch.banExpiresAt) : undefined;
+            const expires =
+                normalized === undefined ? full.ban_expires_at || null : normalized;
+            sets.push('ban_expires_at = ?');
+            params.push(expires);
+            insertBanHistorySqlite({
+                userKind: kind,
+                userId: id,
+                actor: patch.actor,
+                action: 'ban',
+                startedAt: nowIso,
+                endsAt: expires,
+            });
+        } else {
+            sets.push('ban_expires_at = NULL');
+            insertBanHistorySqlite({
+                userKind: kind,
+                userId: id,
+                actor: patch.actor,
+                action: 'unban',
+                startedAt: nowIso,
+                endsAt: null,
+            });
+        }
+    } else if (patch.banExpiresAt !== undefined) {
+        sets.push('ban_expires_at = ?');
+        params.push(normalizeBanExpiresAt(patch.banExpiresAt));
     }
     if (patch.lobbyRole !== undefined) {
         sets.push('lobby_role = ?');
@@ -306,17 +423,17 @@ export function patchLobbyUserFlagsSqlite(kind, id, patch) {
         sets.push('email = ?');
         params.push(String(patch.email));
     }
-    if (!sets.length) return null;
+    if (!sets.length) return materializeUserBanSqlite(kind, full);
     params.push(id);
     requireDb()
         .prepare(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`)
         .run(...params);
     const out = requireDb()
         .prepare(
-            `SELECT id, username, display_name, banned, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
+            `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
         )
         .get(id);
-    return rowToLobbyUser(out, kind);
+    return materializeUserBanSqlite(kind, out);
 }
 
 /**
@@ -327,11 +444,39 @@ export function getLobbyUserByIdSqlite(kind, id) {
     const table = kind === 'teacher' ? 'teachers' : 'students';
     const row = requireDb()
         .prepare(
-            `SELECT id, username, display_name, banned, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
+            `SELECT id, username, display_name, banned, ban_expires_at, lobby_role, email, avatar_url FROM ${table} WHERE id = ?`,
         )
         .get(id);
     if (!row) return null;
-    return rowToLobbyUser(row, kind);
+    return materializeUserBanSqlite(kind, row);
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {number} [limit]
+ */
+export function listBanHistorySqlite(kind, id, limit = 50) {
+    return requireDb()
+        .prepare(
+            `SELECT id, user_kind AS userKind, user_id AS userId, actor, action,
+                    started_at AS startedAt, ends_at AS endsAt, created_at AS createdAt
+             FROM lobby_ban_history
+             WHERE user_kind = ? AND user_id = ?
+             ORDER BY created_at DESC
+             LIMIT ?`,
+        )
+        .all(kind, id, limit)
+        .map((r) => ({
+            id: r.id,
+            userKind: r.userKind,
+            userId: r.userId,
+            actor: r.actor,
+            action: r.action,
+            startedAt: r.startedAt,
+            endsAt: r.endsAt,
+            createdAt: r.createdAt,
+        }));
 }
 
 export function updateStudentSqlite(id, { username, displayName, avatarUrl, password } = {}) {

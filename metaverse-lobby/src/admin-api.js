@@ -248,6 +248,7 @@ export async function handleAdminApi(request, env, kv) {
                 last: '',
                 online: onlineRefs.has(userRef) || onlineNames.has(u.displayName),
                 banned: Boolean(u.banned),
+                banExpiresAt: u.banExpiresAt || null,
                 kind: u.kind,
                 rawId: u.id,
                 history: [],
@@ -256,12 +257,24 @@ export async function handleAdminApi(request, env, kv) {
         return json({ users: rows });
     }
 
+    const banHistoryMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/ban-history$/);
+    if (banHistoryMatch && request.method === 'GET') {
+        const userId = decodeURIComponent(banHistoryMatch[1]);
+        const [kind, rawId] = userId.split('-');
+        const sim = await fetchSim(env, `/service/users/${kind}/${rawId}/ban-history`);
+        if (!sim.ok) return json(sim.data || { error: 'ban_history_failed' }, sim.status || 502);
+        return json(sim.data || { history: [] });
+    }
+
     if (url.pathname.startsWith('/api/admin/users/') && request.method === 'PATCH') {
         const id = decodeURIComponent(url.pathname.replace('/api/admin/users/', ''));
         const [kind, rawId] = id.split('-');
         const body = await request.json();
         const patch = {};
         if (body.banned !== undefined) patch.banned = Boolean(body.banned);
+        if (body.banExpiresAt !== undefined) patch.banExpiresAt = body.banExpiresAt;
+        if (body.banPermanent === true) patch.banExpiresAt = null;
+        patch.actor = String(session?.sub || 'admin');
         if (body.email !== undefined) patch.email = String(body.email).trim();
         if (body.role === 'admin' || body.lobbyRole === 'admin') patch.lobbyRole = 'admin';
         if (body.role === 'member' || body.lobbyRole === 'user') patch.lobbyRole = 'user';
@@ -272,7 +285,7 @@ export async function handleAdminApi(request, env, kv) {
             await insertAuditLog(db, {
                 id: crypto.randomUUID(),
                 actor: session?.sub || 'admin',
-                action: 'user_patch',
+                action: patch.banned !== undefined ? (patch.banned ? 'user_ban' : 'user_unban') : 'user_patch',
                 target_type: 'user',
                 target_id: id,
                 detail: patch,

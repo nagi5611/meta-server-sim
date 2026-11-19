@@ -72,14 +72,22 @@
       return this.users.find((u) => u.id === id) || null;
     },
     async patchUser(id, patch) {
-      if (patch.banned !== undefined) {
-        await API.patchUser(id, { banned: patch.banned });
-      }
+      const body = {};
+      if (patch.banned !== undefined) body.banned = patch.banned;
+      if (patch.banExpiresAt !== undefined) body.banExpiresAt = patch.banExpiresAt;
+      if (patch.banPermanent) body.banPermanent = true;
+      if (Object.keys(body).length) await API.patchUser(id, body);
       if (patch.role) {
         await API.patchUser(id, { role: patch.role });
       }
       await this.refresh();
       return this.user(id);
+    },
+    async loadBanHistory(id) {
+      const data = await API.banHistory(id);
+      const u = this.user(id);
+      if (u) u.banHistory = data.history || [];
+      return data.history || [];
     },
     async kickUser(id) {
       await API.kickUser(id);
