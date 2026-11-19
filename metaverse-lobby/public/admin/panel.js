@@ -716,7 +716,7 @@
     const prog = $("#thProg");
     const bar = $("#thProgBar");
     const dropTxt = $("#thDropTxt");
-  const clientErr = validateThumbFile(file);
+    const clientErr = validateThumbFile(file);
     if (clientErr) {
       if (errEl) errEl.textContent = clientErr;
       toast(clientErr);

@@ -41,6 +41,15 @@ export async function handleThumbnailUpload(request, env) {
         return json({ error: 'assets_not_configured', message: 'LOBBY_ASSETS R2 binding is required' }, 503);
     }
 
+    const contentLength = request.headers.get('content-length');
+    if (contentLength) {
+        const n = Number(contentLength);
+        // Allow small multipart framing overhead above the file cap.
+        if (Number.isFinite(n) && n > MAX_BYTES + 64 * 1024) {
+            return json({ error: 'file_too_large', maxBytes: MAX_BYTES }, 413);
+        }
+    }
+
     let form;
     try {
         form = await request.formData();
