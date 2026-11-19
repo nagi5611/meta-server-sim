@@ -184,6 +184,21 @@
   .join-code-panel .join-fields .iwrap{flex:1 1 140px;min-width:0}
   .join-code-panel .join-fields .btn{flex:none}
   .join-code-banned{margin:0;font-size:14px;line-height:1.5;color:var(--color-danger,#c0392b)}
+  @keyframes join-fields-limit-shake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-4px)}
+    40%{transform:translateX(4px)}
+    60%{transform:translateX(-3px)}
+    80%{transform:translateX(3px)}
+  }
+  .join-fields.is-limit-hit .iwrap{
+    animation:join-fields-limit-shake 300ms ease;
+    box-shadow:0 0 0 2px #dc2626;border-radius:var(--radius-sm);
+  }
+  .join-fields.is-limit-hit .iwrap .inp{
+    border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.12);
+  }
+  .join-fields.is-limit-hit .iwrap .cnt{color:#dc2626}
   .panel{
     background:var(--color-surface);border:1px solid var(--color-border);
     border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;

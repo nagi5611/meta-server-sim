@@ -40,6 +40,54 @@ let pendingAvatarPreviewUrl = null;
 const displayInput = $('#display-name');
 const joinCodeInput = $('#join-code');
 const codeCount = $('#codeCount');
+const JOIN_CODE_MAX = 12;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let joinCodeLimitHitTimer = null;
+
+function getJoinCodeFields() {
+    return joinCodeInput?.closest('.join-fields') ?? null;
+}
+
+function pulseJoinCodeLimitHit() {
+    const fields = getJoinCodeFields();
+    if (!fields) return;
+    fields.classList.add('is-limit-hit');
+    if (joinCodeLimitHitTimer != null) clearTimeout(joinCodeLimitHitTimer);
+    joinCodeLimitHitTimer = setTimeout(() => {
+        fields.classList.remove('is-limit-hit');
+        joinCodeLimitHitTimer = null;
+    }, 320);
+}
+
+function sanitizeJoinCodeRaw(raw) {
+    return String(raw).toUpperCase().replace(/[^A-Z0-9-]/g, '');
+}
+
+/** @param {KeyboardEvent} e */
+function joinCodeRejectedKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    const nav = new Set([
+        'Backspace',
+        'Delete',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End',
+        'Tab',
+        'Escape',
+    ]);
+    if (nav.has(e.key)) return false;
+    if (e.key === 'Enter') return false;
+    if (e.key.length !== 1) return false;
+    const el = joinCodeInput;
+    if (!el) return false;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const selected = Math.max(0, end - start);
+    return el.value.length - selected + 1 > JOIN_CODE_MAX;
+}
 
 /** @type {Array<Record<string, unknown>>} */
 let worlds = [];
@@ -1065,14 +1113,31 @@ $('#join-code-btn')?.addEventListener('click', async () => {
 });
 
 joinCodeInput?.addEventListener('input', () => {
-    const v = joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 12);
+    const sanitized = sanitizeJoinCodeRaw(joinCodeInput.value);
+    if (sanitized.length > JOIN_CODE_MAX) pulseJoinCodeLimitHit();
+    const v = sanitized.slice(0, JOIN_CODE_MAX);
     joinCodeInput.value = v;
-    if (codeCount) codeCount.textContent = `${v.length}/12`;
+    if (codeCount) codeCount.textContent = `${v.length}/${JOIN_CODE_MAX}`;
     joinCodeInput.classList.remove('bad');
     localStorage.setItem('mnm.code', v);
 });
 
+joinCodeInput?.addEventListener('paste', (e) => {
+    const paste = e.clipboardData?.getData('text') ?? '';
+    const el = joinCodeInput;
+    if (!el) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const merged = sanitizeJoinCodeRaw(el.value.slice(0, start) + paste + el.value.slice(end));
+    if (merged.length > JOIN_CODE_MAX) pulseJoinCodeLimitHit();
+});
+
 joinCodeInput?.addEventListener('keydown', (e) => {
+    if (joinCodeRejectedKey(e)) {
+        e.preventDefault();
+        pulseJoinCodeLimitHit();
+        return;
+    }
     if (e.key === 'Enter') $('#join-code-btn')?.click();
 });
 
