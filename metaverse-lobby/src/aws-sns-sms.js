@@ -1,6 +1,31 @@
 import { AwsClient } from 'aws4fetch';
 
 const DEFAULT_SNS_REGION = 'ap-northeast-1';
+/** @type {[number, number]} E.164 digit count for country code 81 (no leading +). */
+const JP_CC_LEN_MIN = 11;
+const JP_CC_LEN_MAX = 14;
+const DOMESTIC_MIN = 10;
+const DOMESTIC_MAX = 13;
+
+/**
+ * Common typo: +811070… (extra digit after 81) → +817070…
+ * @param {string} digits digits only, may start with 81
+ */
+function repairJapanCcTypo(digits) {
+    const m = /^8110(\d{8,11})$/.exec(digits);
+    if (!m) return digits;
+    return `8170${m[1]}`;
+}
+
+/**
+ * @param {string} digits after country code normalization (starts with 81)
+ */
+function jpInternationalFromDigits(digits) {
+    let d = repairJapanCcTypo(digits);
+    if (!d.startsWith('81')) return null;
+    if (d.length < JP_CC_LEN_MIN || d.length > JP_CC_LEN_MAX) return null;
+    return `+${d}`;
+}
 
 /**
  * @param {Record<string, unknown>} env
@@ -31,17 +56,14 @@ export function normalizeJapanPhoneE164(input) {
     if (!s) return null;
     if (s.startsWith('+')) {
         const digits = s.slice(1).replace(/\D/g, '');
-        if (digits.startsWith('81') && digits.length >= 11 && digits.length <= 13) {
-            return `+${digits}`;
-        }
-        return null;
+        return jpInternationalFromDigits(digits);
     }
     const digits = s.replace(/\D/g, '');
-    if (digits.startsWith('81') && digits.length >= 11 && digits.length <= 13) {
-        return `+${digits}`;
+  if (digits.startsWith('81')) {
+        return jpInternationalFromDigits(digits);
     }
-    if (digits.startsWith('0') && digits.length >= 10 && digits.length <= 11) {
-        return `+81${digits.slice(1)}`;
+    if (digits.startsWith('0') && digits.length >= DOMESTIC_MIN && digits.length <= DOMESTIC_MAX) {
+        return jpInternationalFromDigits(`81${digits.slice(1)}`);
     }
     return null;
 }
@@ -50,12 +72,13 @@ export function normalizeJapanPhoneE164(input) {
  * @param {string} phoneE164
  * @returns {string}
  */
-export function maskAdminPhone(phoneE164) {
+export function maskAdminPhone(phoneE164, tailDigits = 6) {
     const p = String(phoneE164 || '').trim();
-    if (p.length < 8) return '***';
-    const tail = p.slice(-4);
-    const head = p.slice(0, Math.min(4, p.length - 4));
-    return `${head}***${tail}`;
+    const tail = Math.min(8, Math.max(4, Number(tailDigits) || 6));
+    if (p.length < tail + 4) return '***';
+    const suffix = p.slice(-tail);
+    const head = p.slice(0, Math.min(5, p.length - tail));
+    return `${head}***${suffix}`;
 }
 
 /**
