@@ -102,17 +102,25 @@ export async function setGuestUsername(page, username) {
 }
 
 /**
- * 管理画面ワンタイム token を sessionStorage に設定
+ * 管理画面ワンタイム token を E2E 用にメモリへ渡す（sessionStorage は使わない）
  * @param {import('@playwright/test').Page} page
  * @param {string} token
  */
 export async function setAdminToken(page, token) {
+    const baseUrl = process.env.E2E_BASE_URL || 'http://localhost:3003';
+    const cookieUrl = baseUrl.replace(/\/$/, '');
+    await page.context().addCookies([
+        {
+            name: 'metaverseAdminToken',
+            value: token,
+            url: cookieUrl,
+            httpOnly: true,
+            sameSite: 'Lax',
+            path: '/',
+        },
+    ]);
     await page.addInitScript((t) => {
-        try {
-            sessionStorage.setItem('metaverseAdminToken', t);
-        } catch {
-            /* ignore */
-        }
+        window.__TENANT_PENDING_ADMIN_METAVERSE_TOKEN__ = t;
     }, token);
 }
 

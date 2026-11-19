@@ -9,6 +9,7 @@ import {
     consumeAdminToken,
     generateAdminToken,
     peekAdminToken,
+    isActiveAdminMetaverseCookie,
     readAdminTokenFromCookieHeader,
 } from '../lib/admin-metaverse-token.js';
 import {
@@ -82,6 +83,14 @@ describe('admin-metaverse-token', () => {
 
     it('ADMIN_TOKEN_TTL_MS is five minutes', () => {
         assert.equal(ADMIN_TOKEN_TTL_MS, 5 * 60 * 1000);
+    });
+
+    it('isActiveAdminMetaverseCookie respects IP binding', () => {
+        const { token } = generateAdminToken('default', '198.51.100.8');
+        const header = `metaverseAdminToken=${encodeURIComponent(token)}`;
+        assert.equal(isActiveAdminMetaverseCookie(header, '198.51.100.8'), true);
+        assert.equal(isActiveAdminMetaverseCookie(header, '203.0.113.1'), false);
+        assert.equal(isActiveAdminMetaverseCookie('', '198.51.100.8'), false);
     });
 
     it('readAdminTokenFromCookieHeader parses HttpOnly cookie name', () => {

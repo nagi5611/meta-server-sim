@@ -112,6 +112,18 @@ describe('tenant-socket-auth', () => {
         );
     });
 
+    it('allows valid admin metaverse HttpOnly cookie without auth.adminToken', () => {
+        process.env.TENANT_SOCKET_SECRET = 'room-key';
+        const { token } = generateAdminToken('default', '10.0.0.6');
+        const handshake = {
+            auth: {},
+            headers: {
+                cookie: `metaverseAdminToken=${encodeURIComponent(token)}`,
+            },
+        };
+        assert.equal(isTenantSocketJoinAuthorized(tenantBase, handshake, '10.0.0.6'), true);
+    });
+
     it('TENANT_SOCKET_JOIN_ENFORCE=0 keeps connections open with secret set', () => {
         process.env.TENANT_SOCKET_SECRET = 'room-key';
         process.env.TENANT_SOCKET_JOIN_ENFORCE = '0';

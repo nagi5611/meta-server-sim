@@ -1,5 +1,6 @@
 // public/js/tenant-socket-io-shim.js — Socket.io をテナント path で接続（再帰エイリアス回避）
 import { io as originalIo } from 'socket.io-client-original';
+import { getInMemoryAdminMetaverseToken } from './tenant-admin-metaverse-auth.js';
 import { getTenantBase } from './tenant-runtime-shim.js';
 
 const CLIENT_SESSION_STORAGE_KEY = 'metaverseClientSessionId';
@@ -50,14 +51,10 @@ export function io(url, options = {}) {
     const socketPath = tenantBase ? `${tenantBase}/socket.io` : '/socket.io';
     /** @type {Record<string, unknown>} */
     let auth = { ...(options.auth || {}) };
-    // 管理トークンは /admin/enter-metaverse の HttpOnly Cookie で送る（E2E 等の sessionStorage フォールバックのみ）
-    try {
-        const legacyStored = sessionStorage.getItem('metaverseAdminToken');
-        if (legacyStored && !auth.adminToken) {
-            auth.adminToken = legacyStored;
-        }
-    } catch {
-        /* ignore */
+    // join 制限時の補助。主経路は handshake 付属の HttpOnly Cookie（peek はサーバー側）
+    const inMemoryAdminToken = getInMemoryAdminMetaverseToken();
+    if (inMemoryAdminToken && !auth.adminToken) {
+        auth.adminToken = inMemoryAdminToken;
     }
     const clientSessionId = getOrCreateClientSessionId();
     if (clientSessionId && !auth.clientSessionId) {

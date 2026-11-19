@@ -35,7 +35,10 @@ import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
 import { FDS_SMOKE_PLAYBACK_STALL_MS } from './fds/fds-smoke-transfer-policy.js';
 import { TenantFdsSmokeExposureMonitor } from './tenant-fds-smoke-exposure.js';
 import { ensureFdsSmokeButtonPanel, isFdsSmokePanelButton } from './fds/fds-smoke-control-panel.js';
-import { fetchAdminMetaverseEntry } from './tenant-admin-metaverse-auth.js';
+import {
+    clearInMemoryAdminMetaverseEntry,
+    fetchAdminMetaverseEntry,
+} from './tenant-admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
@@ -58,7 +61,7 @@ MenuManager.prototype.logout = async function tenantLogout() {
     }
     localStorage.removeItem('username');
     localStorage.removeItem('userRole');
-    sessionStorage.removeItem('metaverseAdminToken');
+    clearInMemoryAdminMetaverseEntry();
     await navigateToLobbyAfterLogout();
 };
 
