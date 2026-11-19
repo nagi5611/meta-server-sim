@@ -148,7 +148,20 @@ export async function handlePublicAuth(request, env) {
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
         if (!session) return json({ user: null });
-        if (isLobbySessionBanned(session)) {
+        const refMatch = /^((?:student|teacher))-(\d+)$/.exec(String(session.sub || ''));
+        if (refMatch) {
+            const sim = await fetchSim(env, `/service/users/${refMatch[1]}/${refMatch[2]}`);
+            if (sim.ok && sim.data) {
+                if (sim.data.banned) {
+                    return json({ user: null, banned: true, message: 'banned' });
+                }
+                if (session.banned) {
+                    return json({ user: null, banned: false, reauth: true });
+                }
+            } else if (isLobbySessionBanned(session)) {
+                return json({ user: null, banned: true, message: 'banned' });
+            }
+        } else if (isLobbySessionBanned(session)) {
             return json({ user: null, banned: true, message: 'banned' });
         }
         const avatarUrl = String(session.avatarUrl || '').trim();
@@ -221,6 +234,9 @@ export async function handlePublicAuth(request, env) {
         const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
         const body = await request.json();
         const session = await getPublicSession(request, env);
+        if (isLobbySessionBanned(session)) {
+            return json({ error: 'banned' }, 403);
+        }
         const id = `je-${crypto.randomUUID()}`;
         const row = {
             id,

@@ -188,6 +188,28 @@
   </div>
 </div>
 
+<div class="scrim" id="banned-scrim" role="alertdialog" aria-modal="true" aria-labelledby="bannedTitle" hidden>
+  <div class="amodal">
+    <div class="am-top">
+      <div>
+        <h2 id="bannedTitle" data-i18n="lobby.bannedTitle">利用停止</h2>
+      </div>
+      <button type="button" class="am-x" id="bannedClose" data-i18n-aria="common.close">×</button>
+    </div>
+    <p class="banned-msg" data-i18n="lobby.bannedJoinMessage">あなたはバンされています</p>
+    <p class="banned-contact">
+      <span data-i18n="lobby.bannedContactLead">お問い合わせ</span>
+      <a
+        class="banned-contact__link"
+        href="mailto:developer@mmh-virtual.jp"
+        data-i18n="lobby.bannedContact"
+        data-i18n-aria="lobby.bannedContactAria"
+      >developer@mmh-virtual.jp</a>
+    </p>
+    <button type="button" class="btn btn-primary btn-block" id="bannedOk" data-i18n="common.close">閉じる</button>
+  </div>
+</div>
+
 <div class="scrim" id="auth-scrim" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
   <div class="amodal">
     <div class="am-top">

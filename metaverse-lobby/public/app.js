@@ -27,6 +27,7 @@ let annPage = 0;
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
 const authScrim = $('#auth-scrim');
+const bannedScrim = $('#banned-scrim');
 const profileMenu = $('#profileMenu');
 const profileDrop = $('#profileDrop');
 const profileInput = $('#pName');
@@ -203,7 +204,7 @@ function syncJoinCodePanel() {
     }
 }
 
-function applyBannedCatalogState(fromApi = true) {
+function applyBannedCatalogState(showModal = false) {
     catalogBanned = true;
     worlds = [];
     if (authState.user) {
@@ -211,13 +212,35 @@ function applyBannedCatalogState(fromApi = true) {
         saveAuthState();
         renderAuthHeader();
     }
-    if (fromApi && !bannedNoticeShown) {
+    if (hint) hint.textContent = t('auth.errBanned');
+    syncJoinCodePanel();
+    if (showModal && !bannedNoticeShown) {
+        bannedNoticeShown = true;
+        showBannedModal();
+    } else if (!bannedNoticeShown) {
         bannedNoticeShown = true;
         showToast(t('auth.errBanned'));
     }
-    if (hint) hint.textContent = t('auth.errBanned');
-    syncJoinCodePanel();
     render();
+}
+
+function showBannedModal() {
+    if (!bannedScrim) return;
+    bannedScrim.hidden = false;
+    bannedScrim.classList.add('on');
+    setTimeout(() => $('#bannedOk')?.focus(), 60);
+}
+
+function closeBannedModal() {
+    if (!bannedScrim) return;
+    bannedScrim.classList.remove('on');
+    bannedScrim.hidden = true;
+}
+
+function guardBannedJoin() {
+    if (!catalogBanned) return false;
+    showBannedModal();
+    return true;
 }
 
 function render() {
@@ -272,10 +295,7 @@ function setJoinMsg(text) {
 }
 
 function openJoin(world) {
-    if (catalogBanned) {
-        showToast(t('auth.errBanned'));
-        return;
-    }
+    if (guardBannedJoin()) return;
     selected = world;
     const status = String(world.status || 'online');
     const st = statusInfo(status);
@@ -766,8 +786,14 @@ $('#join-cancel')?.addEventListener('click', closeJoin);
 joinScrim?.addEventListener('click', (ev) => {
     if (ev.target === joinScrim) closeJoin();
 });
+$('#bannedClose')?.addEventListener('click', closeBannedModal);
+$('#bannedOk')?.addEventListener('click', closeBannedModal);
+bannedScrim?.addEventListener('click', (ev) => {
+    if (ev.target === bannedScrim) closeBannedModal();
+});
 
 $('#join-go')?.addEventListener('click', () => {
+    if (guardBannedJoin()) return;
     if (!selected) return;
     const v = validateName(displayInput.value);
     if (!v.ok) {
@@ -800,10 +826,7 @@ displayInput?.addEventListener('keydown', (e) => {
 });
 
 $('#join-code-btn')?.addEventListener('click', async () => {
-    if (catalogBanned) {
-        showToast(t('auth.errBanned'));
-        return;
-    }
+    if (guardBannedJoin()) return;
     const code = String(joinCodeInput?.value || '')
         .toUpperCase()
         .replace(/[^A-Z0-9-]/g, '')
@@ -849,7 +872,7 @@ $('#join-code-btn')?.addEventListener('click', async () => {
         showToast(t('toast.listRefreshFail'));
     } finally {
         btn.disabled = catalogBanned;
-        btn.textContent = prevLabel;
+        btn.textContent = prevLabel || t('common.join');
     }
 });
 
@@ -1069,6 +1092,7 @@ $('#profileForm')?.addEventListener('submit', async (e) => {
 
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    if (bannedScrim?.classList.contains('on')) closeBannedModal();
     if (joinScrim?.classList.contains('on')) closeJoin();
     if (authScrim?.classList.contains('on')) hideAuthModal();
     if (profileDrop && !profileDrop.hidden) closeProfileDrop();
@@ -1095,6 +1119,7 @@ async function bootstrapAuth() {
             return;
         }
         catalogBanned = false;
+        bannedNoticeShown = false;
         syncJoinCodePanel();
         if (data.user) signIn(data.user);
     } catch {
