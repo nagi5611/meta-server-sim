@@ -6,3 +6,7 @@ LOBBY_SIM_SERVICE_TOKEN=unused-local
 
 # Optional: announcement auto-translation (also: wrangler secret put GEMINI_TRANSLATION_API_KEY)
 GEMINI_TRANSLATION_API_KEY=
+
+# Optional: lobby join / profile display-name moderation (Jev). Do not reuse GEMINI_TRANSLATION_API_KEY.
+# LOBBY_JEV_API_KEY=
+# Or alias: JEV_API_KEY= / TYPESAFE_API_KEY=

@@ -499,6 +499,25 @@ function validateName(name) {
     return { ok: true, value: n };
 }
 
+function mapJoinApiError(data) {
+    const code = data?.error;
+    if (code === 'display_name_rejected') {
+        return data?.reason_ja || t('join.errDisplayRejected');
+    }
+    if (code === 'invalid_name_chars') return t('join.errDisplayChars');
+    if (code === 'name_too_long') return t('join.errDisplayRequired');
+    if (code === 'maintenance') return t('toast.maintServer');
+    return null;
+}
+
+function setJoinGoPending(pending) {
+    const btn = $('#join-go');
+    if (!btn) return;
+    btn.disabled = pending;
+    btn.classList.toggle('is-join-pending', pending);
+    btn.setAttribute('aria-busy', pending ? 'true' : 'false');
+}
+
 async function navigateToWorld(world, displayName) {
     let data;
     try {
@@ -514,11 +533,14 @@ async function navigateToWorld(world, displayName) {
             return;
         }
         if (!res.ok) {
-            if (data.error === 'maintenance') {
-                showToast(t('toast.maintServer'));
-            } else {
-                showToast(t('toast.listRefreshFail'));
+            const joinMsg = mapJoinApiError(data);
+            if (joinMsg) {
+                setJoinMsg(joinMsg);
+                displayInput?.classList.add('bad');
+                displayInput?.focus();
+                return;
             }
+            showToast(t('toast.listRefreshFail'));
             return;
         }
     } catch {
@@ -841,6 +863,9 @@ function toggleProfileDrop() {
 function mapProfileApiError(data) {
     const code = data?.error;
     if (code === 'name_required') return t('auth.errNameRequired');
+    if (code === 'display_name_rejected') {
+        return data?.reason_ja || t('join.errDisplayRejected');
+    }
     if (code === 'invalid_name_chars') return t('join.errDisplayChars');
     if (code === 'name_too_long') return t('join.errDisplayRequired');
     if (code === 'unauthorized') return t('auth.errInvalid');
@@ -969,14 +994,11 @@ $('#join-go')?.addEventListener('click', async () => {
     }
     displayInput.classList.remove('bad');
     setJoinMsg('');
-    const btn = $('#join-go');
-    btn.disabled = true;
-    btn.textContent = t('join.connecting');
+    setJoinGoPending(true);
     try {
         await navigateToWorld(selected, v.value);
     } finally {
-        btn.disabled = false;
-        btn.textContent = t('common.join');
+        setJoinGoPending(false);
     }
 });
 
@@ -1076,6 +1098,9 @@ function mapAuthApiError(data) {
     if (code === 'invalid_email') return t('auth.errEmailInvalid');
     if (code === 'email_exists') return t('auth.errEmailExists');
     if (code === 'name_required') return t('auth.errNameRequired');
+    if (code === 'display_name_rejected') {
+        return data?.reason_ja || t('join.errDisplayRejected');
+    }
     if (code === 'password_too_short' || code === 'password_invalid') {
         return t('auth.errPassMin', { min: data.minLength || 8 });
     }

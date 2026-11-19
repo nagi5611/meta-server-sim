@@ -51,6 +51,7 @@ sim 反映: `scripts/lobby-production-apply.sh`、`scripts/metasim-production-gi
 |--------|------------|
 | `LOBBY_WORKERS_DEV_SUBDOMAIN` | workers.dev サブドメインが **未登録**の初回のみ（workflow は `env` に渡す。登録済みなら省略可） |
 | `GEMINI_TRANSLATION_API_KEY` | 管理画面お知らせの Gemini 自動翻訳（未設定時は原文のみ保存） |
+| `LOBBY_JEV_API_KEY` | ロビー参加時表示名の Jev モデレーション（未設定時はスキップ）。代替: deploy 時 `JEV_API_KEY` / `TYPESAFE_API_KEY` |
 
 ### Repository variables（Secret ではない）
 
@@ -59,7 +60,7 @@ sim 反映: `scripts/lobby-production-apply.sh`、`scripts/metasim-production-gi
 | `LOBBY_KV_NAMESPACE_ID` | 未設定時は `metaverse-lobby/wrangler.toml` の KV id |
 | `LOBBY_CUSTOM_HOSTNAME` | 未設定時 `m.mmh-virtual.jp` |
 
-Worker **[vars]**（`metaverse-lobby/wrangler.toml`、Secret ではない）: `GEMINI_TRANSLATION_MODEL` は空プレースホルダ（省略時 Worker コードの `gemini-3.1-flash-lite`）。
+Worker **[vars]**（`metaverse-lobby/wrangler.toml`、Secret ではない）: `GEMINI_TRANSLATION_MODEL` は空プレースホルダ（省略時 Worker コードの `gemini-3.1-flash-lite`）。表示名 Jev は `LOBBY_JEV_API_URL` / `LOBBY_JEV_MODEL` / `LOBBY_JEV_REJECT_THRESHOLD` / `LOBBY_DISPLAY_NAME_MOD_ENABLED`（詳細は `docs/metaverse-lobby-admin-integration.md`）。
 
 ---
 

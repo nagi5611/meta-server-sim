@@ -17,6 +17,8 @@
 
 ロビーで入力した表示名は、参加先 URL に `?displayName=` を付与します。テナント側 `tenant-lobby-entry.js` が `localStorage.username` に書き込み、既存のソケット入場フローでその名前が使われます。
 
+参加確認（`POST /api/join-world`）では Worker が **Jev** で表示名を検査します（Secret `LOBBY_JEV_API_KEY`、vars は `metaverse-lobby/wrangler.toml`）。お知らせ翻訳用 `GEMINI_TRANSLATION_API_KEY` とは別です。
+
 ## 環境変数（シミュレーションサーバー）
 
 | 変数 | 用途 |

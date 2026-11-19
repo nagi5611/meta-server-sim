@@ -35,3 +35,9 @@ LOBBY_PUBLIC_POLL_MS = "10000"
 LOBBY_SIM_ORIGIN = "https://sim.mmh-virtual.jp"
 # Optional Gemini announcement translation model (empty = gemini-3.1-flash-lite in Worker)
 GEMINI_TRANSLATION_MODEL = ""
+# Lobby join display-name moderation (Jev / TypeSafe — API key is Wrangler secret LOBBY_JEV_API_KEY)
+LOBBY_DISPLAY_NAME_MOD_ENABLED = "1"
+LOBBY_JEV_API_URL = "https://api.typesafe.ai/v1/systemone"
+LOBBY_JEV_MODEL = "jev-latest"
+LOBBY_JEV_REJECT_THRESHOLD = "0.7"
+LOBBY_JEV_TIMEOUT_MS = "8000"

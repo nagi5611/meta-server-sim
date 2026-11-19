@@ -115,6 +115,24 @@ metaverse-lobby/public/admin/
 
 本番デプロイ: GitHub Actions **Deploy metaverse-lobby** のリポジトリシークレット `GEMINI_TRANSLATION_API_KEY`、または `scripts/lobby-provision-cloudflare.sh` 実行時に同変数を渡すと `wrangler secret put GEMINI_TRANSLATION_API_KEY` されます。API キーはログに出力しません。sim 本番のチャット検閲用 `GEMINI_API_KEY` とは別名です。
 
+## 参加時表示名のモデレーション（Jev）
+
+`POST /api/join-world`・プロフィール表示名変更・新規登録（Worker 側）で、TypeSafe **Jev** が表示名を判定します。お知らせ翻訳の `GEMINI_TRANSLATION_*` とは**共有しません**。
+
+| 種別 | 変数 | 用途 |
+|------|------|------|
+| **Secret** | `LOBBY_JEV_API_KEY` | Jev API キー（未設定時はモデレーションをスキップ） |
+| Secret（代替） | `JEV_API_KEY` / `TYPESAFE_API_KEY` | GHA / provision 実行時、上記 Secret への投入に利用可 |
+| **var** | `LOBBY_DISPLAY_NAME_MOD_ENABLED` | `0` / `false` で無効（既定 `1`） |
+| var | `LOBBY_JEV_API_URL` | 既定 `https://api.typesafe.ai/v1/systemone` |
+| var | `LOBBY_JEV_MODEL` | 既定 `jev-latest` |
+| var | `LOBBY_JEV_REJECT_THRESHOLD` | noul 拒否閾値 0–1（既定 `0.7`） |
+| var | `LOBBY_JEV_TIMEOUT_MS` | 既定 `8000` |
+
+本番: GitHub **Repository secret** `LOBBY_JEV_API_KEY`（または deploy 時に `JEV_API_KEY` / `TYPESAFE_API_KEY`）、`scripts/lobby-provision-cloudflare.sh` はいずれかがセットされていれば `wrangler secret put LOBBY_JEV_API_KEY` を実行します。
+
+sim 本番（ロビー経由 signup / プロフィール PATCH / テナント `set-username`）は `TYPESAFE_API_KEY` または `JEV_API_KEY` と既存 `CHAT_MOD_JEV_*` 閾値を流用します（`DISPLAY_NAME_JEV_POLICY_TEXT` でポリシー上書き可）。
+
 ---
 
 ## ローカル確認

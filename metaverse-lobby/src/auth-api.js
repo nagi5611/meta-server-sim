@@ -3,6 +3,7 @@ import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
 import { insertJoinEvent } from './db-ops.js';
 import { handleProfileAvatarUpload } from './lobby-profile-assets.js';
 import { resolveLobbySessionBan } from './lobby-ban-guard.js';
+import { moderateLobbyDisplayName } from './display-name-moderator.js';
 
 const PUBLIC_COOKIE = 'lobby_session';
 
@@ -123,6 +124,13 @@ export async function handlePublicAuth(request, env) {
 
     if (url.pathname === '/api/auth/signup' && request.method === 'POST') {
         const body = await request.json();
+        const signupName = String(body?.displayName || body?.name || '').trim();
+        if (signupName) {
+            const moderation = await moderateLobbyDisplayName({ env, displayName: signupName });
+            if (!moderation.allowed) {
+                return json({ error: 'display_name_rejected', reason_ja: moderation.reason_ja || undefined }, 422);
+            }
+        }
         const sim = await fetchSim(env, '/api/lobby/auth/signup', { method: 'POST', body });
         if (!sim.ok) return json(sim.data || { error: 'signup_failed' }, sim.status || 400);
         const user = sim.data?.user;
@@ -214,6 +222,10 @@ export async function handlePublicAuth(request, env) {
         if (displayName.length > 64) return json({ error: 'name_too_long', maxLength: 64 }, 400);
         if (!/^[\p{L}\p{N}_\- ]+$/u.test(displayName)) {
             return json({ error: 'invalid_name_chars' }, 400);
+        }
+        const moderation = await moderateLobbyDisplayName({ env, displayName });
+        if (!moderation.allowed) {
+            return json({ error: 'display_name_rejected', reason_ja: moderation.reason_ja || undefined }, 422);
         }
         const sim = await fetchSim(env, '/service/lobby/user-profile', {
             method: 'PATCH',

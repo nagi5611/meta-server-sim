@@ -2,6 +2,7 @@ import { getPublicSession, resolveLobbyViewer } from './auth-api.js';
 import { resolveLobbySessionBan } from './lobby-ban-guard.js';
 import { findRegistryEntryByJoinCode, normalizeJoinCode } from './join-by-code-api.js';
 import { insertJoinEvent } from './db-ops.js';
+import { moderateLobbyDisplayName } from './display-name-moderator.js';
 
 const LIVE_KEY = 'live';
 
@@ -75,6 +76,19 @@ export async function handleJoinWorldRequest(request, env) {
     if (!worldId && joinCode.length < 6) return json({ error: 'world_id_or_code_required' }, 400);
     if (displayName.length > 64) return json({ error: 'name_too_long', maxLength: 64 }, 400);
     if (displayName && !/^[\p{L}\p{N}_\- ]+$/u.test(displayName)) return json({ error: 'invalid_name_chars' }, 400);
+
+    if (displayName) {
+        const moderation = await moderateLobbyDisplayName({ env, displayName });
+        if (!moderation.allowed) {
+            return json(
+                {
+                    error: 'display_name_rejected',
+                    reason_ja: moderation.reason_ja || undefined,
+                },
+                422,
+            );
+        }
+    }
 
     const registry = (await kv.get('registry', 'json')) || { metaverses: [] };
     const live = (await kv.get(LIVE_KEY, 'json')) || { worlds: {}, series: {} };

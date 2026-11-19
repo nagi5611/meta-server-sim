@@ -392,6 +392,13 @@ fi
 if [[ -n "${GEMINI_TRANSLATION_API_KEY:-}" ]]; then
   printf '%s' "$GEMINI_TRANSLATION_API_KEY" | npx wrangler secret put GEMINI_TRANSLATION_API_KEY
 fi
+if [[ -n "${LOBBY_JEV_API_KEY:-}" ]]; then
+  printf '%s' "$LOBBY_JEV_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
+elif [[ -n "${JEV_API_KEY:-}" ]]; then
+  printf '%s' "$JEV_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
+elif [[ -n "${TYPESAFE_API_KEY:-}" ]]; then
+  printf '%s' "$TYPESAFE_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
+fi
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
   log "applying D1 migrations (lobby-ops) if database exists …"
