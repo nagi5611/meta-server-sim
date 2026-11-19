@@ -16,6 +16,7 @@ Cloud Agent から自宅本番 **meta.mmh-virtual.jp** に **cursor** ユーザ�
 | 種別 | 変数名 | 値 |
 |------|--------|-----|
 | **Secret（必須）** | `META_MMH_VIRTUAL_SSH_PASSWORD` | cursor ユーザーの SSH パスワード |
+| **Secret（推奨）** | `META_MMH_VIRTUAL_SSH_SUDO_PASSWORD` | cursor ユーザーの **sudo** パスワード（SSH パスワードと別のことが多い） |
 
 ホストとユーザー名は固定（Secrets 不要）:
 
@@ -116,6 +117,7 @@ IP 変更で restart したときは `/etc/mmh-virtual/metasim-mediasoup-ip.env`
 | ファイル | 用途 |
 |----------|------|
 | `scripts/ssh-meta-production.sh` | パスワード認証 SSH（引数はリモートで実行するコマンド、省略時は対話シェル） |
+| `scripts/ssh-meta-sudo.sh` | リモートで `sudo -S` 実行（`META_MMH_VIRTUAL_SSH_SUDO_PASSWORD` 優先、失敗時 SSH パスワード） |
 
 ## 禁止事項
 
