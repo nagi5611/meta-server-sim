@@ -112,12 +112,28 @@
       <path d="${area(total)}" fill="${orange}" fill-opacity="${fA}"/>
       <path d="${line(total)}" fill="none" stroke="${orange}" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke" ${focus ? 'stroke-opacity=".55"' : ""}/>
       ${focus ? `<path d="${line(focus)}" fill="none" stroke="#101624" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : ""}
-      <line class="cursor" x1="0" x2="0" y1="${padT}" y2="${padT + ih}" stroke="#101624" stroke-opacity=".25" stroke-width="1" vector-effect="non-scaling-stroke" style="display:none"/>
     </svg>`;
   }
+  const CHART_PAD_L = 40, CHART_PAD_R = 8, CHART_PAD_T = 10, CHART_PAD_B = 24, CHART_H = 220;
   chart.geom = function (W, n) {
-    const padL = 40, padR = 8;
-    return { padL, iw: W - padL - padR, n };
+    const ih = CHART_H - CHART_PAD_T - CHART_PAD_B;
+    return { padL: CHART_PAD_L, padT: CHART_PAD_T, ih, iw: W - CHART_PAD_L - CHART_PAD_R, n };
+  };
+  chart.ensureCursor = function (svg, geom) {
+    let cur = svg.querySelector(".cursor");
+    if (!cur) {
+      cur = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      cur.setAttribute("class", "cursor");
+      cur.setAttribute("y1", geom.padT);
+      cur.setAttribute("y2", geom.padT + geom.ih);
+      cur.setAttribute("stroke", "#101624");
+      cur.setAttribute("stroke-opacity", ".25");
+      cur.setAttribute("stroke-width", "1");
+      cur.setAttribute("vector-effect", "non-scaling-stroke");
+      cur.setAttribute("opacity", "0");
+      svg.appendChild(cur);
+    }
+    return cur;
   };
 
   window.UI = { esc, status, audience, lobby, popup, chart, VIEWER_TEXT };

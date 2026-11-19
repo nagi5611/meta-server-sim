@@ -99,7 +99,6 @@
 
   /* ================= メタバース ================= */
   function series() {
-    void store.fetchMetrics(state.range).then(() => drawChart()).catch(() => drawChart());
     const ws = store.worlds;
     const get = state.range === "24h" ? M.hourly : M.daily;
     const len = state.range === "24h" ? 24 : 7;
@@ -170,42 +169,95 @@
     </div></section>`;
   }
 
-  function drawChart() {
+  let chartLive = null;
+  let metricsInflight = null;
+
+  function chartFingerprint(s, focus, W) {
+    return state.range + "|" + (state.focus || "") + "|" + W + "|" + s.total.join(",") + "|" + (focus ? focus.join(",") : "");
+  }
+
+  function pullChartMetrics() {
+    if (metricsInflight) return metricsInflight;
+    metricsInflight = store.fetchMetrics(state.range)
+      .then(() => { metricsInflight = null; drawChart(true); })
+      .catch(() => { metricsInflight = null; });
+    return metricsInflight;
+  }
+
+  function moveChartHover(e) {
+    if (!chartLive) return;
+    const { svg, cur, tip, g, s, fw, W } = chartLive;
+    const r = svg.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const i = Math.max(0, Math.min(g.n - 1, Math.round(((px - g.padL) / g.iw) * (g.n - 1))));
+    const xx = g.padL + (i / (g.n - 1)) * g.iw;
+    cur.setAttribute("x1", xx);
+    cur.setAttribute("x2", xx);
+    if (cur.getAttribute("opacity") !== "1") cur.setAttribute("opacity", "1");
+    const top = store.worlds
+      .map((w) => [w, s.per[w.id][i]])
+      .filter((p) => p[1] > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const rows = fw
+      ? `<div class="r"><span>${esc(fw.name)}</span><b class="num">${fmtNum(s.per[fw.id][i])}</b></div>`
+      : top.slice(0, 4).map((p) => `<div class="r mut"><span>${esc(p[0].name)}</span><span class="num">${fmtNum(p[1])}</span></div>`).join("");
+    tip.innerHTML = `<div class="t">${esc(s.labels[i])}</div>
+      <div class="r"><span>合計</span><b class="num">${fmtNum(s.total[i])}</b></div>${rows}`;
+    tip.style.left = Math.max(80, Math.min(W - 80, xx)) + "px";
+    tip.classList.add("on");
+  }
+
+  function bindChartBox(box) {
+    if (box.dataset.chartBound) return;
+    box.dataset.chartBound = "1";
+    let raf = 0, pending = null;
+    box.addEventListener("mousemove", (e) => {
+      pending = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (pending) moveChartHover(pending);
+        pending = null;
+      });
+    });
+    box.addEventListener("mouseleave", () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      pending = null;
+      if (!chartLive || chartLive.box !== box) return;
+      chartLive.tip.classList.remove("on");
+      chartLive.cur.setAttribute("opacity", "0");
+    });
+  }
+
+  function drawChart(force) {
     const box = $("#chart");
     if (!box) return;
     const s = series();
     const W = Math.max(280, box.clientWidth), H = 220;
     const focus = state.focus && s.per[state.focus] ? s.per[state.focus] : null;
-    const tip = $("#tip");
+    const fp = chartFingerprint(s, focus, W);
+    if (!force && chartLive && chartLive.box === box && chartLive.fp === fp) {
+      chartLive.s = s;
+      chartLive.fw = state.focus && store.world(state.focus);
+      return;
+    }
+    let tip = $("#tip", box);
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.className = "tip";
+      tip.id = "tip";
+    }
     box.innerHTML = U.chart(s.total, focus, s.labels, W, H);
     box.appendChild(tip);
-    const svg = $("svg", box), cur = $(".cursor", box);
+    const svg = $("svg", box);
     const g = U.chart.geom(W, s.total.length);
+    const cur = U.chart.ensureCursor(svg, g);
     const fw = state.focus && store.world(state.focus);
-
-    box.onmousemove = (e) => {
-      const r = svg.getBoundingClientRect();
-      const px = e.clientX - r.left;
-      const i = Math.max(0, Math.min(g.n - 1, Math.round(((px - g.padL) / g.iw) * (g.n - 1))));
-      const xx = g.padL + (i / (g.n - 1)) * g.iw;
-      cur.setAttribute("x1", xx); cur.setAttribute("x2", xx); cur.style.display = "";
-      const top = store.worlds
-        .map((w) => [w, s.per[w.id][i]])
-        .filter((p) => p[1] > 0)
-        .sort((a, b) => b[1] - a[1]);
-      const rows = fw
-        ? `<div class="r"><span>${esc(fw.name)}</span><b class="num">${fmtNum(s.per[fw.id][i])}</b></div>`
-        : top.slice(0, 4).map((p) => `<div class="r mut"><span>${esc(p[0].name)}</span><span class="num">${fmtNum(p[1])}</span></div>`).join("");
-      tip.innerHTML = `<div class="t">${esc(s.labels[i])}</div>
-        <div class="r"><span>合計</span><b class="num">${fmtNum(s.total[i])}</b></div>${rows}`;
-      const left = Math.max(80, Math.min(W - 80, xx));
-      tip.style.left = left + "px";
-      tip.classList.add("on");
-    };
-    box.onmouseleave = () => { tip.classList.remove("on"); cur.style.display = "none"; };
+    chartLive = { box, fp, svg, cur, tip, g, s, fw, W };
+    bindChartBox(box);
   }
   let rz;
-  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawChart, 120); });
+  window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => drawChart(true), 120); });
 
   function viewWorlds() {
     const ws = store.worlds;
@@ -574,7 +626,10 @@
       v === "editor" && state.editing ? viewEditor() :
       v === "users" ? viewUsers() : v === "announcements" ? viewAnnouncements() :
       v === "logs" ? viewLogs() : v === "settings" ? viewSettings() : viewWorlds();
-    if (v === "worlds") drawChart();
+    if (v === "worlds") {
+      drawChart(true);
+      pullChartMetrics();
+    }
   }
 
   /* ================= events ================= */
