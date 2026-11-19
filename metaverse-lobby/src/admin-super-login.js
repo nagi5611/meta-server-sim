@@ -4,6 +4,12 @@ import {
     insertSuperAdminLoginEvent,
     listSuperAdminLoginEvents,
 } from './db-ops.js';
+import {
+    buildOtpSmsMessage,
+    maskAdminPhone,
+    normalizeJapanPhoneE164,
+    sendAdminOtpSms,
+} from './aws-sns-sms.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const OTP_KV_PREFIX = 'super_admin_otp:';
@@ -45,7 +51,19 @@ export function formatJstTimestamp(now = new Date()) {
  * @returns {boolean}
  */
 export function isSuperAdminOtpEnabled(env) {
-    return Boolean(String(env.ADMIN_EMAIL || '').trim());
+    return Boolean(
+        String(env.ADMIN_PHONE || '').trim() || String(env.ADMIN_EMAIL || '').trim(),
+    );
+}
+
+/**
+ * @param {Record<string, unknown>} env
+ * @returns {'sms' | 'email' | null}
+ */
+export function resolveSuperAdminOtpChannel(env) {
+    if (String(env.ADMIN_PHONE || '').trim()) return 'sms';
+    if (String(env.ADMIN_EMAIL || '').trim()) return 'email';
+    return null;
 }
 
 /**
@@ -267,6 +285,8 @@ export async function handleAdminLoginSuper(request, env, kv) {
 
     if (superAdmin && isSuperAdminOtpEnabled(env)) {
         await logSuperAdminAttempt(db, { clientIp, outcome: 'password_ok' });
+        const channel = resolveSuperAdminOtpChannel(env);
+        const adminPhone = String(env.ADMIN_PHONE || '').trim();
         const adminEmail = String(env.ADMIN_EMAIL || '').trim();
         const code = generateOtpCode();
         const challengeId = crypto.randomUUID();
@@ -277,16 +297,29 @@ export async function handleAdminLoginSuper(request, env, kv) {
             { expirationTtl: OTP_TTL_SEC },
         );
         const atJst = formatJstTimestamp();
+        /** @type {string} */
+        let otpSentTo = '';
         try {
-            await sendAdminOtpEmail(env, {
-                to: adminEmail,
-                subject: 'みんなでメタ 管理ログイン確認コード',
-                text: `スーパー管理者ログインの確認コード: ${code}\n有効期限: 10分\nIP: ${clientIp}\n時刻(JST): ${atJst}`,
-                html: `<p>スーパー管理者ログインの確認コード:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>有効期限: 10分</p><p>IP: ${clientIp}<br>時刻 (JST): ${atJst}</p>`,
-            });
+            if (channel === 'sms') {
+                const smsBody = buildOtpSmsMessage({ code, clientIp, atJst });
+                await sendAdminOtpSms(env, { phone: adminPhone, message: smsBody });
+                const e164 = normalizeJapanPhoneE164(adminPhone) || adminPhone;
+                otpSentTo = maskAdminPhone(e164);
+            } else {
+                await sendAdminOtpEmail(env, {
+                    to: adminEmail,
+                    subject: 'みんなでメタ 管理ログイン確認コード',
+                    text: `スーパー管理者ログインの確認コード: ${code}\n有効期限: 10分\nIP: ${clientIp}\n時刻(JST): ${atJst}`,
+                    html: `<p>スーパー管理者ログインの確認コード:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>有効期限: 10分</p><p>IP: ${clientIp}<br>時刻 (JST): ${atJst}</p>`,
+                });
+                otpSentTo = maskAdminEmail(adminEmail);
+            }
         } catch (err) {
             await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
             const codeName = /** @type {{ code?: string }} */ (err).code;
+            if (codeName === 'SNS_NOT_CONFIGURED' || codeName === 'ADMIN_PHONE_INVALID') {
+                return { status: 503, body: { error: 'otp_sms_not_configured' } };
+            }
             if (codeName === 'RESEND_NOT_CONFIGURED') {
                 return { status: 503, body: { error: 'otp_mail_not_configured' } };
             }
@@ -298,7 +331,8 @@ export async function handleAdminLoginSuper(request, env, kv) {
                 ok: true,
                 otpRequired: true,
                 challengeId,
-                otpSentTo: maskAdminEmail(adminEmail),
+                otpChannel: channel,
+                otpSentTo,
                 clientIp,
                 attemptedAtJst: atJst,
             },

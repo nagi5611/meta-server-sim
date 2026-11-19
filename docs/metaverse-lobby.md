@@ -56,11 +56,15 @@ Worker 静的アカウント `LOBBY_ADMIN_USER` / `LOBBY_ADMIN_PASSWORD` は JWT
 
 | 保存先 | 名前 | 用途 |
 |--------|------|------|
-| **GitHub Actions** secrets | `ADMIN_EMAIL` | OTP 送信先（未設定時はローカル向けに OTP をスキップして従来どおり即セッション） |
+| **GitHub Actions** secrets | `ADMIN_PHONE` | **推奨。** スーパー管理者 OTP の SMS 送信先（`+81…` または `090…` 形式。設定時は AWS SNS SMS が優先） |
+| **GitHub Actions** secrets | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SNS_REGION` | SNS `Publish` 用（リージョン未設定時 Worker は `ap-northeast-1`）。SMS タイプは Transactional |
+| **GitHub Actions** secrets | `ADMIN_EMAIL` | OTP 送信先（`ADMIN_PHONE` 未設定時のメールフォールバック） |
 | **GitHub Actions** secrets | `ADMIN_OTP_SECRET` | 任意。OTP HMAC 用（未設定時は `LOBBY_ADMIN_SESSION_SECRET`） |
-| **GitHub Actions** secrets | `RESEND_API_KEY` | Worker から OTP メール送信（sim の Resend と同じキーで可） |
+| **GitHub Actions** secrets | `RESEND_API_KEY` | メール OTP / パスワード再設定（sim の Resend と同じキーで可） |
 | **Worker** var | `RESEND_FROM_EMAIL` | 任意。未設定時 `みんなでメタ <noreply@mmh-virtual.jp>` |
-| **Worker** secrets | 上記 3 つ | `scripts/lobby-provision-cloudflare.sh` が投入 |
+| **Worker** secrets | 上記 | `scripts/lobby-provision-cloudflare.sh` が投入 |
+
+`ADMIN_PHONE` も `ADMIN_EMAIL` も未設定のときは OTP をスキップし、従来どおり即セッションです。
 
 試行は D1 `super_admin_login_events` に **クライアント IP + JST 時刻** を記録します。管理 UI のゲート（OTP 手順）と設定画面の監査表、サイドバーの「前回ログイン」に表示します。OTP は KV（TTL 10 分）にハッシュ保存します。
 

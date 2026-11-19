@@ -67,7 +67,11 @@ jobs:
           LOBBY_JWT_SECRET: ${{ secrets.LOBBY_JWT_SECRET }}
           LOBBY_ADMIN_SESSION_SECRET: ${{ secrets.LOBBY_ADMIN_SESSION_SECRET }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PHONE: ${{ secrets.ADMIN_PHONE }}
           ADMIN_OTP_SECRET: ${{ secrets.ADMIN_OTP_SECRET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SNS_REGION: ${{ secrets.AWS_SNS_REGION }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           LOBBY_SIM_SERVICE_TOKEN: ${{ secrets.LOBBY_SIM_SERVICE_TOKEN }}
           GEMINI_TRANSLATION_API_KEY: ${{ secrets.GEMINI_TRANSLATION_API_KEY }}

@@ -116,8 +116,10 @@
               ? "admin.gateSessionNotConfigured"
               : code === "otp_invalid" || code === "otp_expired" || code === "otp_locked"
                 ? "admin.gateOtpInvalid"
-                : code === "otp_mail_not_configured" || code === "otp_send_failed"
-                  ? "admin.gateOtpMailFail"
+                : code === "otp_sms_not_configured"
+                  ? "admin.gateOtpSmsFail"
+                  : code === "otp_mail_not_configured" || code === "otp_send_failed"
+                    ? "admin.gateOtpMailFail"
                   : "admin.gateErr";
       $("#gateErr").textContent = tr(key);
       if (otpState.pending) $("#gOtp")?.select();
@@ -904,7 +906,7 @@
       : "";
     return head("設定") + `<div class="sheet set">
       <div class="set-row"><h3>管理ログイン</h3><div>
-        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。スーパー管理者は <code>ADMIN_EMAIL</code> 宛 OTP 2FA（Secrets: <code>ADMIN_EMAIL</code>, <code>ADMIN_OTP_SECRET</code>, Worker <code>RESEND_API_KEY</code>）。カタログは sim 本番 JSON が正本です。</p></div></div>
+        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。スーパー管理者は <code>ADMIN_PHONE</code> 宛 SMS OTP（AWS SNS: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_SNS_REGION</code>）または <code>ADMIN_EMAIL</code> + <code>RESEND_API_KEY</code>。カタログは sim 本番 JSON が正本です。</p></div></div>
       ${auditBlock}
       <div class="set-row"><h3>パスワード再設定メール</h3><div>
         <p>Resend で再設定リンクを送信します。sim の <code>RESEND_API_KEY</code> と <code>RESEND_FROM_EMAIL</code>、任意で <code>LOBBY_PASSWORD_RESET_URL</code> を設定してください。</p></div></div>
