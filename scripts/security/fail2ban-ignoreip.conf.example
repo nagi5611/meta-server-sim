@@ -1,0 +1,8 @@
+# Copy to /etc/mmh-virtual/fail2ban-ignoreip.conf (mode 0640, root:root).
+# One IPv4/IPv6 or CIDR per line. Lines starting with # are ignored.
+# Used by scripts/install-fail2ban-meta-production.sh when rebuilding jail ignoreip.
+#
+# Examples (replace with your addresses — do not commit real public IPs to git):
+# 203.0.113.10
+# 198.51.100.0/24
+# 2001:db8::/48
