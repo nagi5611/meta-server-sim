@@ -23,6 +23,11 @@ import { handleThumbnailUpload } from './lobby-assets.js';
 import { isLobbySuperAdmin } from './lobby-super-admin.js';
 import { getSuperAdminLoginAudit, handleAdminLoginSuper } from './admin-super-login.js';
 import { resolveAdminSessionSecret } from './admin-secrets.js';
+import {
+    enforceBootstrapAdminContinuity,
+    resolveBootstrapAdminEligibility,
+    resolveBootstrapAdminTtlSec,
+} from './lobby-admin-bootstrap-guard.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
@@ -60,7 +65,9 @@ async function verifyAdmin(request, env) {
         readCookie(request, ADMIN_COOKIE) ||
         (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
     if (!token) return null;
-    return verifyJwt(token, secret);
+    const payload = await verifyJwt(token, secret);
+    if (!payload) return null;
+    return enforceBootstrapAdminContinuity(request, env, payload);
 }
 
 /**
@@ -92,18 +99,34 @@ export async function handleAdminApi(request, env, kv) {
 
     if (url.pathname === '/api/admin/bootstrap-from-lobby' && request.method === 'POST') {
         const publicSession = await getPublicSession(request, env);
-        if (!publicSession || String(publicSession.role || '') !== 'admin') {
-            return json({ error: 'forbidden' }, 403);
+        const eligibility = await resolveBootstrapAdminEligibility(publicSession, env);
+        if (!eligibility.allowed) {
+            const err =
+                eligibility.reason === 'banned'
+                    ? 'banned'
+                    : eligibility.reason === 'demoted'
+                      ? 'admin_role_revoked'
+                      : 'forbidden';
+            return json({ error: err }, 403);
         }
         const secret = resolveAdminSessionSecret(env);
         if (!secret) return json({ error: 'session_not_configured' }, 503);
-        const sessionUser = String(publicSession.username || publicSession.sub || 'admin');
+        const sessionUser = String(publicSession?.username || publicSession?.sub || 'admin');
+        const lobbySub = String(publicSession?.sub || sessionUser);
+        const ttlSec = resolveBootstrapAdminTtlSec(env);
         const token = await signJwt(
-            { sub: sessionUser, role: 'admin', admin: true, superAdmin: false },
+            {
+                sub: sessionUser,
+                lobbySub,
+                role: 'admin',
+                admin: true,
+                superAdmin: false,
+                bootstrapFromLobby: true,
+            },
             secret,
-            60 * 60 * 12,
+            ttlSec,
         );
-        const cookie = setCookieHeader(ADMIN_COOKIE, token, 60 * 60 * 12, '/');
+        const cookie = setCookieHeader(ADMIN_COOKIE, token, ttlSec, '/');
         return json(
             { ok: true, user: { username: sessionUser, role: 'admin', superAdmin: false } },
             200,
@@ -120,6 +143,15 @@ export async function handleAdminApi(request, env, kv) {
     if (thumbUpload) return thumbUpload;
 
     if (url.pathname === '/api/admin/session' && request.method === 'GET') {
+        if (session?.bootstrapFromLobby) {
+            const publicSession = await getPublicSession(request, env);
+            const eligibility = await resolveBootstrapAdminEligibility(publicSession, env);
+            if (!eligibility.allowed) {
+                return json({ error: 'admin_role_revoked' }, 403, {
+                    'set-cookie': setCookieHeader(ADMIN_COOKIE, '', 0, '/'),
+                });
+            }
+        }
         const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
         const superAdmin = isLobbySuperAdmin(session);
         const payload = {
