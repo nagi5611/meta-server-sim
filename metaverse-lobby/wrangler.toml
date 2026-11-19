@@ -4,6 +4,12 @@ compatibility_date = "2024-11-01"
 workers_dev = true
 # 静的 UI は Cloudflare Pages（public/）。API のみ Worker。
 
+[[d1_databases]]
+binding = "LOBBY_DB"
+database_name = "lobby-ops"
+database_id = "00000000000000000000000000000001"
+migrations_dir = "migrations"
+
 [[kv_namespaces]]
 binding = "LOBBY_KV"
 # 初回 CI で上書き可。固定 ID: Actions variable LOBBY_KV_NAMESPACE_ID
@@ -22,3 +28,4 @@ crons = ["* * * * *"]
 
 [vars]
 LOBBY_PUBLIC_POLL_MS = "10000"
+LOBBY_SIM_ORIGIN = "https://sim.mmh-virtual.jp"

@@ -16,28 +16,50 @@
 
   /* ================= 認証 ================= */
   const gate = $("#gate"), app = $("#app");
-  function enter() {
-    gate.hidden = true; app.hidden = false;
-    render();
+  async function enter() {
+    $("#gateErr").textContent = "";
+    $("#gateBtn").disabled = true;
+    try {
+      await store.refresh();
+      gate.hidden = true;
+      app.hidden = false;
+      render();
+    } catch (err) {
+      $("#gateErr").textContent = err?.data?.error === "unauthorized" ? "セッションの有効期限が切れました。再ログインしてください。" : "データの読み込みに失敗しました。";
+      gate.hidden = false;
+      app.hidden = true;
+    } finally {
+      $("#gateBtn").disabled = false;
+    }
   }
-  $("#gateForm").addEventListener("submit", (e) => {
+  $("#gateForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if ($("#gUser").value.trim() === "admin" && $("#gPass").value === "admin1234") {
-      sessionStorage.setItem("mmh.admin.authed", "1");
-      $("#gateErr").textContent = "";
-      enter();
-    } else {
+  $("#gateErr").textContent = "";
+    try {
+      await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
+      await enter();
+    } catch {
       $("#gateErr").textContent = "ユーザー名かパスワードが違います。";
       $("#gPass").select();
     }
   });
-  $("#logoutBtn").addEventListener("click", () => {
-    sessionStorage.removeItem("mmh.admin.authed");
+  $("#logoutBtn").addEventListener("click", async () => {
+    try { await window.LobbyAdminApi.logout(); } catch { /* ignore */ }
     app.hidden = true; gate.hidden = false;
     $("#gPass").value = ""; $("#gUser").focus();
   });
-  if (sessionStorage.getItem("mmh.admin.authed") === "1") enter();
-  else setTimeout(() => $("#gUser").focus(), 50);
+  (async function trySession() {
+    try {
+      await store.refresh();
+      gate.hidden = true;
+      app.hidden = false;
+      render();
+    } catch {
+      gate.hidden = false;
+      app.hidden = true;
+      setTimeout(() => $("#gUser").focus(), 50);
+    }
+  })();
 
   $("#nav").addEventListener("click", (e) => {
     const t = e.target.closest("[data-nav]");
@@ -61,6 +83,7 @@
 
   /* ================= メタバース ================= */
   function series() {
+    void store.fetchMetrics(state.range).then(() => drawChart());
     const ws = store.worlds;
     const get = state.range === "24h" ? M.hourly : M.daily;
     const len = state.range === "24h" ? 24 : 7;
@@ -396,29 +419,27 @@
     if (!u) return;
     if (k === "role") {
       const to = u.role === "admin" ? "member" : "admin";
-      store.patchUser(id, { role: to });
-      render(); toast(to === "admin" ? `${u.name} を管理者にしました` : `${u.name} を一般ユーザーに戻しました`);
+      store.patchUser(id, { role: to }).then(() => {
+        render(); toast(to === "admin" ? `${u.name} を管理者にしました` : `${u.name} を一般ユーザーに戻しました`);
+      });
       return;
     }
     if (k === "ban") {
       if (!u.banned) {
         confirm(`${u.name} を BAN しますか？`, "サインインとメタバースへの参加ができなくなります。参加履歴は残ります。", "BAN する", () => {
-          store.patchUser(id, { banned: true, online: false });
-          render(); toast(`${u.name} を BAN しました`);
+          store.patchUser(id, { banned: true }).then(() => { render(); toast(`${u.name} を BAN しました`); });
         });
       } else {
-        store.patchUser(id, { banned: false });
-        render(); toast(`${u.name} の BAN を解除しました`);
+        store.patchUser(id, { banned: false }).then(() => { render(); toast(`${u.name} の BAN を解除しました`); });
       }
       return;
     }
     if (k === "kick") {
-      store.patchUser(id, { online: false });
-      render(); toast(`${u.name} の接続を切りました`);
+      store.kickUser(id).then(() => { render(); toast(`${u.name} の接続を切りました`); }).catch(() => toast("キックに失敗しました"));
       return;
     }
     if (k === "reset") {
-      toast(`${u.email} にパスワード再設定メールを送信しました`);
+      toast("パスワード再設定メールは準備中です");
       return;
     }
     if (k === "delete") {
@@ -440,30 +461,27 @@
 
   /* ================= 参加履歴 ================= */
   function viewLogs() {
-    const all = [];
-    store.users.forEach((u) => u.history.forEach((h) => all.push({ u, h })));
-    all.sort((a, b) => new Date(b.h.at) - new Date(a.h.at));
-    const fails = all.filter((r) => !r.h.ok).length;
-    return head("参加履歴", "", null, `${all.length}件 · 接続失敗 ${fails}件`) +
+    const logs = state.joinLogs || [];
+    const fails = logs.filter((r) => !r.ok).length;
+    return head("参加履歴", "", null, `${logs.length}件 · 接続失敗 ${fails}件`) +
       `<div class="sheet"><table>
-        <thead><tr><th style="width:150px">日時</th><th>ユーザー</th><th>メタバース</th><th class="r" style="width:110px">滞在</th></tr></thead>
-        <tbody>${all.map((r) => `<tr>
-          <td class="num dim">${fmtDateTime(r.h.at)}</td>
-          <td><div class="u-cell"><span class="av">${esc(r.u.name[0].toUpperCase())}</span><span class="nm" style="font-weight:600;color:var(--ink)">${esc(r.u.name)}</span></div></td>
-          <td>${esc(store.worldName(r.h.world))}</td>
-          <td class="r num">${r.h.ok ? fmtDur(r.h.dur) : `<span style="color:var(--danger)">接続失敗</span>`}</td>
+        <thead><tr><th style="width:150px">日時</th><th>ユーザー</th><th>メタバース</th><th class="r" style="width:110px">結果</th></tr></thead>
+        <tbody>${logs.map((r) => `<tr>
+          <td class="num dim">${fmtDateTime(r.joined_at)}</td>
+          <td><input type="hidden"><div class="u-cell"><span class="av">${esc(String(r.display_name || "?")[0].toUpperCase())}</span><span class="nm" style="font-weight:600;color:var(--ink)">${esc(r.display_name || "—")}</span></div></td>
+          <td>${esc(store.worldName(r.world_id))}</td>
+          <td class="r num">${r.ok ? "参加" : `<span style="color:var(--danger)">接続失敗</span>`}</td>
         </tr>`).join("")}</tbody></table></div>`;
   }
 
   /* ================= 設定 ================= */
   function viewSettings() {
     return head("設定") + `<div class="sheet set">
-      <div class="set-row"><h3>Basic 認証</h3><div>
-        <dl><dt>ユーザー名</dt><dd>admin</dd><dt>パスワード</dt><dd>••••••••</dd><dt>Realm</dt><dd>mmh-virtual-admin</dd></dl>
-        <p>本番ではサーバー側（.htpasswd など）で設定してください。この画面の認証は試作用です。</p></div></div>
-      <div class="set-row"><h3>データ</h3><div>
-        <p>編集内容はこのブラウザに保存されています。</p>
-        <button class="btn btn-line" data-act="reset" style="margin-top:10px">初期データに戻す</button></div></div>
+      <div class="set-row"><h3>管理ログイン</h3><div>
+        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。カタログは sim 本番 JSON が正本です。</p></div></div>
+      <div class="set-row"><h3>パスワード再設定メール</h3><div>
+        <p>メール連携は準備中です（Turnstile + Email Sending 予定）。</p>
+        <button class="btn btn-line" type="button" disabled style="margin-top:10px;opacity:.5">再設定メール（未実装）</button></div></div>
     </div>`;
   }
 
@@ -474,6 +492,11 @@
     $("#cw").textContent = store.worlds.length;
     $("#cu").textContent = store.users.length;
     const v = state.view;
+    if (v === "logs" && !state.joinLogs) {
+      store.joinLogs(1).then((data) => { state.joinLogs = data.logs || []; render(); });
+      $("#main").innerHTML = head("参加履歴", "", null, "読み込み中…");
+      return;
+    }
     $("#main").innerHTML =
       v === "editor" && state.editing ? viewEditor() :
       v === "users" ? viewUsers() : v === "logs" ? viewLogs() : v === "settings" ? viewSettings() : viewWorlds();
@@ -493,12 +516,11 @@
       if (act === "save") return save();
       if (act === "delete") return askDelete(id);
       if (act === "preview") return openPreview(id);
-      if (act === "reset") return confirm("初期データに戻しますか？", "追加・編集した内容はすべて消えます。", "戻す", () => { store.reset(); state.view = "worlds"; render(); toast("初期データに戻しました"); });
     }
     const fo = t.closest("[data-focus]");
     if (fo) { e.preventDefault(); const id = fo.dataset.focus; state.focus = state.focus === id || !id ? null : id; return render(); }
     const rg = t.closest("[data-range]");
-    if (rg) { state.range = rg.dataset.range; return render(); }
+    if (rg) { state.range = rg.dataset.range; store.fetchMetrics(state.range).then(() => render()); return; }
     const fl = t.closest("[data-filter]");
     if (fl) { state.filter = fl.dataset.filter; return render(); }
     const vw = t.closest("[data-viewer]");
@@ -556,17 +578,19 @@
       w.code = w.code || w.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase();
     }
     w.name = w.name.trim(); w.url = w.url.trim(); w.updated = new Date().toISOString();
-    store.upsertWorld(w);
-    const msg = state.isNew ? "追加しました" : "保存しました";
-    state.view = "worlds"; state.editing = null; state.isNew = false;
-    render(); toast(msg);
+    store.upsertWorld(w).then(() => {
+      const msg = state.isNew ? "追加しました" : "保存しました";
+      state.view = "worlds"; state.editing = null; state.isNew = false;
+      render(); toast(msg);
+    }).catch(() => toast("保存に失敗しました"));
   }
   function askDelete(id) {
     const w = store.world(id); if (!w) return;
     confirm(`「${w.name}」を削除しますか？`, "公開ページの一覧からも消えます。参加履歴は残ります。", "削除", () => {
-      store.removeWorld(id);
-      if (state.focus === id) state.focus = null;
-      state.view = "worlds"; state.editing = null; render(); toast("削除しました");
+      store.removeWorld(id).then(() => {
+        if (state.focus === id) state.focus = null;
+        state.view = "worlds"; state.editing = null; render(); toast("削除しました");
+      }).catch(() => toast("削除に失敗しました"));
     });
   }
 

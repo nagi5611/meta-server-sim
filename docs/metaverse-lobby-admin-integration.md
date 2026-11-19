@@ -1,6 +1,6 @@
 # メタバースロビー管理パネル（Pages）— HTML 移植とバックエンド連携
 
-`design_handoff_metaverse-admin` を **`metaverse-lobby/public/admin/`** に移植済み（UI は **localStorage モック**のまま）。
+`design_handoff_metaverse-admin` を **`metaverse-lobby/public/admin/`** に移植済み。UI は **`/admin/api/*` → Worker → sim service** に接続（#1–#13、#15 実装。#14 メールは UI スタブのみ）。
 
 | URL（想定） | 内容 |
 |-------------|------|

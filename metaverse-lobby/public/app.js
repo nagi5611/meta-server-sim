@@ -271,12 +271,26 @@ function navigateToWorld(world, displayName) {
     url.searchParams.set('displayName', displayName);
     localStorage.setItem('mnm.name', displayName);
     localStorage.setItem('lobbyDisplayName', displayName);
+    void fetch('/api/join-events', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ worldId: world.id, displayName, ok: true }),
+    }).catch(() => {});
     window.location.href = url.toString();
+}
+
+function canViewWorld(world) {
+    const audience = String(world?.audience || 'all');
+    if (audience === 'all') return true;
+    if (!authState.user) return false;
+    if (audience === 'signed') return true;
+    return authState.user.role === 'admin';
 }
 
 async function refresh() {
     try {
-        const res = await fetch('/api/metaverses', { cache: 'no-store' });
+        const res = await fetch('/api/metaverses', { cache: 'no-store', credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
@@ -366,10 +380,11 @@ function renderAuthHeader() {
     }
 }
 
-function signIn(displayName) {
-    const name = String(displayName || '').trim().slice(0, 32);
+function signIn(user) {
+    const name = String(user?.name || user?.displayName || '').trim().slice(0, 32);
     if (!name) return;
-    authState.user = { name, handle: handleTo(name) };
+    const handle = user?.handle || handleTo(user?.username || name);
+    authState.user = { name, handle, role: user?.role || 'member' };
     saveAuthState();
     renderAuthHeader();
     const dn = name.slice(0, 16);
@@ -384,10 +399,16 @@ function signIn(displayName) {
     showToast('ログインしました。表示名を同期しました');
 }
 
-function signOut() {
+async function signOut() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+        /* ignore */
+    }
     authState.user = null;
     saveAuthState();
     renderAuthHeader();
+    refresh();
     showToast('ログアウトしました');
 }
 
@@ -456,17 +477,7 @@ $('#join-code-btn')?.addEventListener('click', () => {
             openJoin(hit);
             return;
         }
-        openJoin({
-            id: `code-${code}`,
-            name: `参加コード ${code}`,
-            players: 0,
-            capacity: 800,
-            status: 'online',
-            description:
-                '招待コードで接続するプライベートワールド。主催者が設定した定員と公開範囲に従います。',
-            joinCode: code,
-            entryUrl: `https://sim.mmh-virtual.jp/${code.replace(/[^A-Z0-9]/g, '').replace(/^P/, 'P-')}/`,
-        });
+        showToast(`参加コード ${code} に一致するワールドがありません`);
     }, 500);
 });
 
@@ -501,9 +512,14 @@ $('#switchTab')?.addEventListener('click', () => {
     setTimeout(() => (authTab === 'signup' ? $('#mName') : $('#mEmail')).focus(), 40);
 });
 
-$('#authForm')?.addEventListener('submit', (e) => {
+$('#authForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const uname = $('#mName').value.trim();
+    if (authTab === 'signup') {
+        const err = $('#authErr');
+        err.textContent = '新規登録は sim 管理から行ってください';
+        err.classList.add('on');
+        return;
+    }
     const email = $('#mEmail').value.trim();
     const pass = $('#mPass').value;
     const err = $('#authErr');
@@ -511,22 +527,33 @@ $('#authForm')?.addEventListener('submit', (e) => {
         err.textContent = t;
         err.classList.add('on');
     };
-
-    if (authTab === 'signup' && uname.length < 2) return showErr('ユーザー名は2文字以上で入力してください');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showErr('メールアドレスの形式が正しくありません');
+    if (!email) return showErr('ユーザー名を入力してください');
     if (pass.length < 4) return showErr('パスワードは4文字以上で入力してください');
 
     const btn = $('#authSubmit');
     btn.disabled = true;
-    btn.textContent = authTab === 'signup' ? '作成中…' : '認証中…';
-    setTimeout(() => {
-        const name = authTab === 'signup' ? uname : email.split('@')[0] || 'user';
-        signIn(name);
+    btn.textContent = '認証中…';
+    try {
+        const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: email, password: pass }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            return showErr(data.error === 'banned' ? 'アカウントが停止されています' : 'ユーザー名またはパスワードが違います');
+        }
+        signIn(data.user);
         clearDraft();
-        btn.disabled = false;
-        syncAuthModal();
         hideAuthModal();
-    }, 600);
+        refresh();
+    } catch {
+        showErr('認証に失敗しました');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+    }
 });
 
 $('#logoutBtn')?.addEventListener('click', signOut);
@@ -549,7 +576,18 @@ if (joinCodeInput) {
     if (codeCount) codeCount.textContent = `${savedCode.length}/12`;
 }
 
-renderAuthHeader();
+async function bootstrapAuth() {
+    try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (data.user) signIn(data.user);
+    } catch {
+        /* guest */
+    }
+    renderAuthHeader();
+}
+
+bootstrapAuth();
 refresh();
 setInterval(refresh, POLL_MS);
 if (document.fonts) document.fonts.ready.then(() => initMarquees(document));

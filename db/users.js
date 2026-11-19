@@ -15,6 +15,7 @@ import {
     sqliteUsersDbExists,
     updateStudentSqlite,
     updateTeacherSqlite,
+    patchLobbyUserFlagsSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
 } from './users-sqlite.js';
@@ -114,7 +115,10 @@ export async function verifyStudent(username, password) {
     return withUsersBackend(
         async () => {
             const row = await d1First(
-                'SELECT id, username, password_hash, display_name FROM students WHERE username = ?',
+                `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
+                        COALESCE(email, '') AS email
+                 FROM students WHERE username = ?`,
                 [username.trim()]
             );
             if (!row) return null;
@@ -124,6 +128,10 @@ export async function verifyStudent(username, password) {
                 id: Number(row.id),
                 username: String(row.username),
                 displayName: String(row.display_name),
+                banned: Boolean(row.banned),
+                lobbyRole: String(row.lobby_role || 'user'),
+                email: String(row.email || ''),
+                kind: 'student',
             };
         },
         () => verifyStudentSqlite(username, password)
@@ -134,7 +142,10 @@ export async function verifyTeacher(username, password) {
     return withUsersBackend(
         async () => {
             const row = await d1First(
-                'SELECT id, username, password_hash, display_name FROM teachers WHERE username = ?',
+                `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
+                        COALESCE(email, '') AS email
+                 FROM teachers WHERE username = ?`,
                 [username.trim()]
             );
             if (!row) return null;
@@ -144,6 +155,10 @@ export async function verifyTeacher(username, password) {
                 id: Number(row.id),
                 username: String(row.username),
                 displayName: String(row.display_name),
+                banned: Boolean(row.banned),
+                lobbyRole: String(row.lobby_role || 'admin'),
+                email: String(row.email || ''),
+                kind: 'teacher',
             };
         },
         () => verifyTeacherSqlite(username, password)
@@ -222,17 +237,94 @@ async function registerTeacherD1(username, password, displayName) {
     }
 }
 
+function mapStudentRow(row) {
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        createdAt: row.created_at,
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || 'user'),
+        email: String(row.email || ''),
+        kind: 'student',
+    };
+}
+
+function mapTeacherRow(row) {
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        createdAt: row.created_at,
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || 'admin'),
+        email: String(row.email || ''),
+        kind: 'teacher',
+    };
+}
+
 export async function listStudents() {
     return withUsersBackend(
-        () => d1All('SELECT id, username, display_name, created_at FROM students ORDER BY id'),
+        async () => {
+            const rows = await d1All(
+                `SELECT id, username, display_name, created_at,
+                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'user') AS lobby_role,
+                        COALESCE(email,'') AS email FROM students ORDER BY id`,
+            );
+            return rows.map(mapStudentRow);
+        },
         () => listStudentsSqlite()
     );
 }
 
 export async function listTeachers() {
     return withUsersBackend(
-        () => d1All('SELECT id, username, display_name, created_at FROM teachers ORDER BY id'),
+        async () => {
+            const rows = await d1All(
+                `SELECT id, username, display_name, created_at,
+                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'admin') AS lobby_role,
+                        COALESCE(email,'') AS email FROM teachers ORDER BY id`,
+            );
+            return rows.map(mapTeacherRow);
+        },
         () => listTeachersSqlite()
+    );
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
+ */
+export async function patchLobbyUserFlags(kind, id, patch) {
+    return withUsersBackend(
+        async () => {
+            const table = kind === 'teacher' ? 'teachers' : 'students';
+            const sets = [];
+            const params = [];
+            if (patch.banned !== undefined) {
+                sets.push('banned = ?');
+                params.push(patch.banned ? 1 : 0);
+            }
+            if (patch.lobbyRole !== undefined) {
+                sets.push('lobby_role = ?');
+                params.push(String(patch.lobbyRole));
+            }
+            if (patch.email !== undefined) {
+                sets.push('email = ?');
+                params.push(String(patch.email));
+            }
+            if (!sets.length) return null;
+            params.push(id);
+            await d1Run(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`, params);
+            const row = await d1First(
+                `SELECT id, username, display_name, banned, lobby_role, email FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!row) return null;
+            return kind === 'teacher' ? mapTeacherRow({ ...row, created_at: null }) : mapStudentRow({ ...row, created_at: null });
+        },
+        () => patchLobbyUserFlagsSqlite(kind, id, patch),
     );
 }
 

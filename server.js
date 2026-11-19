@@ -41,6 +41,8 @@ import { isValidTenantId } from './lib/tenant-id.js';
 
 import { registerPlatformAdmin } from './lib/platform-admin.js';
 import { registerPlatformLobbyRoutes } from './lib/platform-lobby-routes.js';
+import { registerPlatformLobbyServiceRoutes } from './lib/platform-lobby-service-routes.js';
+import { registerPlatformLobbyAuthRoutes } from './lib/platform-lobby-auth-routes.js';
 import { ensureLobbyCatalogSeeded } from './lib/platform-lobby-bootstrap.js';
 
 import { initPlatformRuntime } from './lib/platform-runtime.js';
@@ -152,6 +154,8 @@ if (requireSecureHttp) {
 
 
 
+registerPlatformLobbyServiceRoutes(app);
+registerPlatformLobbyAuthRoutes(app);
 registerPlatformAdmin(app, { staticDir: STATIC_DIR });
 
 initTenantPluginsPlatform();

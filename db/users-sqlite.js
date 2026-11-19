@@ -47,7 +47,26 @@ export function initSqliteUsersDb(dbPath = getPlatformUsersDbPath()) {
             created_at TEXT DEFAULT (datetime('now'))
         );
     `);
+    ensureLobbyUserColumns(db);
     return db;
+}
+
+/**
+ * @param {import('better-sqlite3').Database} database
+ */
+function ensureLobbyUserColumns(database) {
+    const addCol = (table, sql) => {
+        try {
+            database.exec(sql);
+        } catch {
+            /* column exists */
+        }
+    };
+    for (const table of ['students', 'teachers']) {
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN banned INTEGER DEFAULT 0`);
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN lobby_role TEXT DEFAULT 'user'`);
+        addCol(table, `ALTER TABLE ${table} ADD COLUMN email TEXT DEFAULT ''`);
+    }
 }
 
 function requireDb() {
@@ -55,22 +74,38 @@ function requireDb() {
     return db;
 }
 
+function rowToLobbyUser(row, kind) {
+    return {
+        id: row.id,
+        username: row.username,
+        displayName: row.display_name,
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        email: String(row.email || ''),
+        kind,
+    };
+}
+
 export function verifyStudentSqlite(username, password) {
     const row = requireDb()
-        .prepare('SELECT id, username, password_hash, display_name FROM students WHERE username = ?')
+        .prepare(
+            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM students WHERE username = ?',
+        )
         .get(username.trim());
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
-    return { id: row.id, username: row.username, displayName: row.display_name };
+    return rowToLobbyUser(row, 'student');
 }
 
 export function verifyTeacherSqlite(username, password) {
     const row = requireDb()
-        .prepare('SELECT id, username, password_hash, display_name FROM teachers WHERE username = ?')
+        .prepare(
+            'SELECT id, username, password_hash, display_name, banned, lobby_role, email FROM teachers WHERE username = ?',
+        )
         .get(username.trim());
     if (!row) return null;
     if (!bcrypt.compareSync(password, row.password_hash)) return null;
-    return { id: row.id, username: row.username, displayName: row.display_name };
+    return rowToLobbyUser(row, 'teacher');
 }
 
 export function registerStudentSqlite(username, password, displayName) {
@@ -97,14 +132,74 @@ export function registerTeacherSqlite(username, password, displayName) {
 
 export function listStudentsSqlite() {
     return requireDb()
-        .prepare('SELECT id, username, display_name, created_at FROM students ORDER BY id')
-        .all();
+        .prepare(
+            'SELECT id, username, display_name, created_at, banned, lobby_role, email FROM students ORDER BY id',
+        )
+        .all()
+        .map((row) => ({
+            id: row.id,
+            username: row.username,
+            displayName: row.display_name,
+            createdAt: row.created_at,
+            banned: Boolean(row.banned),
+            lobbyRole: String(row.lobby_role || 'user'),
+            email: String(row.email || ''),
+            kind: 'student',
+        }));
 }
 
 export function listTeachersSqlite() {
     return requireDb()
-        .prepare('SELECT id, username, display_name, created_at FROM teachers ORDER BY id')
-        .all();
+        .prepare(
+            'SELECT id, username, display_name, created_at, banned, lobby_role, email FROM teachers ORDER BY id',
+        )
+        .all()
+        .map((row) => ({
+            id: row.id,
+            username: row.username,
+            displayName: row.display_name,
+            createdAt: row.created_at,
+            banned: Boolean(row.banned),
+            lobbyRole: String(row.lobby_role || 'admin'),
+            email: String(row.email || ''),
+            kind: 'teacher',
+        }));
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
+ */
+export function patchLobbyUserFlagsSqlite(kind, id, patch) {
+    const table = kind === 'teacher' ? 'teachers' : 'students';
+    const row = requireDb().prepare(`SELECT id FROM ${table} WHERE id = ?`).get(id);
+    if (!row) return null;
+    const sets = [];
+    const params = [];
+    if (patch.banned !== undefined) {
+        sets.push('banned = ?');
+        params.push(patch.banned ? 1 : 0);
+    }
+    if (patch.lobbyRole !== undefined) {
+        sets.push('lobby_role = ?');
+        params.push(String(patch.lobbyRole));
+    }
+    if (patch.email !== undefined) {
+        sets.push('email = ?');
+        params.push(String(patch.email));
+    }
+    if (!sets.length) return null;
+    params.push(id);
+    requireDb()
+        .prepare(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`)
+        .run(...params);
+    const out = requireDb()
+        .prepare(
+            `SELECT id, username, display_name, banned, lobby_role, email FROM ${table} WHERE id = ?`,
+        )
+        .get(id);
+    return rowToLobbyUser(out, kind);
 }
 
 export function updateStudentSqlite(id, { username, displayName, password } = {}) {
