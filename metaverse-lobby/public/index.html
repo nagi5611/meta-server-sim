@@ -41,37 +41,44 @@
   </div>
 </header>
 
-<main>
-  <section class="panel announcements" id="announcements-panel" hidden aria-labelledby="annTitle">
-    <div class="panel-head">
-      <h2 id="annTitle" data-i18n="lobby.announcements">お知らせ</h2>
-    </div>
-    <ul class="ann-list" id="announcement-list"></ul>
-    <p class="ann-empty" id="announcement-empty" hidden data-i18n="lobby.announcementsEmpty">現在お知らせはありません</p>
-  </section>
-
-  <section class="panel" aria-labelledby="panelTitle">
-    <div class="panel-head">
-      <h2 id="panelTitle" data-i18n="lobby.worldList">メタバース一覧</h2>
-      <span id="refresh-hint" class="hint num" aria-live="polite">同期中…</span>
-    </div>
-
-    <div class="grid" id="world-grid" role="list"></div>
-
-    <div class="other">
-      <div class="oh">
-        <b data-i18n="lobby.otherWorlds">その他のメタバース</b>
-        <span data-i18n="lobby.joinByCode">参加コードで入室</span>
-      </div>
-      <div class="of">
-        <div class="iwrap">
-          <input id="join-code" class="inp code-inp" type="text" maxlength="12" data-i18n-placeholder="lobby.joinCode" data-i18n-aria="lobby.joinCode" autocomplete="off" spellcheck="false">
-          <span class="cnt num" id="codeCount">0/12</span>
+<main class="lobby-main">
+  <div class="lobby-layout">
+    <aside class="lobby-aside" aria-label="" data-i18n-aria="lobby.announcements">
+      <section class="panel announcements" id="announcements-panel" hidden aria-labelledby="annTitle">
+        <div class="panel-head">
+          <h2 id="annTitle" data-i18n="lobby.announcements">お知らせ</h2>
         </div>
-        <button type="button" class="btn btn-primary" id="join-code-btn" data-i18n="common.join">参加</button>
-      </div>
+        <ul class="ann-list" id="announcement-list"></ul>
+        <p class="ann-empty" id="announcement-empty" hidden data-i18n="lobby.announcementsEmpty">現在お知らせはありません</p>
+      </section>
+    </aside>
+
+    <div class="lobby-content">
+      <section class="panel worlds-panel" aria-labelledby="panelTitle">
+        <div class="panel-head panel-head--worlds">
+          <div class="panel-head-leading">
+            <h2 id="panelTitle" data-i18n="lobby.worldList">メタバース一覧</h2>
+            <span id="refresh-hint" class="hint num" aria-live="polite">同期中…</span>
+          </div>
+          <div class="panel-head-join">
+            <div class="join-label">
+              <b data-i18n="lobby.otherWorlds">その他のメタバース</b>
+              <span data-i18n="lobby.joinByCode">参加コードで入室</span>
+            </div>
+            <div class="join-fields">
+              <div class="iwrap">
+                <input id="join-code" class="inp code-inp" type="text" maxlength="12" data-i18n-placeholder="lobby.joinCode" data-i18n-aria="lobby.joinCode" autocomplete="off" spellcheck="false">
+                <span class="cnt num" id="codeCount">0/12</span>
+              </div>
+              <button type="button" class="btn btn-primary" id="join-code-btn" data-i18n="common.join">参加</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid" id="world-grid" role="list"></div>
+      </section>
     </div>
-  </section>
+  </div>
 </main>
 
 <div class="scrim" id="join-scrim" role="dialog" aria-modal="true" aria-labelledby="jName" hidden>

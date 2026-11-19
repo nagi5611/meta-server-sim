@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="lobby.css" />
+  <title>Announcements preview</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f4f5f7; }
+    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px; display: grid; grid-template-columns: 268px 1fr; gap: 20px; align-items: start; }
+    .side { min-width: 0; }
+    .main-ph { min-height: 200px; border: 1px dashed #ccc; border-radius: 12px; display: grid; place-items: center; color: #888; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <aside class="side">
+    <section class="panel announcements" id="announcements-panel" aria-labelledby="annTitle">
+      <div class="panel-head" style="display:flex;padding:16px;border-bottom:1px solid #e5e7eb">
+        <h2 id="annTitle" style="margin:0;font-size:18px">お知らせ</h2>
+      </div>
+      <ul class="ann-list" id="announcement-list"></ul>
+    </section>
+    </aside>
+    <div class="main-ph">メタバース一覧（右カラム）</div>
+  </div>
+  <script type="module">
+    const items = [
+      { id: '1', title: '短い告知', createdAt: '2026-11-20T09:00:00.000Z' },
+      { id: '2', title: 'とても長いタイトルのお知らせで省略記号が出るかどうかの確認用サンプル', createdAt: '2026-11-19T08:00:00.000Z' },
+    ];
+    const list = document.getElementById('announcement-list');
+    for (const a of items) {
+      const li = document.createElement('li');
+      li.className = 'ann-item';
+      const head = document.createElement('div');
+      head.className = 'ann-head';
+      const title = document.createElement('h3');
+      title.className = 'ann-title';
+      title.textContent = a.title;
+      head.appendChild(title);
+      const timeEl = document.createElement('time');
+      timeEl.className = 'ann-date';
+      timeEl.textContent = '2026/11/20';
+      head.appendChild(timeEl);
+      li.appendChild(head);
+      list.appendChild(li);
+    }
+  </script>
+</body>
+</html>
