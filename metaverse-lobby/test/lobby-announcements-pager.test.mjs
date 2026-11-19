@@ -44,6 +44,8 @@ test('lobby index includes accessible public footer', () => {
     const css = readFileSync(join(publicDir, 'lobby.css'), 'utf8');
     assert.match(html, /<footer class="site-footer"/);
     assert.match(html, /data-i18n="lobby\.footerOrg"/);
+    assert.match(html, /data-i18n="lobby\.footerContactLabel"/);
+    assert.match(html, /data-i18n="lobby\.footerSiteLabel"/);
     assert.match(html, /href="mailto:developer@mmh-virtual\.jp"/);
     assert.match(html, /href="https:\/\/mmh-virtual\.jp"/);
     assert.match(html, /rel="noopener noreferrer"/);
@@ -57,6 +59,8 @@ test('locales define announcement pager strings for ja, zh-CN, zh-TW, en', () =>
         assert.ok(locales[loc]['lobby.announcementsPageNext'], loc);
         assert.ok(locales[loc]['lobby.announcementsPageGoto'], loc);
         assert.ok(locales[loc]['lobby.footerOrg'], loc);
+        assert.ok(locales[loc]['lobby.footerContactLabel'], loc);
+        assert.ok(locales[loc]['lobby.footerSiteLabel'], loc);
         assert.ok(locales[loc]['lobby.footerContactAria'], loc);
         assert.ok(locales[loc]['lobby.footerSiteAria'], loc);
     }
