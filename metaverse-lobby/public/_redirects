@@ -1,0 +1,4 @@
+# API は Pages Functions（functions/api, functions/admin/api）で処理
+/reset-password.html  /reset-password.html  200
+/admin                /admin/index.html       301
+/admin/               /admin/index.html       200
