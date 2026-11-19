@@ -1,0 +1,48 @@
+name: npm audit
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - metaverse-lobby/package.json
+      - metaverse-lobby/package-lock.json
+      - .github/workflows/npm-audit.yml
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - metaverse-lobby/package.json
+      - metaverse-lobby/package-lock.json
+      - .github/workflows/npm-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: root
+            directory: .
+            lockfile: package-lock.json
+          - name: metaverse-lobby
+            directory: metaverse-lobby
+            lockfile: package-lock.json
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - name: npm ci and audit (${{ matrix.name }})
+        working-directory: ${{ matrix.directory }}
+        run: |
+          npm ci
+          npm audit --audit-level=high
