@@ -163,6 +163,8 @@ test('lobby index keeps join code visible and provides banned modal', () => {
     assert.match(html, /id="join-code"/);
     assert.match(html, /id="banned-scrim"/);
     assert.match(html, /data-i18n="lobby\.bannedJoinMessage"/);
+    assert.match(html, /href="mailto:developer@mmh-virtual\.jp"/);
+    assert.match(html, /data-i18n="lobby\.bannedContact"/);
     assert.doesNotMatch(html, /id="join-code-banned"/);
     assert.equal(locales.ja['lobby.bannedJoinMessage'], 'あなたはバンされています');
     assert.equal(locales['zh-CN']['lobby.bannedJoinMessage'], '你已被封禁');

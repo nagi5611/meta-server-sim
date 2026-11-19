@@ -1090,7 +1090,7 @@ async function bootstrapAuth() {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         const data = await res.json();
         if (data.banned) {
-            applyBannedCatalogState(false);
+            applyBannedCatalogState(true);
             return;
         }
         catalogBanned = false;
