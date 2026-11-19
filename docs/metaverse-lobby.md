@@ -25,6 +25,10 @@
 | `LOBBY_WORKER_SYNC_URL` | 例: `https://metaverse-lobby.<account>.workers.dev/api/admin/sync`（sync は Worker 直 URL 推奨） |
 | `LOBBY_WORKER_SYNC_SECRET` | sync POST の Bearer（Worker 側 `LOBBY_WORKER_SYNC_SECRET` と同一） |
 | `LOBBY_MAINTENANCE=1` | ロビー向けにメンテ表示を強制 |
+| `LOBBY_SIM_SERVICE_TOKEN` | ロビー Worker → sim `/service/*` |
+| `RESEND_API_KEY` | パスワード再設定メール（Resend） |
+| `RESEND_FROM_EMAIL` | 送信元（例: `みんなでメタ <noreply@yourdomain.com>`） |
+| `LOBBY_PASSWORD_RESET_URL` | 任意。再設定ページ URL（既定 `https://m.mmh-virtual.jp/reset-password.html`） |
 
 カタログ本体: `data/platform/lobby-catalog.json`
 
@@ -68,7 +72,15 @@ sudo LOBBY_ENV_FILE=/path/to/lobby-secrets.env bash /home/nagi/sim-server/meta-s
 
 初回は管理画面から tenant を保存するか、`PUT /admin/lobby-catalog` でカタログを登録後、`POST /admin/lobby-catalog/sync`（設定 → ネットワーク）で Worker に反映します。
 
-## 管理画面との連携
+## Pages ロビー管理パネル（デザイン handoff）
+
+- URL: **`https://m.mmh-virtual.jp/admin/`**（静的 UI + localStorage モック）
+- ソース: `metaverse-lobby/public/admin/`
+- バックエンド連携一覧: [`docs/metaverse-lobby-admin-integration.md`](metaverse-lobby-admin-integration.md)
+
+sim 本番の Tenant / env 管理は従来どおり **`https://sim.mmh-virtual.jp/admin/`**。
+
+## 管理画面との連携（sim API）
 
 - **Tenant 新規作成** (`POST /admin/tenants`): ロビー項目を自動追加し、Worker sync を試行
 - **Tenant 削除**: ロビー項目を削除

@@ -31,7 +31,13 @@ jobs:
           npx wrangler deploy --dry-run
       - name: Check Pages static paths
         working-directory: metaverse-lobby
-        run: test -f functions/api/'[[path]]'.js && test -f public/index.html
+        run: |
+          test -f functions/api/'[[path]]'.js
+          test -f public/index.html
+          test -f public/admin/index.html
+          test -f public/admin/panel.js
+          test -f functions/admin/api/'[[path]]'.js
+          test -f migrations/0001_lobby_ops.sql
 
   deploy:
     needs: validate

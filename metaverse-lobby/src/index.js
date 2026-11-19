@@ -1,8 +1,21 @@
 import { LobbyPoller } from './lobby-poller.js';
+import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
+import { handleAdminApi, handleAdminLogin } from './admin-api.js';
+import { rollupDailyMetrics } from './db-ops.js';
 
 export { LobbyPoller };
 
 const LIVE_KEY = 'live';
+
+function json(data, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+        },
+    });
+}
 
 /**
  * @param {Record<string, unknown>} env
@@ -19,6 +32,8 @@ async function pollStatus(env) {
         if (!id) continue;
         let status = 'online';
         let maintenance = Boolean(world.maintenance);
+        if (world.lobbyStatus === 'event') status = 'live';
+        if (world.lobbyStatus === 'maint' || maintenance) status = 'maint';
         if (world.statusUrl) {
             try {
                 const res = await fetch(world.statusUrl, { signal: AbortSignal.timeout(12_000) });
@@ -26,7 +41,7 @@ async function pollStatus(env) {
                     const data = await res.json();
                     maintenance = Boolean(data.maintenance) || data.status === 'maint' || !data.ok;
                     if (maintenance) status = 'maint';
-                    else if (data.status === 'live') status = 'live';
+                    else if (data.status === 'live' || world.lobbyStatus === 'event') status = 'live';
                 } else {
                     status = 'degraded';
                 }
@@ -57,6 +72,13 @@ async function pollStatus(env) {
     );
 }
 
+function audienceVisible(audience, viewer) {
+    const a = String(audience || 'all');
+    if (a === 'all') return true;
+    if (a === 'signed') return viewer === 'signed' || viewer === 'admin';
+    return viewer === 'admin';
+}
+
 /**
  * @param {Request} request
  * @param {Record<string, unknown>} env
@@ -64,6 +86,15 @@ async function pollStatus(env) {
 async function handleApi(request, env) {
     const url = new URL(request.url);
     const kv = /** @type {KVNamespace} */ (env.LOBBY_KV);
+
+    const loginRes = await handleAdminLogin(request, env);
+    if (loginRes) return loginRes;
+
+    const publicAuth = await handlePublicAuth(request, env);
+    if (publicAuth) return publicAuth;
+
+    const adminRes = await handleAdminApi(request, env, kv);
+    if (adminRes) return adminRes;
 
     if (url.pathname === '/api/admin/sync' && request.method === 'POST') {
         const secret = String(env.LOBBY_WORKER_SYNC_SECRET || '').trim();
@@ -83,44 +114,41 @@ async function handleApi(request, env) {
     if (url.pathname === '/api/metaverses' && request.method === 'GET') {
         const registry = (await kv.get('registry', 'json')) || { metaverses: [] };
         const live = (await kv.get(LIVE_KEY, 'json')) || { worlds: {}, series: {} };
-        const metaverses = (registry.metaverses || []).map((m) => {
-            const id = m.id;
-            const w = live.worlds?.[id] || {};
-            const series = live.series?.[id] || [];
-            let status = w.status || (m.maintenance ? 'maint' : 'online');
-            if (m.maintenance) status = 'maint';
-            return {
-                id,
-                name: m.name,
-                joinCode: m.joinCode || null,
-                entryUrl: m.entryUrl,
-                description: m.description || '',
-                thumbnailUrl: m.thumbnailUrl || null,
-                capacity: m.capacity ?? null,
-                players: Number(w.players ?? 0) || 0,
-                status,
-                series: series.length ? series : new Array(24).fill(0),
-                statusAt: w.statusAt || live.statusAt || null,
-                presenceAt: w.presenceAt || null,
-            };
-        });
+        const viewer = await resolveLobbyViewer(request, env);
+        const preview = url.searchParams.get('preview') === '1' && viewer === 'admin';
+        const metaverses = (registry.metaverses || [])
+            .filter((m) => preview || audienceVisible(m.audience, viewer))
+            .map((m) => {
+                const id = m.id;
+                const w = live.worlds?.[id] || {};
+                const series = live.series?.[id] || [];
+                let status = w.status || (m.maintenance ? 'maint' : 'online');
+                if (m.lobbyStatus === 'event') status = 'live';
+                if (m.maintenance || m.lobbyStatus === 'maint') status = 'maint';
+                return {
+                    id,
+                    name: m.name,
+                    joinCode: m.joinCode || null,
+                    entryUrl: m.entryUrl,
+                    description: m.description || '',
+                    thumbnailUrl: m.thumbnailUrl || null,
+                    capacity: m.capacity ?? null,
+                    audience: m.audience || 'all',
+                    players: Number(w.players ?? 0) || 0,
+                    status,
+                    series: series.length ? series : new Array(24).fill(0),
+                    statusAt: w.statusAt || live.statusAt || null,
+                    presenceAt: w.presenceAt || null,
+                };
+            });
         return json({
             updatedAt: registry.updatedAt || live.updatedAt || null,
             metaverses,
+            viewer,
         });
     }
 
     return null;
-}
-
-function json(data, status = 200) {
-    return new Response(JSON.stringify(data), {
-        status,
-        headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'cache-control': 'no-store',
-        },
-    });
 }
 
 export default {
@@ -136,5 +164,8 @@ export default {
         ctx.waitUntil(pollStatus(env));
         const id = env.LOBBY_POLLER.idFromName('primary');
         ctx.waitUntil(env.LOBBY_POLLER.get(id).fetch('http://lobby-poller/wake'));
+        if (env.LOBBY_DB) {
+            ctx.waitUntil(rollupDailyMetrics(env.LOBBY_DB));
+        }
     },
 };

@@ -15,6 +15,10 @@ import {
     sqliteUsersDbExists,
     updateStudentSqlite,
     updateTeacherSqlite,
+    patchLobbyUserFlagsSqlite,
+    consumePasswordResetTokenSqlite,
+    createPasswordResetTokenSqlite,
+    getUserForPasswordResetSqlite,
     verifyStudentSqlite,
     verifyTeacherSqlite,
 } from './users-sqlite.js';
@@ -114,7 +118,10 @@ export async function verifyStudent(username, password) {
     return withUsersBackend(
         async () => {
             const row = await d1First(
-                'SELECT id, username, password_hash, display_name FROM students WHERE username = ?',
+                `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'user') AS lobby_role,
+                        COALESCE(email, '') AS email
+                 FROM students WHERE username = ?`,
                 [username.trim()]
             );
             if (!row) return null;
@@ -124,6 +131,10 @@ export async function verifyStudent(username, password) {
                 id: Number(row.id),
                 username: String(row.username),
                 displayName: String(row.display_name),
+                banned: Boolean(row.banned),
+                lobbyRole: String(row.lobby_role || 'user'),
+                email: String(row.email || ''),
+                kind: 'student',
             };
         },
         () => verifyStudentSqlite(username, password)
@@ -134,7 +145,10 @@ export async function verifyTeacher(username, password) {
     return withUsersBackend(
         async () => {
             const row = await d1First(
-                'SELECT id, username, password_hash, display_name FROM teachers WHERE username = ?',
+                `SELECT id, username, password_hash, display_name,
+                        COALESCE(banned, 0) AS banned, COALESCE(lobby_role, 'admin') AS lobby_role,
+                        COALESCE(email, '') AS email
+                 FROM teachers WHERE username = ?`,
                 [username.trim()]
             );
             if (!row) return null;
@@ -144,6 +158,10 @@ export async function verifyTeacher(username, password) {
                 id: Number(row.id),
                 username: String(row.username),
                 displayName: String(row.display_name),
+                banned: Boolean(row.banned),
+                lobbyRole: String(row.lobby_role || 'admin'),
+                email: String(row.email || ''),
+                kind: 'teacher',
             };
         },
         () => verifyTeacherSqlite(username, password)
@@ -222,17 +240,94 @@ async function registerTeacherD1(username, password, displayName) {
     }
 }
 
+function mapStudentRow(row) {
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        createdAt: row.created_at,
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || 'user'),
+        email: String(row.email || ''),
+        kind: 'student',
+    };
+}
+
+function mapTeacherRow(row) {
+    return {
+        id: Number(row.id),
+        username: String(row.username),
+        displayName: String(row.display_name),
+        createdAt: row.created_at,
+        banned: Boolean(row.banned),
+        lobbyRole: String(row.lobby_role || 'admin'),
+        email: String(row.email || ''),
+        kind: 'teacher',
+    };
+}
+
 export async function listStudents() {
     return withUsersBackend(
-        () => d1All('SELECT id, username, display_name, created_at FROM students ORDER BY id'),
+        async () => {
+            const rows = await d1All(
+                `SELECT id, username, display_name, created_at,
+                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'user') AS lobby_role,
+                        COALESCE(email,'') AS email FROM students ORDER BY id`,
+            );
+            return rows.map(mapStudentRow);
+        },
         () => listStudentsSqlite()
     );
 }
 
 export async function listTeachers() {
     return withUsersBackend(
-        () => d1All('SELECT id, username, display_name, created_at FROM teachers ORDER BY id'),
+        async () => {
+            const rows = await d1All(
+                `SELECT id, username, display_name, created_at,
+                        COALESCE(banned,0) AS banned, COALESCE(lobby_role,'admin') AS lobby_role,
+                        COALESCE(email,'') AS email FROM teachers ORDER BY id`,
+            );
+            return rows.map(mapTeacherRow);
+        },
         () => listTeachersSqlite()
+    );
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {{ banned?: boolean, lobbyRole?: string, email?: string }} patch
+ */
+export async function patchLobbyUserFlags(kind, id, patch) {
+    return withUsersBackend(
+        async () => {
+            const table = kind === 'teacher' ? 'teachers' : 'students';
+            const sets = [];
+            const params = [];
+            if (patch.banned !== undefined) {
+                sets.push('banned = ?');
+                params.push(patch.banned ? 1 : 0);
+            }
+            if (patch.lobbyRole !== undefined) {
+                sets.push('lobby_role = ?');
+                params.push(String(patch.lobbyRole));
+            }
+            if (patch.email !== undefined) {
+                sets.push('email = ?');
+                params.push(String(patch.email));
+            }
+            if (!sets.length) return null;
+            params.push(id);
+            await d1Run(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = ?`, params);
+            const row = await d1First(
+                `SELECT id, username, display_name, banned, lobby_role, email FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!row) return null;
+            return kind === 'teacher' ? mapTeacherRow({ ...row, created_at: null }) : mapStudentRow({ ...row, created_at: null });
+        },
+        () => patchLobbyUserFlagsSqlite(kind, id, patch),
     );
 }
 
@@ -324,4 +419,90 @@ export async function deleteBenchUsers(_runId) {
 
 export async function countBenchUsers() {
     return 0;
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ */
+export async function getUserForPasswordReset(kind, id) {
+    return withUsersBackend(
+        async () => {
+            const table = kind === 'teacher' ? 'teachers' : 'students';
+            const row = await d1First(
+                `SELECT id, username, display_name, COALESCE(email,'') AS email FROM ${table} WHERE id = ?`,
+                [id],
+            );
+            if (!row) return null;
+            return {
+                id: Number(row.id),
+                username: String(row.username),
+                displayName: String(row.display_name),
+                email: String(row.email || ''),
+                kind,
+            };
+        },
+        () => getUserForPasswordResetSqlite(kind, id),
+    );
+}
+
+/**
+ * @param {'student'|'teacher'} kind
+ * @param {number} id
+ * @param {number} ttlMs
+ */
+export async function createPasswordResetToken(kind, id, ttlMs) {
+    return withUsersBackend(
+        () => createPasswordResetTokenD1(kind, id, ttlMs),
+        () => createPasswordResetTokenSqlite(kind, id, ttlMs),
+    );
+}
+
+/**
+ * @param {string} token
+ * @param {string} newPassword
+ */
+export async function consumePasswordResetToken(token, newPassword) {
+    return withUsersBackend(
+        () => consumePasswordResetTokenD1(token, newPassword),
+        () => consumePasswordResetTokenSqlite(token, newPassword),
+    );
+}
+
+async function createPasswordResetTokenD1(kind, id, ttlMs) {
+    const crypto = await import('node:crypto');
+    const token = crypto.randomBytes(32).toString('base64url');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + ttlMs);
+    await d1Run('DELETE FROM password_reset_tokens WHERE user_kind = ? AND user_id = ?', [kind, id]);
+    await d1Run(
+        'INSERT INTO password_reset_tokens (token_hash, user_kind, user_id, expires_at) VALUES (?, ?, ?, ?)',
+        [hash, kind, id, expiresAt.toISOString()],
+    );
+    return { token, expiresAt };
+}
+
+async function consumePasswordResetTokenD1(token, newPassword) {
+    const crypto = await import('node:crypto');
+    const hash = crypto.createHash('sha256').update(String(token)).digest('hex');
+    const row = await d1First('SELECT * FROM password_reset_tokens WHERE token_hash = ?', [hash]);
+    if (!row || row.used_at) {
+        const err = new Error('invalid_or_used_token');
+        err.code = 'INVALID_TOKEN';
+        throw err;
+    }
+    if (new Date(String(row.expires_at)).getTime() < Date.now()) {
+        const err = new Error('token_expired');
+        err.code = 'TOKEN_EXPIRED';
+        throw err;
+    }
+    const kind = row.user_kind === 'teacher' ? 'teacher' : 'student';
+    const userId = Number(row.user_id);
+    if (kind === 'teacher') {
+        await updateTeacher(userId, { password: newPassword });
+    } else {
+        await updateStudent(userId, { password: newPassword });
+    }
+    await d1Run(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE token_hash = ?`, [hash]);
+    return { ok: true, kind, userId };
 }

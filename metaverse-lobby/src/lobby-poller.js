@@ -1,5 +1,7 @@
 /** @typedef {{ id: string, presenceUrl?: string | null, statusUrl?: string | null }} RegistryMetaverse */
 
+import { recordPresenceSample } from './db-ops.js';
+
 const LIVE_KEY = 'live';
 
 /**
@@ -91,5 +93,15 @@ export class LobbyPoller {
                 updatedAt: new Date().toISOString(),
             }),
         );
+
+        const db = /** @type {D1Database | undefined} */ (this.env.LOBBY_DB);
+        if (db) {
+            for (const world of list) {
+                const id = String(world?.id || '');
+                if (!id) continue;
+                const players = Number(worlds[id]?.players ?? 0) || 0;
+                await recordPresenceSample(db, id, players);
+            }
+        }
     }
 }

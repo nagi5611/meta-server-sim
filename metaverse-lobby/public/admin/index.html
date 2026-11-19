@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理｜みんなでメタ</title>
+<link rel="icon" href="/assets/icon-192.png">
+<link rel="stylesheet" href="/colors_and_type.css">
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<!-- 本番: Cloudflare Access または sim 側 Basic 認証推奨。下記ゲートはプロトタイプ互換の試用 UI -->
+<section class="gate" id="gate" data-screen-label="Basic認証">
+  <form class="gate-box" id="gateForm" novalidate autocomplete="off">
+    <div class="gate-mark"><img src="/assets/icon-192.png" alt="">みんなでメタ</div>
+    <h1>管理画面にログイン</h1>
+    <p class="lead">Basic 認証のユーザー名とパスワードを入力してください。</p>
+    <div class="field">
+      <label for="gUser">ユーザー名</label>
+      <input class="inp" id="gUser" type="text" autocomplete="username" spellcheck="false">
+    </div>
+    <div class="field">
+      <label for="gPass">パスワード</label>
+      <input class="inp" id="gPass" type="password" autocomplete="current-password">
+    </div>
+    <p class="gate-err" id="gateErr" role="alert"></p>
+    <button class="btn btn-primary btn-block" type="submit" id="gateBtn" style="height:40px">ログイン</button>
+    <div class="gate-meta">
+      <span>Realm <code>mmh-virtual-admin</code></span>
+      <span>Worker 管理ログイン（<code>LOBBY_ADMIN_*</code>）</span>
+    </div>
+  </form>
+</section>
+
+<div class="shell" id="app" hidden>
+  <aside class="side">
+    <a class="side-mark" href="#" data-nav="worlds">
+      <img src="/assets/icon-192.png" alt="">
+      <span>みんなでメタ<small>管理</small></span>
+    </a>
+
+    <nav class="side-nav" id="nav">
+      <a href="#" class="snav" data-nav="worlds"><span>メタバース</span><b class="num" id="cw">0</b></a>
+      <a href="#" class="snav" data-nav="users"><span>ユーザー</span><b class="num" id="cu">0</b></a>
+      <a href="#" class="snav" data-nav="logs"><span>参加履歴</span></a>
+      <a href="#" class="snav" data-nav="settings"><span>設定</span></a>
+    </nav>
+
+    <div class="side-foot">
+      <a class="side-link" href="/" target="_blank" rel="noopener">公開ページを開く ↗</a>
+      <div class="side-user">
+        <span class="av">A</span>
+        <span class="who"><b id="whoUser">admin</b><span>管理者</span></span>
+        <button type="button" class="txt-btn" id="logoutBtn">ログアウト</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="page" id="main"></main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="toast" id="toast"></div>
+
+<script src="/admin/api.js"></script>
+<script src="/admin/store.js"></script>
+<script src="/admin/ui.js"></script>
+<script src="/admin/panel.js"></script>
+</body>
+</html>

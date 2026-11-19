@@ -296,6 +296,24 @@ run_wrangler_deploy
 printf '%s' "$SYNC_SECRET" | npx wrangler secret put LOBBY_WORKER_SYNC_SECRET
 printf '%s' "$PRESENCE_SECRET" | npx wrangler secret put LOBBY_PRESENCE_SECRET
 
+if [[ -n "${LOBBY_SIM_SERVICE_TOKEN:-}" ]]; then
+  printf '%s' "$LOBBY_SIM_SERVICE_TOKEN" | npx wrangler secret put LOBBY_SIM_SERVICE_TOKEN
+fi
+if [[ -n "${LOBBY_ADMIN_PASSWORD:-}" ]]; then
+  printf '%s' "$LOBBY_ADMIN_PASSWORD" | npx wrangler secret put LOBBY_ADMIN_PASSWORD
+fi
+if [[ -n "${LOBBY_JWT_SECRET:-}" ]]; then
+  printf '%s' "$LOBBY_JWT_SECRET" | npx wrangler secret put LOBBY_JWT_SECRET
+fi
+if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
+  printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
+fi
+
+if [[ -f "${LOBBY_DIR}/migrations/0001_lobby_ops.sql" ]]; then
+  log "applying D1 migrations (lobby-ops) if database exists …"
+  npx wrangler d1 migrations apply lobby-ops --remote 2>&1 || log "d1 migrations apply skipped (create DB: wrangler d1 create lobby-ops)"
+fi
+
 WORKER_URL=""
 if [[ -f "$DEPLOY_LOG" ]]; then
   WORKER_URL="$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' "$DEPLOY_LOG" | tail -1 || true)"
@@ -309,6 +327,11 @@ if [[ -z "$WORKER_URL" ]]; then
 fi
 
 write_pages_api_proxy_function "$WORKER_URL"
+ADMIN_PAGES_API_PROXY="${LOBBY_DIR}/functions/admin/api/[[path]].js"
+if [[ -f "$ADMIN_PAGES_API_PROXY" ]]; then
+  sed -i "s|https://metaverse-lobby[^'\"]*workers.dev|${WORKER_URL%/}|g" "$ADMIN_PAGES_API_PROXY" || \
+    sed -i "s|WORKER_ORIGIN_PLACEHOLDER|${WORKER_URL%/}|g" "$ADMIN_PAGES_API_PROXY"
+fi
 ensure_pages_project
 log "deploying pages (static UI) …"
 run_pages_deploy
