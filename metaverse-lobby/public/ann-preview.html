@@ -6,8 +6,7 @@
   <title>Announcements preview</title>
   <style>
     body { margin: 0; font-family: system-ui, sans-serif; background: #f4f5f7; }
-    .wrap { max-width: 960px; margin: 40px auto; padding: 0 24px; }
-    .lobby-layout { display: flex; flex-direction: column; gap: 20px; }
+    .wrap { max-width: var(--container, 960px); margin: 40px auto; padding: 0 24px; }
     .main-ph {
       min-height: 120px; border: 1px dashed #ccc; border-radius: 12px;
       display: grid; place-items: center; color: #888; font-size: 14px;
@@ -18,12 +17,29 @@
 <body>
   <div class="wrap">
     <div class="lobby-layout">
-      <section class="panel announcements" id="announcements-panel" aria-labelledby="annTitle">
-        <div class="panel-head" style="display:flex;padding:12px 20px;border-bottom:1px solid #e5e7eb">
-          <h2 id="annTitle" style="margin:0;font-size:16px">お知らせ</h2>
-        </div>
-        <ul class="ann-list" id="announcement-list"></ul>
-      </section>
+      <div class="lobby-top-row">
+        <section class="panel announcements" id="announcements-panel" aria-labelledby="annTitle">
+          <div class="panel-head">
+            <h2 id="annTitle">お知らせ</h2>
+          </div>
+          <ul class="ann-list" id="announcement-list"></ul>
+        </section>
+        <section class="panel join-code-panel" aria-labelledby="joinCodeTitle">
+          <div class="panel-head">
+            <h2 id="joinCodeTitle">メタバース参加コード</h2>
+          </div>
+          <div class="join-panel-body">
+            <p class="join-panel-hint">参加コードで入室</p>
+            <div class="join-fields">
+              <div class="iwrap">
+                <input class="inp code-inp" type="text" maxlength="12" placeholder="参加コード" value="ABC123">
+                <span class="cnt num">6/12</span>
+              </div>
+              <button type="button" class="btn btn-primary">参加</button>
+            </div>
+          </div>
+        </section>
+      </div>
       <div class="main-ph">メタバース一覧（下のパネル）</div>
     </div>
   </div>

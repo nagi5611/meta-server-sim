@@ -140,6 +140,21 @@
   .lobby-layout{
     display:flex;flex-direction:column;gap:20px;align-items:stretch;min-width:0;
   }
+  .lobby-top-row{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,420px);
+    gap:20px;align-items:stretch;min-width:0;
+  }
+  .lobby-top-row:has(#announcements-panel[hidden]){grid-template-columns:1fr}
+  .lobby-top-row:has(#announcements-panel[hidden]) .join-code-panel{
+    justify-self:end;width:min(100%,420px);
+  }
+  .join-code-panel .panel-head{padding:12px 20px 10px}
+  .join-code-panel .panel-head h2{font-size:16px}
+  .join-panel-body{padding:0 20px 16px;display:flex;flex-direction:column;gap:10px}
+  .join-panel-hint{margin:0;font-size:var(--fs-micro);color:var(--color-text-faint);line-height:1.35}
+  .join-code-panel .join-fields{display:flex;align-items:center;gap:8px;width:100%}
+  .join-code-panel .join-fields .iwrap{flex:1 1 140px;min-width:0}
+  .join-code-panel .join-fields .btn{flex:none}
   .panel{
     background:var(--color-surface);border:1px solid var(--color-border);
     border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;
@@ -239,10 +254,6 @@
   .card.off .spark path,.card.off .spark circle{stroke:#c9ced6!important;fill:none}
   .card.off .spark path:first-child{fill:#eef0f4!important;stroke:none!important}
 
-  /* world list header: join-by-code */
-  .panel-head--worlds{
-    flex-wrap:wrap;align-items:flex-end;row-gap:14px;
-  }
   .panel-head-leading{display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex:0 1 auto;min-width:0}
   .panel-head-leading .hint{margin:0}
   .panel-head-join{
@@ -451,6 +462,8 @@
   .toast.on{opacity:1;transform:none}
 
   @media (max-width:900px){
+    .lobby-top-row{grid-template-columns:1fr}
+    .lobby-top-row:has(#announcements-panel[hidden]) .join-code-panel{justify-self:stretch;width:100%}
     .grid{grid-template-columns:repeat(2,1fr);gap:14px;padding:16px}
     .panel-head{padding:16px 16px 12px}
     .panel-head-join{flex-direction:column;align-items:stretch;width:100%;margin-left:0}
@@ -467,6 +480,10 @@
     .hdr-user{display:none}
     main.lobby-main{padding:16px 12px 30px}
     .panel.announcements .panel-head{padding:10px 14px 8px}
+    .join-code-panel .panel-head{padding:10px 14px 8px}
+    .join-panel-body{padding:0 14px 14px}
+    .join-code-panel .join-fields{flex-direction:column;align-items:stretch}
+    .join-code-panel .join-fields .btn{width:100%}
     .ann-list{padding:2px 14px 8px}
     .ann-head{gap:8px}
     .ann-date{min-width:5.25em;font-size:11px}
