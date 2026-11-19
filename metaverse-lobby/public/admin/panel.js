@@ -417,20 +417,45 @@
 
   /* ================= ユーザー ================= */
   const ROLE_TEXT = { admin: "管理者", member: "一般" };
+  const BAN_ACTION_TEXT = { ban: "BAN", unban: "解除", expire: "期限切れ" };
+  function fmtBanUntil(u) {
+    if (!u?.banned) return "—";
+    if (!u.banExpiresAt) return "永久";
+    return `～${fmtDateTime(u.banExpiresAt)}`;
+  }
   function userState(u) {
-    if (u.banned) return `<span class="st bad">停止中</span>`;
+    if (u.banned) return `<span class="st bad" title="${esc(fmtBanUntil(u))}">停止中</span>`;
     if (u.online) return `<span class="st">オンライン</span>`;
     return `<span class="st off">オフライン</span>`;
+  }
+  function fmtBanHistoryRow(h) {
+    const ends = h.endsAt ? fmtDateTime(h.endsAt) : "永久";
+  const who = h.actor ? esc(h.actor) : "—";
+    return `<div class="hrow"><b>${BAN_ACTION_TEXT[h.action] || esc(h.action)}</b>
+      <span class="d num">${who}</span>
+      <span class="t num">${fmtDateTime(h.startedAt)} · ${ends}</span></div>`;
+  }
+
+  function ensureUserBanHistory(id) {
+    if (!id) return;
+    const u = store.user(id);
+    if (!u || u._banHist) return;
+    u._banHist = "loading";
+    store.loadBanHistory(id).then(() => {
+      u._banHist = "done";
+      render();
+    }).catch(() => { u._banHist = "err"; });
   }
 
   function viewUsers() {
     const us = store.users;
     const sel = us.find((u) => u.id === state.user) || us[0];
+    if (sel?.id) ensureUserBanHistory(sel.id);
     const rows = us.map((u) => `
       <tr class="row ${u.id === sel.id ? "sel" : ""}" data-user="${esc(u.id)}">
         <td><div class="u-cell"><span class="av">${esc(u.name[0].toUpperCase())}</span>
           <div><div class="nm">${esc(u.name)} ${u.role === "admin" ? `<span class="tag">管理者</span>` : ""} ${u.banned ? `<span class="tag warn">BAN</span>` : ""}</div><div class="em">${esc(u.email)}</div></div></div></td>
-        <td class="hide-sm">${userState(u)}</td>
+        <td class="hide-sm">${userState(u)}<span class="dim" style="display:block;font-size:11px;margin-top:2px">${esc(fmtBanUntil(u))}</span></td>
         <td class="r num">${u.history.length}</td>
         <td class="r num dim hide-sm">${fmtDateTime(u.last)}</td>
         <td class="ops" style="width:96px">
@@ -446,8 +471,14 @@
         <div><span>参加</span><b class="num">${sel.history.length}回</b></div>
         <div><span>合計滞在</span><b class="num">${fmtDur(total)}</b></div>
         <div><span>状態</span><b style="font-size:13px">${sel.banned ? "利用停止" : sel.online ? "オンライン" : "オフライン"}</b></div>
+        <div><span>BAN 期間</span><b class="num" style="font-size:13px">${esc(fmtBanUntil(sel))}</b></div>
       </div>
       ${sel.banned ? `<div class="det-ban">このアカウントは BAN されています。サインインもメタバースへの参加もできません。</div>` : ""}
+      <div class="det-l"><div class="cap">BAN 履歴</div>
+        ${(sel.banHistory || []).length
+          ? (sel.banHistory || []).map((h) => fmtBanHistoryRow(h)).join("")
+          : '<p class="dim" style="margin:0;font-size:13px">履歴を読み込むと表示されます</p>'}
+      </div>
       <div class="det-l"><div class="cap">参加履歴</div>
         ${sel.history.map((h) => `<div class="hrow ${h.ok ? "" : "fail"}"><b>${esc(store.worldName(h.world))}</b>
           <span class="d num">${h.ok ? fmtDur(h.dur) : "接続失敗"}</span><span class="t num">${fmtDateTime(h.at)}</span></div>`).join("")}
@@ -521,9 +552,7 @@
     }
     if (k === "ban") {
       if (!u.banned) {
-        confirm(`${u.name} を BAN しますか？`, "サインインとメタバースへの参加ができなくなります。参加履歴は残ります。", "BAN する", () => {
-          store.patchUser(id, { banned: true }).then(() => { render(); toast(`${u.name} を BAN しました`); });
-        });
+        openBanModal(u);
       } else {
         store.patchUser(id, { banned: false }).then(() => { render(); toast(`${u.name} の BAN を解除しました`); });
       }
@@ -867,7 +896,6 @@
     });
   }
 
-  const THUMB_MAX_BYTES = 10 * 1024 * 1024;
   const THUMB_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
   function validateThumbFile(file) {
@@ -877,7 +905,6 @@
     }
     const size = Number(file?.size) || 0;
     if (size <= 0) return "空のファイルはアップロードできません";
-    if (size > THUMB_MAX_BYTES) return "ファイルが大きすぎます（最大10MB）";
     return "";
   }
 
@@ -894,12 +921,35 @@
       toast(clientErr);
       return;
     }
+    if (!window.resizeThumbnailFile) {
+      const msg = "画像の処理モジュールを読み込めませんでした";
+      if (errEl) errEl.textContent = msg;
+      toast(msg);
+      return;
+    }
     if (errEl) errEl.textContent = "";
     if (prog) prog.hidden = false;
     if (bar) bar.style.width = "0%";
+    if (dropTxt) dropTxt.textContent = "画像を処理中…";
+    let uploadFile = file;
+    try {
+      const { blob, fileName } = await window.resizeThumbnailFile(file);
+      uploadFile = new File([blob], fileName, { type: blob.type || "image/webp" });
+    } catch (err) {
+      const msg =
+        err?.message === "file_too_large"
+          ? "ファイルが大きすぎます（最大10MB）"
+          : "画像の処理に失敗しました";
+      if (errEl) errEl.textContent = msg;
+      toast(msg);
+      if (prog) prog.hidden = true;
+      if (bar) bar.style.width = "0%";
+      if (dropTxt) dropTxt.textContent = "画像をドロップ、またはクリックして選択";
+      return;
+    }
     if (dropTxt) dropTxt.textContent = "アップロード中…";
     try {
-      const data = await window.LobbyAdminApi.uploadThumbnail(file, (pct) => {
+      const data = await window.LobbyAdminApi.uploadThumbnail(uploadFile, (pct) => {
         if (bar) bar.style.width = pct + "%";
       });
       const url = String(data?.url || "").trim();
@@ -974,7 +1024,11 @@
     const row = t.closest("tr.row[data-id]");
     if (row) return startEdit(row.dataset.id);
     const ur = t.closest("tr.row[data-user]");
-    if (ur) { state.user = ur.dataset.user; return render(); }
+    if (ur) {
+      state.user = ur.dataset.user;
+      ensureUserBanHistory(state.user);
+      return render();
+    }
   });
 
   main.addEventListener("input", (e) => {
@@ -1177,6 +1231,41 @@
       <div class="btns"><button class="btn btn-quiet" data-close>キャンセル</button><button class="btn btn-danger" id="okB">${esc(ok)}</button></div></div>`;
     scrim.classList.add("on");
     $("#okB").addEventListener("click", () => { close(); fn(); });
+    setTimeout(() => $("#okB").focus(), 30);
+  }
+
+  function openBanModal(u) {
+    const def = new Date(Date.now() + 7 * 864e5);
+    def.setMinutes(0, 0, 0);
+    const local = new Date(def.getTime() - def.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    scrim.innerHTML = `<div class="modal"><h2>${esc(u.name)} を BAN</h2>
+      <p>サインインとメタバースへの参加を停止します。</p>
+      <label style="display:flex;gap:8px;align-items:center;margin:12px 0;font-size:14px">
+        <input type="checkbox" id="banPerm" checked> 永久 BAN
+      </label>
+      <label class="dim" style="display:block;font-size:13px;margin-bottom:6px">解除予定（永久以外）</label>
+      <input type="datetime-local" id="banUntil" class="inp" disabled value="${local}">
+      <div class="btns" style="margin-top:16px">
+        <button class="btn btn-quiet" data-close>キャンセル</button>
+        <button class="btn btn-danger" id="okB">BAN する</button>
+      </div></div>`;
+    scrim.classList.add("on");
+    const perm = $("#banPerm");
+    const until = $("#banUntil");
+    perm?.addEventListener("change", () => { if (until) until.disabled = perm.checked; });
+    $("#okB").addEventListener("click", () => {
+      const patch = { banned: true };
+      if (!perm?.checked && until?.value) {
+        patch.banExpiresAt = new Date(until.value).toISOString();
+      } else {
+        patch.banPermanent = true;
+      }
+      close();
+      store.patchUser(u.id, patch).then(() => {
+        render();
+        toast(`${u.name} を BAN しました`);
+      });
+    });
     setTimeout(() => $("#okB").focus(), 30);
   }
 
