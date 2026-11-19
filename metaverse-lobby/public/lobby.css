@@ -38,20 +38,20 @@
   .locale-select{position:relative;flex:none;z-index:30}
   .locale-select--block{width:100%}
   .locale-select__trigger{
-    display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;
-    border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);
-    font-size:12.5px;font-weight:600;color:var(--color-text);background:var(--color-surface);
+    display:flex;align-items:center;gap:6px;height:auto;padding:0;
+    border:none;border-radius:0;box-shadow:none;
+    font-size:12.5px;font-weight:600;color:var(--color-text);background:transparent;
     cursor:pointer;white-space:nowrap;min-width:0;
   }
-  .locale-select__trigger:hover{background:var(--color-surface-muted)}
+  .locale-select__trigger:hover{color:var(--color-primary-dark)}
   .locale-select__flag{font-size:14px;line-height:1;flex:none}
   .locale-select__label{overflow:hidden;text-overflow:ellipsis}
   .locale-select__chev{
     flex:none;width:10px;height:6px;margin-left:2px;
     background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a92a1' stroke-width='1.4'/%3E%3C/svg%3E") no-repeat center;
   }
-  .locale-select__trigger:focus-visible{outline:2px solid var(--color-primary-soft);border-color:var(--color-primary)}
-  .locale-select.is-open .locale-select__trigger{border-color:var(--color-primary)}
+  .locale-select__trigger:focus-visible{outline:none;border:none;box-shadow:none;color:var(--color-primary)}
+  .locale-select.is-open .locale-select__trigger{color:var(--color-primary-dark)}
   .locale-select__menu{
     position:absolute;right:0;top:calc(100% + 4px);min-width:100%;width:max-content;
     margin:0;padding:4px;list-style:none;
