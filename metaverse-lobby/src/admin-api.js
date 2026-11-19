@@ -1,7 +1,13 @@
 import { fetchSim } from './sim-client.js';
 import { entryToWorld, worldToEntry } from './catalog-map.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
-import { insertAuditLog } from './db-ops.js';
+import {
+    deleteAnnouncement,
+    insertAnnouncement,
+    insertAuditLog,
+    listAnnouncements,
+    updateAnnouncement,
+} from './db-ops.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
@@ -249,6 +255,83 @@ export async function handleAdminApi(request, env, kv) {
             .bind(limit, offset)
             .all();
         return json({ logs: rows.results || [], page });
+    }
+
+    const annList = url.pathname === '/api/admin/announcements';
+    const annItem = url.pathname.match(/^\/api\/admin\/announcements\/([^/]+)$/);
+    const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+
+    if (annList && request.method === 'GET') {
+        const items = db ? await listAnnouncements(db, { publishedOnly: false, limit: 100 }) : [];
+        return json({ announcements: items });
+    }
+
+    if (annList && request.method === 'POST') {
+        if (!db) return json({ error: 'db_not_configured' }, 503);
+        const body = await request.json();
+        const title = String(body.title || '').trim();
+        const bodyText = String(body.body || '').trim();
+        if (!title || !bodyText) return json({ error: 'title_and_body_required' }, 400);
+        const id = crypto.randomUUID();
+        const item = await insertAnnouncement(db, id, {
+            title,
+            body: bodyText,
+            published: body.published !== false,
+            sortOrder: body.sortOrder,
+        });
+        await insertAuditLog(db, {
+            id: crypto.randomUUID(),
+            actor: session?.sub || 'admin',
+            action: 'announcement_create',
+            target_type: 'announcement',
+            target_id: id,
+            detail: { title },
+            created_at: new Date().toISOString(),
+        });
+        return json({ ok: true, announcement: item }, 201);
+    }
+
+    if (annItem && request.method === 'PUT') {
+        if (!db) return json({ error: 'db_not_configured' }, 503);
+        const id = decodeURIComponent(annItem[1]);
+        const body = await request.json();
+        const title = body.title !== undefined ? String(body.title).trim() : undefined;
+        const bodyText = body.body !== undefined ? String(body.body).trim() : undefined;
+        if (title === '' || bodyText === '') return json({ error: 'title_and_body_required' }, 400);
+        const item = await updateAnnouncement(db, id, {
+            title,
+            body: bodyText,
+            published: body.published,
+            sortOrder: body.sortOrder,
+        });
+        if (!item) return json({ error: 'not_found' }, 404);
+        await insertAuditLog(db, {
+            id: crypto.randomUUID(),
+            actor: session?.sub || 'admin',
+            action: 'announcement_update',
+            target_type: 'announcement',
+            target_id: id,
+            detail: { title: item.title },
+            created_at: new Date().toISOString(),
+        });
+        return json({ ok: true, announcement: item });
+    }
+
+    if (annItem && request.method === 'DELETE') {
+        if (!db) return json({ error: 'db_not_configured' }, 503);
+        const id = decodeURIComponent(annItem[1]);
+        const removed = await deleteAnnouncement(db, id);
+        if (!removed) return json({ error: 'not_found' }, 404);
+        await insertAuditLog(db, {
+            id: crypto.randomUUID(),
+            actor: session?.sub || 'admin',
+            action: 'announcement_delete',
+            target_type: 'announcement',
+            target_id: id,
+            detail: {},
+            created_at: new Date().toISOString(),
+        });
+        return json({ ok: true });
     }
 
     return json({ error: 'not_found' }, 404);

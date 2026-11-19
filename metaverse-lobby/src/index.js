@@ -1,7 +1,7 @@
 import { LobbyPoller } from './lobby-poller.js';
 import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
-import { rollupDailyMetrics } from './db-ops.js';
+import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 
 export { LobbyPoller };
 
@@ -109,6 +109,14 @@ async function handleApi(request, env) {
         await stub.fetch('http://lobby-poller/wake');
         await pollStatus(env);
         return json({ ok: true, count: body.metaverses?.length ?? 0 });
+    }
+
+    if (url.pathname === '/api/announcements' && request.method === 'GET') {
+        const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+        const announcements = db
+            ? await listAnnouncements(db, { publishedOnly: true, limit: 3 })
+            : [];
+        return json({ announcements });
     }
 
     if (url.pathname === '/api/metaverses' && request.method === 'GET') {

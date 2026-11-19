@@ -364,7 +364,7 @@ if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
 fi
 
-if [[ -f "${LOBBY_DIR}/migrations/0001_lobby_ops.sql" ]]; then
+if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
   log "applying D1 migrations (lobby-ops) if database exists …"
   npx wrangler d1 migrations apply lobby-ops --remote 2>&1 || log "d1 migrations apply skipped (create DB: wrangler d1 create lobby-ops)"
 fi

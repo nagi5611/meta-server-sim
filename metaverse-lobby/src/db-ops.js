@@ -24,6 +24,114 @@ export async function ensureLobbyOpsSchema(db) {
     await db.exec(`CREATE TABLE IF NOT EXISTS audit_log (
       id TEXT PRIMARY KEY, actor TEXT, action TEXT, target_type TEXT, target_id TEXT,
       detail TEXT, created_at TEXT)`);
+    await db.exec(`CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
+      published INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+}
+
+/** @param {Record<string, unknown>} row */
+function mapAnnouncementRow(row) {
+    return {
+        id: String(row.id),
+        title: String(row.title || ''),
+        body: String(row.body || ''),
+        published: Boolean(Number(row.published)),
+        sortOrder: Number(row.sort_order) || 0,
+        createdAt: String(row.created_at || ''),
+        updatedAt: String(row.updated_at || ''),
+    };
+}
+
+/**
+ * @param {D1Database} db
+ * @param {{ limit?: number, publishedOnly?: boolean }} [opts]
+ */
+export async function listAnnouncements(db, opts = {}) {
+    if (!db) return [];
+    const publishedOnly = opts.publishedOnly !== false;
+    const limit = Math.min(Math.max(Number(opts.limit) || 50, 1), 100);
+    const sql = publishedOnly
+        ? `SELECT * FROM announcements WHERE published = 1 ORDER BY updated_at DESC LIMIT ?`
+        : `SELECT * FROM announcements ORDER BY sort_order DESC, updated_at DESC LIMIT ?`;
+    const rows = await db.prepare(sql).bind(limit).all();
+    return (rows.results || []).map(mapAnnouncementRow);
+}
+
+/**
+ * @param {D1Database} db
+ * @param {Record<string, unknown>} input
+ * @param {string} id
+ */
+export async function insertAnnouncement(db, id, input) {
+    const now = new Date().toISOString();
+    await db
+        .prepare(
+            `INSERT INTO announcements (id, title, body, published, sort_order, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+            id,
+            input.title,
+            input.body,
+            input.published === false ? 0 : 1,
+            Number(input.sortOrder) || 0,
+            now,
+            now,
+        )
+        .run();
+    return mapAnnouncementRow({
+        id,
+        title: input.title,
+        body: input.body,
+        published: input.published === false ? 0 : 1,
+        sort_order: Number(input.sortOrder) || 0,
+        created_at: now,
+        updated_at: now,
+    });
+}
+
+/**
+ * @param {D1Database} db
+ * @param {string} id
+ * @param {Record<string, unknown>} input
+ */
+export async function updateAnnouncement(db, id, input) {
+    const now = new Date().toISOString();
+    const prev = await db.prepare(`SELECT * FROM announcements WHERE id = ?`).bind(id).first();
+    if (!prev) return null;
+    const title = input.title !== undefined ? String(input.title).trim() : String(prev.title);
+    const body = input.body !== undefined ? String(input.body).trim() : String(prev.body);
+    const published =
+        input.published !== undefined ? (input.published ? 1 : 0) : Number(prev.published);
+    const sortOrder =
+        input.sortOrder !== undefined ? Number(input.sortOrder) || 0 : Number(prev.sort_order) || 0;
+    await db
+        .prepare(
+            `UPDATE announcements SET title = ?, body = ?, published = ?, sort_order = ?, updated_at = ?
+             WHERE id = ?`,
+        )
+        .bind(title, body, published, sortOrder, now, id)
+        .run();
+    return mapAnnouncementRow({
+        id,
+        title,
+        body,
+        published,
+        sort_order: sortOrder,
+        created_at: prev.created_at,
+        updated_at: now,
+    });
+}
+
+/**
+ * @param {D1Database} db
+ * @param {string} id
+ */
+export async function deleteAnnouncement(db, id) {
+    if (!db) return false;
+    const res = await db.prepare(`DELETE FROM announcements WHERE id = ?`).bind(id).run();
+    return (res.meta?.changes || 0) > 0;
 }
 
 /**
