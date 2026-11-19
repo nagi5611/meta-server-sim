@@ -125,13 +125,14 @@ async function handleApi(request, env) {
         const locale = resolveClientLocale(request, url);
         const rows = db ? await listAnnouncements(db, { publishedOnly: true, limit: 3 }) : [];
         const announcements = rows.map((a) => {
-            const { title } = pickAnnouncementText(a.i18n, locale, {
+            const { title, body } = pickAnnouncementText(a.i18n, locale, {
                 title: a.title,
                 body: a.body,
             });
             return {
                 id: a.id,
                 title,
+                body,
                 createdAt: a.createdAt,
                 updatedAt: a.updatedAt,
             };
