@@ -5,7 +5,8 @@
 #       LOBBY_PRESENCE_SECRET, LOBBY_WORKER_SYNC_SECRET, LOBBY_CUSTOM_HOSTNAME,
 #       LOBBY_PAGES_PROJECT_NAME
 #       GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (or LOBBY_GOOGLE_* / legacy GOOGLE_OAUTH_CLIENT_* )
-#       ADMIN_EMAIL, ADMIN_OTP_SECRET (super-admin OTP 2FA), RESEND_API_KEY (Worker OTP mail)
+#       ADMIN_PHONE, ADMIN_EMAIL, ADMIN_OTP_SECRET (super-admin OTP 2FA),
+#       AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SNS_REGION (OTP SMS), RESEND_API_KEY (email OTP fallback)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -427,11 +428,23 @@ fi
 if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
 fi
+if [[ -n "${ADMIN_PHONE:-}" ]]; then
+  printf '%s' "$ADMIN_PHONE" | npx wrangler secret put ADMIN_PHONE
+fi
 if [[ -n "${ADMIN_EMAIL:-}" ]]; then
   printf '%s' "$ADMIN_EMAIL" | npx wrangler secret put ADMIN_EMAIL
 fi
 if [[ -n "${ADMIN_OTP_SECRET:-}" ]]; then
   printf '%s' "$ADMIN_OTP_SECRET" | npx wrangler secret put ADMIN_OTP_SECRET
+fi
+if [[ -n "${AWS_ACCESS_KEY_ID:-}" ]]; then
+  printf '%s' "$AWS_ACCESS_KEY_ID" | npx wrangler secret put AWS_ACCESS_KEY_ID
+fi
+if [[ -n "${AWS_SECRET_ACCESS_KEY:-}" ]]; then
+  printf '%s' "$AWS_SECRET_ACCESS_KEY" | npx wrangler secret put AWS_SECRET_ACCESS_KEY
+fi
+if [[ -n "${AWS_SNS_REGION:-}" ]]; then
+  printf '%s' "$AWS_SNS_REGION" | npx wrangler secret put AWS_SNS_REGION
 fi
 if [[ -n "${RESEND_API_KEY:-}" ]]; then
   printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY

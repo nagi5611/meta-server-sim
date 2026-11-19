@@ -81,7 +81,46 @@ test('getRequestClientIp prefers cf-connecting-ip', () => {
     assert.equal(getRequestClientIp(req), '203.0.113.9');
 });
 
-test('super-admin login with ADMIN_EMAIL requires OTP', async () => {
+test('super-admin login with ADMIN_PHONE sends SMS OTP', async () => {
+    const kv = createMemoryKv();
+    const db = createSuperAdminAuditDb();
+    const sms = [];
+    const env = {
+        LOBBY_ADMIN_USER: 'admin',
+        LOBBY_ADMIN_PASSWORD: 'static-secret',
+        LOBBY_ADMIN_SESSION_SECRET: SECRET,
+        ADMIN_PHONE: '090-1234-5678',
+        LOBBY_SIM_ORIGIN: 'http://127.0.0.1:9',
+        LOBBY_SIM_SERVICE_TOKEN: 'unused',
+        LOBBY_DB: db,
+        __test_sms_sink: sms,
+    };
+    const req = new Request('http://lobby.test/api/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.4' },
+        body: JSON.stringify({ username: 'admin', password: 'static-secret' }),
+    });
+    const res = await handleAdminLogin(req, env, kv);
+    assert.equal(res?.status, 200);
+    const data = await res.json();
+    assert.equal(data.otpRequired, true);
+    assert.equal(data.otpChannel, 'sms');
+    assert.ok(data.challengeId);
+    assert.equal(sms.length, 1);
+    assert.equal(sms[0].phone, '+819012345678');
+    const code = sms[0].message.match(/\d{6}/)?.[0];
+    assert.ok(code);
+
+    const verifyReq = new Request('http://lobby.test/api/admin/login/verify-otp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.4' },
+        body: JSON.stringify({ challengeId: data.challengeId, code }),
+    });
+    const verifyRes = await handleAdminLogin(verifyReq, env, kv);
+    assert.equal(verifyRes?.status, 200);
+});
+
+test('super-admin login with ADMIN_EMAIL requires OTP (email fallback)', async () => {
     const kv = createMemoryKv();
     const db = createSuperAdminAuditDb();
     const mail = [];
