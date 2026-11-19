@@ -23,6 +23,8 @@ import {
 
 } from './lib/platform-network-config.js';
 
+import { resolveLobbyPublicUrl } from './lib/lobby-public-url.js';
+
 import { loadTenantRegistry, listTenants } from './lib/tenant-registry.js';
 import { reconcileAllTenantsAssetsToR2 } from './lib/tenant-r2-sync.js';
 
@@ -246,6 +248,8 @@ app.get('/api/client-config', (req, res) => {
         proxyServiceDomain: PROXY_SERVICE_DOMAIN || null,
 
         portalLinks: getPortalLinksForRequest(req),
+
+        lobbyPublicUrl: resolveLobbyPublicUrl(),
 
     });
 

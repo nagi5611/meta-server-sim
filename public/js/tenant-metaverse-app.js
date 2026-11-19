@@ -40,10 +40,11 @@ import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hi
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
+import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
 
 const DEFAULT_ROOM = 'lobby';
 
-/** テナント退出時は hub へ遷移 */
+/** テナント退出時は公開ロビー（m.mmh-virtual.jp）へ遷移 */
 MenuManager.prototype.logout = async function tenantLogout() {
     try {
         await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
@@ -58,7 +59,7 @@ MenuManager.prototype.logout = async function tenantLogout() {
     localStorage.removeItem('username');
     localStorage.removeItem('userRole');
     sessionStorage.removeItem('metaverseAdminToken');
-    window.location.href = toTenantUrl('/') || '/';
+    await navigateToLobbyAfterLogout();
 };
 
 /** HDR 未配置時に RGBELoader が HTML 404 をパースして落ちるのを防ぐ */
