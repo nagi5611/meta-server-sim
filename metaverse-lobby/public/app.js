@@ -582,9 +582,10 @@ $('#authForm')?.addEventListener('submit', async (e) => {
     const signup = authTab === 'signup';
     const email = $('#mEmail').value.trim();
     const pass = $('#mPass').value;
+    let displayName = '';
     if (signup) {
-        const name = $('#mName').value.trim();
-        if (!name) return showErr(t('auth.errNameRequired'));
+        displayName = $('#mName').value.trim();
+        if (!displayName) return showErr(t('auth.errNameRequired'));
         if (!email) return showErr(t('auth.errEmailRequired'));
         if (pass.length < 4) return showErr(t('auth.errPassShort'));
     } else {
@@ -600,7 +601,9 @@ $('#authForm')?.addEventListener('submit', async (e) => {
             credentials: 'include',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify(
-                signup ? { name, email, password: pass } : { username: email, password: pass },
+                signup
+                    ? { name: displayName, displayName, email, password: pass }
+                    : { username: email, password: pass },
             ),
         });
         const data = await res.json();
