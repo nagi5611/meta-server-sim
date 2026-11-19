@@ -62,6 +62,11 @@ MenuManager.prototype.logout = async function tenantLogout() {
     await navigateToLobbyAfterLogout();
 };
 
+/** 「ロビーに戻る」も公開ロビーへ（logout リダイレクトと同一） */
+MenuManager.prototype.returnToLobby = async function tenantReturnToLobby() {
+    await navigateToLobbyAfterLogout();
+};
+
 /** HDR 未配置時に RGBELoader が HTML 404 をパースして落ちるのを防ぐ */
 const _loadIBLAsyncOrig = SceneManager.prototype._loadIBLAsync;
 SceneManager.prototype._loadIBLAsync = async function patchedTenantLoadIBLAsync() {

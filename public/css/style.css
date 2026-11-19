@@ -258,7 +258,86 @@ body.hub-page {
     border: 1px dashed var(--meta-border);
 }
 
+.hub-login-section {
+    margin-bottom: 4px;
+}
+
+.hub-login-lead {
+    margin: 0 0 12px;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--meta-text-muted);
+}
+
+.hub-login-lead strong {
+    color: var(--meta-text);
+    font-weight: 700;
+}
+
+.hub-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hub-login-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--meta-text-muted);
+    letter-spacing: 0.02em;
+}
+
+.hub-login-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--meta-border);
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--meta-text);
+}
+
+.hub-login-input:focus-visible {
+    outline: 2px solid var(--meta-accent);
+    outline-offset: 1px;
+    border-color: var(--meta-accent);
+}
+
+.hub-login-error {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #b91c1c;
+}
+
+.hub-login-submit {
+    margin-top: 4px;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, var(--meta-accent) 0%, var(--meta-accent-dark) 100%);
+    box-shadow: 0 2px 8px rgba(2, 136, 209, 0.35);
+}
+
+.hub-login-submit:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.hub-login-submit:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
 .hub-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
     padding-top: 12px;
     border-top: 1px solid var(--meta-border);
 }

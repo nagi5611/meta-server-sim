@@ -1,5 +1,9 @@
 // public/js/hub.js — プラットフォーム hub（tenant 一覧）
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import { wireHubLobbyFooterLink, wireHubLobbyLogin } from './hub-lobby-auth.js';
+
+wireHubLobbyLogin();
+void wireHubLobbyFooterLink();
 
 const statusEl = document.getElementById('hub-status');
 const listEl = document.getElementById('tenant-list');

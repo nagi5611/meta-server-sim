@@ -22,6 +22,21 @@
             </div>
         </header>
 
+        <section class="hub-section hub-login-section" aria-labelledby="hub-login-heading">
+            <div class="hub-section-head">
+                <h2 id="hub-login-heading">公開ロビー</h2>
+            </div>
+            <p class="hub-login-lead">みんなでメタの入口は <strong>メタバースロビー</strong> です。ログイン後、公開ロビーへ移動します。</p>
+            <form id="hub-login-form" class="hub-login-form" novalidate>
+                <label class="hub-login-label" for="hub-login-email">メールアドレス</label>
+                <input id="hub-login-email" class="hub-login-input" type="email" name="username" autocomplete="username" required />
+                <label class="hub-login-label" for="hub-login-password">パスワード</label>
+                <input id="hub-login-password" class="hub-login-input" type="password" name="password" autocomplete="current-password" required />
+                <p id="hub-login-error" class="hub-login-error" role="alert" hidden></p>
+                <button type="submit" class="hub-login-submit" id="hub-login-submit">ログインしてロビーへ</button>
+            </form>
+        </section>
+
         <section class="hub-section" aria-labelledby="hub-tenant-heading">
             <div class="hub-section-head">
                 <h2 id="hub-tenant-heading">Tenant 一覧</h2>
@@ -31,6 +46,10 @@
         </section>
 
         <footer class="hub-footer">
+            <a class="hub-footer-link" id="hub-lobby-link" href="https://m.mmh-virtual.jp/">
+                <i class="bi bi-door-open" aria-hidden="true"></i>
+                公開ロビー
+            </a>
             <a class="hub-footer-link" href="/admin.html">
                 <i class="bi bi-shield-lock" aria-hidden="true"></i>
                 管理パネル
