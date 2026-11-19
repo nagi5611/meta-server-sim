@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { validateUserPassword } from '../lib/password-policy.js';
 import { banLifecycleState, isBanActive, normalizeBanExpiresAt } from '../lib/lobby-ban.js';
+import { googleAvatarUrlToStore } from '../lib/lobby-google-avatar.js';
 import { ensurePlatformUsersDbDir, getPlatformUsersDbPath } from './users-path.js';
 
 const BCRYPT_ROUNDS = 10;
@@ -345,7 +346,21 @@ export function peekLobbyGoogleAuthSqlite(googleSub, email) {
 }
 
 /**
- * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ * @param {'students' | 'teachers'} table
+ * @param {number} id
+ * @param {string} existingAvatarUrl
+ * @param {string | undefined} picture
+ * @returns {string}
+ */
+function persistGoogleAvatarSqlite(table, id, existingAvatarUrl, picture) {
+    const next = googleAvatarUrlToStore(existingAvatarUrl, picture || '');
+    if (!next) return String(existingAvatarUrl || '');
+    requireDb().prepare(`UPDATE ${table} SET avatar_url = ? WHERE id = ?`).run(next, id);
+    return next;
+}
+
+/**
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean, picture?: string }} input
  */
 export function completeLobbyGoogleAuthSqlite(input) {
     const sub = String(input.googleSub || '').trim();
@@ -383,6 +398,8 @@ export function completeLobbyGoogleAuthSqlite(input) {
                 err.code = 'BANNED';
                 throw err;
             }
+            const av = persistGoogleAvatarSqlite(table, user.id, user.avatarUrl, input.picture);
+            if (av) user.avatarUrl = av;
             return { kind, user, created: false };
         }
     }
@@ -419,6 +436,8 @@ export function completeLobbyGoogleAuthSqlite(input) {
             err.code = 'BANNED';
             throw err;
         }
+        const av = persistGoogleAvatarSqlite(table, user.id, user.avatarUrl, input.picture);
+        if (av) user.avatarUrl = av;
         return { kind, user, created: false };
     }
 
@@ -435,11 +454,12 @@ export function completeLobbyGoogleAuthSqlite(input) {
     }
     const placeholder = crypto.randomBytes(32).toString('base64url');
     const hash = bcrypt.hashSync(placeholder, BCRYPT_ROUNDS);
+    const createAvatar = googleAvatarUrlToStore('', input.picture || '') || '';
     const result = requireDb()
         .prepare(
-            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
-        .run(e, hash, d, e, 'user', sub);
+        .run(e, hash, d, e, 'user', sub, createAvatar);
     const id = Number(result.lastInsertRowid);
     const newRow = requireDb()
         .prepare(

@@ -1,12 +1,15 @@
 import { fetchSim } from './sim-client.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
+import { moderateLobbyDisplayName } from './display-name-moderator.js';
 
 const PUBLIC_COOKIE = 'lobby_session';
 const OAUTH_STATE_COOKIE = 'lobby_google_oauth_state';
+export const GOOGLE_PENDING_COOKIE = 'lobby_google_pending';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 const OAUTH_SCOPES = 'openid email profile';
+const PENDING_TTL_SEC = 30 * 60;
 
 /**
  * @param {Record<string, unknown>} env
@@ -64,6 +67,43 @@ function json(data, status = 200, extraHeaders = {}) {
 }
 
 /**
+ * @param {string} origin
+ * @param {Record<string, unknown>} env
+ * @param {Record<string, string>} [params]
+ */
+function lobbyPublicRedirect(origin, env, params = {}) {
+    const publicBase = googleOAuthCallbackUrl(env, origin).replace(/\/api\/auth\/google\/callback$/, '');
+    const dest = new URL('/', publicBase || origin || 'https://m.mmh-virtual.jp');
+    for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null && v !== '') dest.searchParams.set(k, String(v));
+    }
+    return dest.pathname + dest.search;
+}
+
+/**
+ * @param {Record<string, unknown>} user
+ * @param {string} secret
+ * @param {string} [picture]
+ */
+async function issueLobbySessionCookies(user, secret, picture) {
+    const avatarUrl = String(user.avatarUrl || picture || '').trim();
+    const sessionToken = await signJwt(
+        {
+            sub: user.userId,
+            username: user.username,
+            displayName: user.displayName,
+            role: user.role,
+            banned: user.banned,
+            ...(avatarUrl ? { avatarUrl } : {}),
+        },
+        secret,
+        60 * 60 * 24 * 7,
+    );
+    const sessionCookie = setCookieHeader(PUBLIC_COOKIE, sessionToken, 60 * 60 * 24 * 7, '/');
+    return { sessionCookie, avatarUrl };
+}
+
+/**
  * @param {Request} request
  * @param {Record<string, unknown>} env
  */
@@ -105,6 +145,102 @@ export async function handleGoogleOAuthApi(request, env) {
         const headers = new Headers({ Location: `${GOOGLE_AUTH_URL}?${params}` });
         headers.append('set-cookie', setCookieHeader(OAUTH_STATE_COOKIE, state, 10 * 60, '/'));
         return new Response(null, { status: 302, headers });
+    }
+
+    if (url.pathname === '/api/auth/google/pending' && request.method === 'GET') {
+        const secret = String(env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ pending: false, error: 'jwt_not_configured' }, 503);
+        const token = readCookie(request, GOOGLE_PENDING_COOKIE);
+        if (!token) return json({ pending: false });
+        const payload = await verifyJwt(token, secret);
+        if (!payload || payload.flow !== 'google_pending' || !payload.googleSub || !payload.email) {
+            return json({ pending: false });
+        }
+        return json({
+            pending: true,
+            email: String(payload.email),
+            suggestedName: String(payload.suggestedName || '').trim() || undefined,
+        });
+    }
+
+    if (url.pathname === '/api/auth/google/complete' && request.method === 'POST') {
+        const secret = String(env.LOBBY_JWT_SECRET || '').trim();
+        if (!secret) return json({ error: 'jwt_not_configured' }, 503);
+        const pendingToken = readCookie(request, GOOGLE_PENDING_COOKIE);
+        if (!pendingToken) return json({ error: 'google_pending_missing' }, 401);
+        const pending = await verifyJwt(pendingToken, secret);
+        if (!pending || pending.flow !== 'google_pending' || !pending.googleSub || !pending.email) {
+            return json({ error: 'google_pending_invalid' }, 401);
+        }
+        const body = await request.json().catch(() => ({}));
+        const displayName = String(body?.displayName || body?.name || '').trim();
+        if (!displayName) return json({ error: 'name_required' }, 400);
+        if (displayName.length > 64) return json({ error: 'name_too_long', maxLength: 64 }, 400);
+        if (!/^[\p{L}\p{N}_\- ]+$/u.test(displayName)) {
+            return json({ error: 'invalid_name_chars' }, 400);
+        }
+        const moderation = await moderateLobbyDisplayName({ env, displayName });
+        if (!moderation.allowed) {
+            return json({ error: 'display_name_rejected', reason_ja: moderation.reason_ja || undefined }, 422);
+        }
+
+        const peek = await fetchSim(env, '/service/lobby/auth/google/peek', {
+            method: 'POST',
+            body: {
+                googleSub: String(pending.googleSub),
+                email: String(pending.email),
+            },
+        });
+        if (!peek.ok) {
+            return json(peek.data || { error: 'google_peek_failed' }, peek.status || 502);
+        }
+        if (peek.data?.action !== 'create') {
+            return json({ error: 'google_pending_stale' }, 409);
+        }
+
+        const sim = await fetchSim(env, '/service/lobby/auth/google', {
+            method: 'POST',
+            body: {
+                googleSub: String(pending.googleSub),
+                email: String(pending.email),
+                emailVerified: pending.emailVerified === true,
+                displayName,
+                picture: String(pending.picture || '').trim(),
+            },
+        });
+        const clearPending = setCookieHeader(GOOGLE_PENDING_COOKIE, '', 0, '/');
+        if (!sim.ok) {
+            const codeKey = String(sim.data?.error || 'google_auth_failed');
+            const status = sim.status || 400;
+            return json(sim.data || { error: codeKey }, status, { 'set-cookie': clearPending });
+        }
+        const user = sim.data?.user;
+        if (!user) {
+            return json({ error: 'google_auth_failed' }, 500, { 'set-cookie': clearPending });
+        }
+        const { sessionCookie } = await issueLobbySessionCookies(
+            user,
+            secret,
+            String(pending.picture || ''),
+        );
+        const headers = new Headers({
+            'content-type': 'application/json; charset=utf-8',
+            'cache-control': 'no-store',
+        });
+        headers.append('set-cookie', clearPending);
+        headers.append('set-cookie', sessionCookie);
+        return new Response(
+            JSON.stringify({
+                ok: true,
+                user: {
+                    name: user.displayName,
+                    handle: `@${user.username}`,
+                    role: user.role || 'member',
+                    ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+                },
+            }),
+            { status: 201, headers },
+        );
     }
 
     if (url.pathname === '/api/auth/google/callback' && request.method === 'GET') {
@@ -153,18 +289,61 @@ export async function handleGoogleOAuthApi(request, env) {
             return redirectWithAuthError(url.origin, 'profile_failed', env);
         }
 
-        const sim = await fetchSim(env, '/service/lobby/auth/google', {
+        const googleSub = String(profile.sub);
+        const email = String(profile.email || '').trim();
+        const emailVerified = profile.email_verified === true;
+        const suggestedName = String(profile.name || profile.given_name || '').trim();
+        const picture = String(profile.picture || '').trim();
+
+        const peekRes = await fetchSim(env, '/service/lobby/auth/google/peek', {
             method: 'POST',
-            body: {
-                googleSub: String(profile.sub),
-                email: String(profile.email || '').trim(),
-                emailVerified: profile.email_verified === true,
-                displayName: String(profile.name || profile.given_name || '').trim(),
-                picture: String(profile.picture || '').trim(),
-            },
+            body: { googleSub, email, emailVerified },
         });
 
         const clearStateCookie = setCookieHeader(OAUTH_STATE_COOKIE, '', 0, '/');
+
+        if (!peekRes.ok) {
+            const codeKey = String(peekRes.data?.error || 'google_peek_failed');
+            return redirectWithAuthError(url.origin, codeKey, env, [clearStateCookie]);
+        }
+
+        const action = String(peekRes.data?.action || 'create');
+
+        if (action === 'create') {
+            if (!emailVerified) {
+                return redirectWithAuthError(url.origin, 'email_not_verified', env, [clearStateCookie]);
+            }
+            const pendingToken = await signJwt(
+                {
+                    flow: 'google_pending',
+                    googleSub,
+                    email,
+                    emailVerified: true,
+                    suggestedName,
+                    picture,
+                },
+                secret,
+                PENDING_TTL_SEC,
+            );
+            const pendingCookie = setCookieHeader(GOOGLE_PENDING_COOKIE, pendingToken, PENDING_TTL_SEC, '/');
+            const headers = new Headers({
+                Location: lobbyPublicRedirect(url.origin, env, { google_complete: '1' }),
+            });
+            headers.append('Set-Cookie', clearStateCookie);
+            headers.append('Set-Cookie', pendingCookie);
+            return new Response(null, { status: 302, headers });
+        }
+
+        const sim = await fetchSim(env, '/service/lobby/auth/google', {
+            method: 'POST',
+            body: {
+                googleSub,
+                email,
+                emailVerified,
+                picture,
+            },
+        });
+
         if (!sim.ok) {
             const codeKey = String(sim.data?.error || 'google_auth_failed');
             return redirectWithAuthError(url.origin, codeKey, env, [clearStateCookie]);
@@ -175,24 +354,10 @@ export async function handleGoogleOAuthApi(request, env) {
             return redirectWithAuthError(url.origin, 'google_auth_failed', env, [clearStateCookie]);
         }
 
-        const avatarUrl = String(user.avatarUrl || profile.picture || '').trim();
-        const sessionToken = await signJwt(
-            {
-                sub: user.userId,
-                username: user.username,
-                displayName: user.displayName,
-                role: user.role,
-                banned: user.banned,
-                ...(avatarUrl ? { avatarUrl } : {}),
-            },
-            secret,
-            60 * 60 * 24 * 7,
-        );
-        const sessionCookie = setCookieHeader(PUBLIC_COOKIE, sessionToken, 60 * 60 * 24 * 7, '/');
-        const publicBase = googleOAuthCallbackUrl(env, url.origin).replace(/\/api\/auth\/google\/callback$/, '');
-        const dest = new URL('/', publicBase || url.origin);
-        dest.searchParams.set('google_auth', 'ok');
-        const headers = new Headers({ Location: dest.pathname + dest.search });
+        const { sessionCookie } = await issueLobbySessionCookies(user, secret, picture);
+        const headers = new Headers({
+            Location: lobbyPublicRedirect(url.origin, env, { google_auth: 'ok' }),
+        });
         headers.append('Set-Cookie', clearStateCookie);
         headers.append('Set-Cookie', sessionCookie);
         return new Response(null, { status: 302, headers });
@@ -208,11 +373,9 @@ export async function handleGoogleOAuthApi(request, env) {
  * @param {string[]} [extraCookies]
  */
 function redirectWithAuthError(origin, error, env, extraCookies = []) {
-    const publicBase = googleOAuthCallbackUrl(env, origin).replace(/\/api\/auth\/google\/callback$/, '');
-    const dest = new URL('/', publicBase || origin || 'https://m.mmh-virtual.jp');
-    dest.searchParams.set('google_auth', 'error');
-    dest.searchParams.set('google_error', error);
-    const headers = new Headers({ Location: dest.pathname + dest.search });
+    const headers = new Headers({
+        Location: lobbyPublicRedirect(origin, env, { google_auth: 'error', google_error: error }),
+    });
     const clear = setCookieHeader(OAUTH_STATE_COOKIE, '', 0, '/');
     headers.append('Set-Cookie', clear);
     for (const c of extraCookies) {

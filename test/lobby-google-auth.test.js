@@ -64,6 +64,87 @@ test('completeLobbyGoogleAuth: create, login, and link email/password account', 
     }
 });
 
+test('POST /service/lobby/auth/google/peek returns create before account exists', async () => {
+    const tmp = path.join(os.tmpdir(), `lobby-google-peek-${process.pid}.db`);
+    const prevTok = process.env.LOBBY_SIM_SERVICE_TOKEN;
+    const token = 'test-service-token-google-peek';
+    let server;
+    try {
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+        resetUsersDbStateForTests();
+        process.env.LOBBY_SIM_SERVICE_TOKEN = token;
+        initSqliteUsersDb(tmp);
+        await initUsersDb();
+
+        const app = express();
+        app.use(express.json());
+        registerPlatformLobbyServiceRoutes(app);
+        server = await listen(app);
+        const { port } = server.address();
+
+        const res = await fetch(`http://127.0.0.1:${port}/service/lobby/auth/google/peek`, {
+            method: 'POST',
+            headers: {
+                authorization: `Bearer ${token}`,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({ googleSub: 'peek-sub', email: 'peek@example.com' }),
+        });
+        assert.equal(res.status, 200);
+        const data = await res.json();
+        assert.equal(data.ok, true);
+        assert.equal(data.action, 'create');
+    } finally {
+        server?.close();
+        resetUsersDbStateForTests();
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+        if (prevTok === undefined) delete process.env.LOBBY_SIM_SERVICE_TOKEN;
+        else process.env.LOBBY_SIM_SERVICE_TOKEN = prevTok;
+    }
+});
+
+test('POST /service/lobby/auth/google requires displayName for new users', async () => {
+    const tmp = path.join(os.tmpdir(), `lobby-google-name-${process.pid}.db`);
+    const prevTok = process.env.LOBBY_SIM_SERVICE_TOKEN;
+    const token = 'test-service-token-google-name';
+    let server;
+    try {
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+        resetUsersDbStateForTests();
+        process.env.LOBBY_SIM_SERVICE_TOKEN = token;
+        initSqliteUsersDb(tmp);
+        await initUsersDb();
+
+        const app = express();
+        app.use(express.json());
+        registerPlatformLobbyServiceRoutes(app);
+        server = await listen(app);
+        const { port } = server.address();
+
+        const res = await fetch(`http://127.0.0.1:${port}/service/lobby/auth/google`, {
+            method: 'POST',
+            headers: {
+                authorization: `Bearer ${token}`,
+                'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+                googleSub: 'needs-name-sub',
+                email: 'needs-name@example.com',
+                emailVerified: true,
+            }),
+        });
+        assert.equal(res.status, 400);
+        const data = await res.json();
+        assert.equal(data.error, 'name_required');
+    } finally {
+        server?.close();
+        resetUsersDbStateForTests();
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+        if (prevTok === undefined) delete process.env.LOBBY_SIM_SERVICE_TOKEN;
+        else process.env.LOBBY_SIM_SERVICE_TOKEN = prevTok;
+    }
+});
+
 test('POST /service/lobby/auth/google issues lobby user json', async () => {
     const tmp = path.join(os.tmpdir(), `lobby-google-svc-${process.pid}.db`);
     const prevTok = process.env.LOBBY_SIM_SERVICE_TOKEN;

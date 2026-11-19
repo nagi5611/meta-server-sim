@@ -71,11 +71,20 @@ npx wrangler d1 execute metaverse-sim --remote --file=./migrations/lobby_users_g
 - カラム: `students.google_sub`, `teachers.google_sub`（部分 UNIQUE インデックス）
 - ローカル SQLite は起動時 `initSqliteUsersDb` が同カラムを追加
 
-Worker コールバック後、sim の `completeLobbyGoogleAuth` が次を行います。
+OAuth コールバック後、Worker は sim に **peek**（`POST /service/lobby/auth/google/peek`）して新規か既存かを判定します。
+
+| peek の `action` | 動作 |
+|------------------|------|
+| `login` / `link` | そのまま `POST /service/lobby/auth/google` でセッション発行 → `/?google_auth=ok` |
+| `create` | **アカウントはまだ作らない**。短時間 JWT Cookie `lobby_google_pending` を発行 → `/?google_complete=1` |
+
+新規（`create`）ではロビー UI が表示名モーダルを開き、利用者が送信すると Worker `POST /api/auth/google/complete` が Jev（表示名モデレーション）を通したうえで sim の `completeLobbyGoogleAuth` を呼びます（メール新規登録と同じポリシー）。
+
+sim の `completeLobbyGoogleAuth` は次を行います。
 
 - `google_sub` 一致 → ログイン
 - 同一メールの既存アカウント（パスワード登録含む）→ `google_sub` をリンクしてログイン
-- 未登録 → 学生を新規作成（ランダム不可パスワードハッシュ、メール/パスワード登録は従来どおり利用可）
+- 未登録 → **送信された表示名**で学生を新規作成（ランダム不可パスワードハッシュ）
 
 ## API
 
@@ -83,8 +92,11 @@ Worker コールバック後、sim の `completeLobbyGoogleAuth` が次を行い
 |---------|------|------|
 | GET | `/api/auth/google/status` | `{ enabled, scopes }` — UI が Google ボタン表示可否 |
 | GET | `/api/auth/google/start` | Google へ 302 リダイレクト |
-| GET | `/api/auth/google/callback` | コード交換・セッション Cookie 発行→ `/` へリダイレクト |
-| POST | `/service/lobby/auth/google` | sim のみ（Bearer `LOBBY_SIM_SERVICE_TOKEN`） |
+| GET | `/api/auth/google/callback` | コード交換。既存はセッション Cookie、新規は pending Cookie → リダイレクト |
+| GET | `/api/auth/google/pending` | 新規完了待ちの有無と表示名の提案 |
+| POST | `/api/auth/google/complete` | 表示名送信 → Jev → sim 作成 → セッション Cookie |
+| POST | `/service/lobby/auth/google/peek` | sim のみ — `{ action: create \| login \| link }` |
+| POST | `/service/lobby/auth/google` | sim のみ — 作成・ログイン・リンク（新規は `displayName` 必須） |
 
 ## UI
 

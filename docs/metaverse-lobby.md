@@ -35,7 +35,7 @@
 
 ### Google OAuth（ロビー登録・ログイン）
 
-ブラウザは `GET /api/auth/google/start` → Google → `GET /api/auth/google/callback`（Pages が `/api/*` を Worker にプロキシ）。sim は `POST /service/lobby/auth/google` でユーザーを作成・紐付けします。
+ブラウザは `GET /api/auth/google/start` → Google → `GET /api/auth/google/callback`（Pages が `/api/*` を Worker にプロキシ）。**新規** Google 利用者はコールバック後に表示名モーダル（`POST /api/auth/google/complete`）を経てから sim がアカウントを作成します。既存は従来どおり即ログイン。詳細は [lobby-google-oauth.md](./lobby-google-oauth.md)。
 
 | 保存先 | 名前 | 備考 |
 |--------|------|------|

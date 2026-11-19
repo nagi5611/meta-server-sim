@@ -583,6 +583,7 @@
   .banned-contact__link:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px;border-radius:2px}
   .am-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:22px;padding-right:52px}
   .am-top h2{font-size:20px;font-weight:700;color:var(--color-heading);letter-spacing:-.01em}
+  .auth-lead{margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--color-text-muted);max-width:36em}
   .am-top h2::after{
     content:"";display:block;width:24px;height:3px;border-radius:2px;
     background:var(--color-primary);margin-top:8px;
@@ -605,11 +606,7 @@
   .auth-oauth-or::before,.auth-oauth-or::after{
     content:"";flex:1;height:1px;background:var(--color-border);
   }
-  .auth-oauth-login{
-    margin:0 0 14px;text-align:center;font-size:12.5px;
-  }
-  .auth-oauth-login a{color:var(--color-primary-dark);font-weight:700;text-decoration:none}
-  .auth-oauth-login a:hover{text-decoration:underline}
+  .auth-google-login{margin:0 0 18px}
   .am-switch{
     margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border);
     display:flex;align-items:center;justify-content:center;gap:6px;

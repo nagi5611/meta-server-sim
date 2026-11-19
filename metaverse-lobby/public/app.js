@@ -771,17 +771,36 @@ let authTab = authState.mode || 'login';
 let googleOAuthEnabled = false;
 
 function syncAuthModal() {
-    const signup = authTab === 'signup';
-    $('#modalTitle').textContent = signup ? t('auth.signup') : t('auth.login');
-    $('#fldName').hidden = !signup;
-    $('#authSubmit').textContent = signup ? t('auth.submitSignup') : t('auth.submitLogin');
-    $('#switchLead').textContent = signup ? t('auth.switchToLoginLead') : t('auth.switchToSignupLead');
-    $('#switchTab').textContent = signup ? t('auth.switchToLogin') : t('auth.switchToSignup');
-    $('#mPass').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+    const googleComplete = authTab === 'google-complete';
+    const signup = !googleComplete && authTab === 'signup';
+    const lead = $('#authGoogleCompleteLead');
+    const switchRow = $('#authSwitchRow');
+    const emailFld = $('#mEmail')?.closest('.fld');
+    const passFld = $('#mPass')?.closest('.fld');
+    if (googleComplete) {
+        $('#modalTitle').textContent = t('auth.googleCompleteTitle');
+        if (lead) lead.hidden = false;
+        $('#fldName').hidden = false;
+        if (emailFld) emailFld.hidden = true;
+        if (passFld) passFld.hidden = true;
+        if (switchRow) switchRow.hidden = true;
+        $('#authSubmit').textContent = t('auth.submitGoogleComplete');
+    } else {
+        $('#modalTitle').textContent = signup ? t('auth.signup') : t('auth.login');
+        if (lead) lead.hidden = true;
+        $('#fldName').hidden = !signup;
+        if (emailFld) emailFld.hidden = false;
+        if (passFld) passFld.hidden = false;
+        if (switchRow) switchRow.hidden = false;
+        $('#authSubmit').textContent = signup ? t('auth.submitSignup') : t('auth.submitLogin');
+        $('#switchLead').textContent = signup ? t('auth.switchToLoginLead') : t('auth.switchToSignupLead');
+        $('#switchTab').textContent = signup ? t('auth.switchToLogin') : t('auth.switchToSignup');
+        $('#mPass').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+    }
     const block = $('#authGoogleBlock');
     const loginLink = $('#authGoogleLoginLink');
-    if (block) block.hidden = !googleOAuthEnabled || !signup;
-    if (loginLink) loginLink.hidden = !googleOAuthEnabled || signup;
+    if (block) block.hidden = googleComplete || !googleOAuthEnabled || !signup;
+    if (loginLink) loginLink.hidden = googleComplete || !googleOAuthEnabled || signup;
 }
 
 function saveDraft() {
@@ -817,11 +836,36 @@ function openAuthModal() {
 }
 
 function hideAuthModal() {
-    saveDraft();
-    authState.mode = authTab;
+    if (authTab !== 'google-complete') saveDraft();
+    if (authTab !== 'google-complete') authState.mode = authTab;
+    else authTab = authState.mode || 'login';
     saveAuthState();
     authScrim.classList.remove('on');
     authScrim.hidden = true;
+    syncAuthModal();
+}
+
+async function openGoogleCompleteModal() {
+    try {
+        const res = await fetch('/api/auth/google/pending', { credentials: 'include' });
+        const data = await res.json();
+        if (!data?.pending) {
+            showToast(t('auth.errGooglePending'));
+            return;
+        }
+        authTab = 'google-complete';
+        $('#authErr').textContent = '';
+        $('#authErr').classList.remove('on');
+        $('#mName').value = String(data.suggestedName || '').trim();
+        $('#mEmail').value = '';
+        $('#mPass').value = '';
+        syncAuthModal();
+        authScrim.hidden = false;
+        authScrim.classList.add('on');
+        setTimeout(() => $('#mName')?.focus(), 60);
+    } catch {
+        showToast(t('auth.errGoogle'));
+    }
 }
 
 function clearPendingAvatar() {
@@ -1168,6 +1212,10 @@ function mapAuthApiError(data) {
     if (code === 'invalid_email') return t('auth.errEmailInvalid');
     if (code === 'email_exists') return t('auth.errEmailExists');
     if (code === 'name_required') return t('auth.errNameRequired');
+    if (code === 'google_pending_missing' || code === 'google_pending_invalid') {
+        return t('auth.errGooglePending');
+    }
+    if (code === 'google_pending_stale') return t('auth.errGooglePendingStale');
     if (code === 'display_name_rejected') {
         return data?.reason_ja || t('join.errDisplayRejected');
     }
@@ -1186,11 +1234,15 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         err.classList.add('on');
     };
     const btn = $('#authSubmit');
+    const googleComplete = authTab === 'google-complete';
     const signup = authTab === 'signup';
     const email = $('#mEmail').value.trim();
     const pass = $('#mPass').value;
     let displayName = '';
-    if (signup) {
+    if (googleComplete) {
+        displayName = $('#mName').value.trim();
+        if (!displayName) return showErr(t('auth.errNameRequired'));
+    } else if (signup) {
         displayName = $('#mName').value.trim();
         if (!displayName) return showErr(t('auth.errNameRequired'));
         if (!email) return showErr(t('auth.errEmailRequired'));
@@ -1201,24 +1253,39 @@ $('#authForm')?.addEventListener('submit', async (e) => {
     }
 
     btn.disabled = true;
-    btn.textContent = signup ? t('auth.signingUp') : t('auth.authenticating');
+    btn.textContent = googleComplete
+        ? t('auth.completingGoogle')
+        : signup
+          ? t('auth.signingUp')
+          : t('auth.authenticating');
     try {
-        const res = await fetch(signup ? '/api/auth/signup' : '/api/auth/login', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(
-                signup
-                    ? { name: displayName, displayName, email, password: pass }
-                    : { username: email, password: pass },
-            ),
-        });
+        const res = await fetch(
+            googleComplete
+                ? '/api/auth/google/complete'
+                : signup
+                  ? '/api/auth/signup'
+                  : '/api/auth/login',
+            {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(
+                    googleComplete
+                        ? { name: displayName, displayName }
+                        : signup
+                          ? { name: displayName, displayName, email, password: pass }
+                          : { username: email, password: pass },
+                ),
+            },
+        );
         const data = await res.json();
         if (!res.ok) {
             return showErr(mapAuthApiError(data));
         }
         signIn(data.user);
-        clearDraft();
+        if (!googleComplete) clearDraft();
+        authTab = 'login';
+        authState.mode = 'login';
         hideAuthModal();
         await syncFavoritesFromServer();
         refresh();
@@ -1226,7 +1293,7 @@ $('#authForm')?.addEventListener('submit', async (e) => {
         showErr(t('auth.errFailed'));
     } finally {
         btn.disabled = false;
-        btn.textContent = signup ? t('auth.submitSignup') : t('auth.submitLogin');
+        syncAuthModal();
     }
 });
 
@@ -1385,12 +1452,18 @@ function mapGoogleAuthQueryError(code) {
 
 async function handleGoogleAuthReturn() {
     const params = new URLSearchParams(window.location.search);
+    const complete = params.get('google_complete');
     const mode = params.get('google_auth');
-    if (!mode) return;
+    if (!mode && !complete) return;
     const clean = new URL(window.location.href);
     clean.searchParams.delete('google_auth');
     clean.searchParams.delete('google_error');
+    clean.searchParams.delete('google_complete');
     window.history.replaceState({}, '', clean.pathname + clean.search + clean.hash);
+    if (complete === '1') {
+        await openGoogleCompleteModal();
+        return;
+    }
     if (mode === 'ok') {
         try {
             const res = await fetch('/api/auth/me', { credentials: 'include' });

@@ -241,6 +241,7 @@
     <div class="am-top">
       <div>
         <h2 id="modalTitle" data-i18n="auth.login">ログイン</h2>
+        <p class="auth-lead" id="authGoogleCompleteLead" hidden data-i18n="auth.googleCompleteLead">Google アカウントの登録を完了するには、ロビーで使う表示名を入力してください。</p>
       </div>
       <button type="button" class="am-x" id="closeModal" data-i18n-aria="common.close">×</button>
     </div>
@@ -249,9 +250,13 @@
         <a class="btn btn-google btn-block" id="authGoogleBtn" href="/api/auth/google/start" data-i18n="auth.googleSignup">Google で登録</a>
         <p class="auth-oauth-or"><span data-i18n="auth.orDivider">または</span></p>
       </div>
-      <p class="auth-oauth-login" id="authGoogleLoginLink" hidden>
-        <a href="/api/auth/google/start" data-i18n="auth.googleLogin">Google でログイン</a>
-      </p>
+      <a
+        class="btn btn-google btn-block auth-google-login"
+        id="authGoogleLoginLink"
+        href="/api/auth/google/start"
+        hidden
+        data-i18n="auth.googleLogin"
+      >Google でログイン</a>
       <div class="fld" id="fldName" hidden>
         <label for="mName" data-i18n="auth.displayName">表示名</label>
         <input id="mName" type="text" placeholder="example user" autocomplete="username">
@@ -269,7 +274,7 @@
       <p class="msg" id="authErr" role="alert"></p>
       <button class="btn btn-primary btn-block" type="submit" id="authSubmit" data-i18n="auth.submitLogin">ログイン</button>
     </form>
-    <div class="am-switch">
+    <div class="am-switch" id="authSwitchRow">
       <span id="switchLead" data-i18n="auth.switchToSignupLead">アカウントをお持ちでない方は</span>
       <button type="button" id="switchTab" data-i18n="auth.switchToSignup">新規登録</button>
     </div>

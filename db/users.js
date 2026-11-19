@@ -33,6 +33,7 @@ import {
 } from './users-sqlite.js';
 import { getPlatformUsersDbPath } from './users-path.js';
 import { banLifecycleState, isBanActive, normalizeBanExpiresAt } from '../lib/lobby-ban.js';
+import { googleAvatarUrlToStore } from '../lib/lobby-google-avatar.js';
 import crypto from 'node:crypto';
 
 /** @type {'d1' | 'sqlite' | null} */
@@ -306,7 +307,20 @@ export async function peekLobbyGoogleAuth(googleSub, email) {
 }
 
 /**
- * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ * @param {'students' | 'teachers'} tableName
+ * @param {number} id
+ * @param {string} existingAvatarUrl
+ * @param {string | undefined} picture
+ */
+async function persistGoogleAvatarD1(tableName, id, existingAvatarUrl, picture) {
+    const next = googleAvatarUrlToStore(existingAvatarUrl, picture || '');
+    if (!next) return String(existingAvatarUrl || '');
+    await d1Run(`UPDATE ${tableName} SET avatar_url = ? WHERE id = ?`, [next, id]);
+    return next;
+}
+
+/**
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean, picture?: string }} input
  */
 async function completeLobbyGoogleAuthD1(input) {
     const sub = String(input.googleSub || '').trim();
@@ -337,6 +351,9 @@ async function completeLobbyGoogleAuthD1(input) {
                 err.code = 'BANNED';
                 throw err;
             }
+            const tableName = kind === 'teacher' ? 'teachers' : 'students';
+            const av = await persistGoogleAvatarD1(tableName, user.id, user.avatarUrl, input.picture);
+            if (av) user.avatarUrl = av;
             return { kind, user, created: false };
         }
     }
@@ -371,6 +388,8 @@ async function completeLobbyGoogleAuthD1(input) {
             err.code = 'BANNED';
             throw err;
         }
+        const av = await persistGoogleAvatarD1(tableName, user.id, user.avatarUrl, input.picture);
+        if (av) user.avatarUrl = av;
         return { kind, user, created: false };
     }
 
@@ -388,10 +407,11 @@ async function completeLobbyGoogleAuthD1(input) {
     const bcrypt = await import('bcryptjs');
     const placeholder = crypto.randomBytes(32).toString('base64url');
     const hash = bcrypt.default.hashSync(placeholder, 10);
+    const createAvatar = googleAvatarUrlToStore('', input.picture || '') || '';
     try {
         const result = await d1Run(
-            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub) VALUES (?, ?, ?, ?, ?, ?)',
-            [e, hash, d, e, 'user', sub],
+            'INSERT INTO students (username, password_hash, display_name, email, lobby_role, google_sub, avatar_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [e, hash, d, e, 'user', sub, createAvatar],
         );
         const newRow = await d1First(`${STUDENT_LOGIN_SELECT} WHERE id = ?`, [result.lastInsertRowid]);
         return { kind: 'student', user: await materializeUserBanD1('student', newRow), created: true };
@@ -406,7 +426,7 @@ async function completeLobbyGoogleAuthD1(input) {
 }
 
 /**
- * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean }} input
+ * @param {{ googleSub: string, email: string, displayName?: string, emailVerified?: boolean, picture?: string }} input
  */
 export async function completeLobbyGoogleAuth(input) {
     return withUsersBackend(

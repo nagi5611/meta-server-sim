@@ -64,6 +64,14 @@ test('GET /api/auth/google/start redirects to Google when configured', async () 
     assert.ok(res.headers.get('Set-Cookie')?.includes('lobby_google_oauth_state'));
 });
 
+test('GET /api/auth/google/pending without cookie returns not pending', async () => {
+    const req = new Request('https://lobby.test/api/auth/google/pending');
+    const res = await handleGoogleOAuthApi(req, { LOBBY_JWT_SECRET: SECRET });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.pending, false);
+});
+
 test('callback rejects invalid oauth state', async () => {
     const state = await signJwt({ flow: 'google_oauth', nonce: 'n' }, SECRET, 600);
     const req = new Request(`https://lobby.test/api/auth/google/callback?code=abc&state=${state}`, {
