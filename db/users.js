@@ -142,7 +142,7 @@ const STUDENT_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
 
 const TEACHER_LOGIN_SELECT = `SELECT id, username, password_hash, display_name,
                         COALESCE(banned, 0) AS banned, ban_expires_at,
-                        COALESCE(lobby_role, 'admin') AS lobby_role,
+                        COALESCE(lobby_role, 'user') AS lobby_role,
                         COALESCE(email, '') AS email, COALESCE(avatar_url, '') AS avatar_url,
                         COALESCE(google_sub, '') AS google_sub FROM teachers`;
 
@@ -161,7 +161,7 @@ function mapVerifiedUserRow(row, kind, overrides = {}) {
         displayName: String(row.display_name),
         banned,
         banExpiresAt: banned ? banExpiresAt : null,
-        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        lobbyRole: String(row.lobby_role || 'user'),
         email: String(row.email || ''),
         avatarUrl: String(row.avatar_url || ''),
         kind,
@@ -602,7 +602,7 @@ export async function listTeachers() {
             const rows = await d1All(
                 `SELECT id, username, display_name, created_at,
                         COALESCE(banned,0) AS banned, ban_expires_at,
-                        COALESCE(lobby_role,'admin') AS lobby_role,
+                        COALESCE(lobby_role,'user') AS lobby_role,
                         COALESCE(email,'') AS email FROM teachers ORDER BY id`,
             );
             const out = [];

@@ -154,7 +154,7 @@ function rowToLobbyUser(row, kind, overrides = {}) {
         displayName: row.display_name,
         banned,
         banExpiresAt: banned ? banExpiresAt : null,
-        lobbyRole: String(row.lobby_role || (kind === 'teacher' ? 'admin' : 'user')),
+        lobbyRole: String(row.lobby_role || 'user'),
         email: String(row.email || ''),
         avatarUrl: String(row.avatar_url || ''),
         kind,
