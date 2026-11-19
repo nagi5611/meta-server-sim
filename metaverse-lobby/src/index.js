@@ -1,10 +1,11 @@
 import { LobbyPoller } from './lobby-poller.js';
-import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
+import { getPublicSession, handlePublicAuth, isLobbySessionBanned, resolveLobbyViewer } from './auth-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
 import { handleAssetGet } from './lobby-assets.js';
 import { handleProfileAvatarGet } from './lobby-profile-assets.js';
 import { pickAnnouncementText, resolveClientLocale } from './announcement-i18n.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
+import { handleJoinByCodeRequest } from './join-by-code-api.js';
 
 export { LobbyPoller };
 
@@ -139,7 +140,20 @@ async function handleApi(request, env) {
         return json({ announcements, locale });
     }
 
+    const joinByCodeRes = await handleJoinByCodeRequest(request, env);
+    if (joinByCodeRes) return joinByCodeRes;
+
     if (url.pathname === '/api/metaverses' && request.method === 'GET') {
+        const session = await getPublicSession(request, env);
+        if (isLobbySessionBanned(session)) {
+            return json({
+                updatedAt: null,
+                metaverses: [],
+                viewer: 'banned',
+                banned: true,
+                message: 'banned',
+            });
+        }
         const registry = (await kv.get('registry', 'json')) || { metaverses: [] };
         const live = (await kv.get(LIVE_KEY, 'json')) || { worlds: {}, series: {} };
         const viewer = await resolveLobbyViewer(request, env);

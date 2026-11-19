@@ -38,10 +38,14 @@ let pendingAvatarBlob = null;
 let pendingAvatarPreviewUrl = null;
 const displayInput = $('#display-name');
 const joinCodeInput = $('#join-code');
+const joinCodeFields = $('#join-code-fields');
+const joinCodeBannedMsg = $('#join-code-banned');
 const codeCount = $('#codeCount');
 
 /** @type {Array<Record<string, unknown>>} */
 let worlds = [];
+let catalogBanned = false;
+let bannedNoticeShown = false;
 /** @type {Record<string, unknown> | null} */
 let selected = null;
 let toastTimer = null;
@@ -186,9 +190,40 @@ function initMarquees(root) {
     });
 }
 
+function syncJoinCodePanel() {
+    if (joinCodeFields) joinCodeFields.hidden = catalogBanned;
+    if (joinCodeBannedMsg) joinCodeBannedMsg.hidden = !catalogBanned;
+    const btn = $('#join-code-btn');
+    if (catalogBanned) {
+        joinCodeInput?.setAttribute('disabled', '');
+        btn?.setAttribute('disabled', '');
+    } else {
+        joinCodeInput?.removeAttribute('disabled');
+        btn?.removeAttribute('disabled');
+    }
+}
+
+function applyBannedCatalogState(fromApi = true) {
+    catalogBanned = true;
+    worlds = [];
+    if (authState.user) {
+        authState.user = null;
+        saveAuthState();
+        renderAuthHeader();
+    }
+    if (fromApi && !bannedNoticeShown) {
+        bannedNoticeShown = true;
+        showToast(t('auth.errBanned'));
+    }
+    if (hint) hint.textContent = t('auth.errBanned');
+    syncJoinCodePanel();
+    render();
+}
+
 function render() {
     if (!grid) return;
     grid.replaceChildren();
+    if (catalogBanned) return;
     for (const w of worlds) {
         const status = String(w.status || 'online');
         const off = status === 'maint';
@@ -237,6 +272,10 @@ function setJoinMsg(text) {
 }
 
 function openJoin(world) {
+    if (catalogBanned) {
+        showToast(t('auth.errBanned'));
+        return;
+    }
     selected = world;
     const status = String(world.status || 'online');
     const st = statusInfo(status);
@@ -450,17 +489,23 @@ async function refresh() {
         ]);
         if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status}`);
         const data = await metaRes.json();
-        worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
+        if (data.banned) {
+            applyBannedCatalogState(false);
+        } else {
+            catalogBanned = false;
+            bannedNoticeShown = false;
+            worlds = Array.isArray(data.metaverses) ? data.metaverses : [];
+            render();
+            lastListUpdatedAt = parseLobbyInstant(data.updatedAt);
+            paintRefreshHint(lastListUpdatedAt);
+        }
         if (annRes.ok) {
             const annData = await annRes.json();
             announcements = Array.isArray(annData.announcements) ? annData.announcements : [];
         } else {
             announcements = [];
         }
-        render();
         renderAnnouncements();
-        lastListUpdatedAt = parseLobbyInstant(data.updatedAt);
-        paintRefreshHint(lastListUpdatedAt);
     } catch {
         if (hint) hint.textContent = t('common.refreshFailed');
         showToast(t('toast.listRefreshFail'));
@@ -754,7 +799,11 @@ displayInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') $('#join-go')?.click();
 });
 
-$('#join-code-btn')?.addEventListener('click', () => {
+$('#join-code-btn')?.addEventListener('click', async () => {
+    if (catalogBanned) {
+        showToast(t('auth.errBanned'));
+        return;
+    }
     const code = String(joinCodeInput?.value || '')
         .toUpperCase()
         .replace(/[^A-Z0-9-]/g, '')
@@ -768,21 +817,40 @@ $('#join-code-btn')?.addEventListener('click', () => {
     joinCodeInput?.classList.remove('bad');
     const btn = $('#join-code-btn');
     btn.disabled = true;
+    const prevLabel = btn.textContent;
     btn.textContent = t('join.lookingUp');
-    setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = t('common.join');
-        const hit = worlds.find((w) => String(w.joinCode || '').toUpperCase() === code);
-        if (hit && hit.status === 'maint') {
+    try {
+        const res = await fetch('/api/join-by-code', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (res.status === 403 && data.error === 'banned') {
+            applyBannedCatalogState(true);
+            return;
+        }
+        if (!res.ok) {
+            showToast(t('toast.codeNotFound', { code }));
+            return;
+        }
+        const hit = data.world;
+        if (!hit) {
+            showToast(t('toast.codeNotFound', { code }));
+            return;
+        }
+        if (hit.status === 'maint') {
             showToast(t('toast.maintByCode'));
             return;
         }
-        if (hit) {
-            openJoin(hit);
-            return;
-        }
-        showToast(t('toast.codeNotFound', { code }));
-    }, 500);
+        openJoin(hit);
+    } catch {
+        showToast(t('toast.listRefreshFail'));
+    } finally {
+        btn.disabled = catalogBanned;
+        btn.textContent = prevLabel;
+    }
 });
 
 joinCodeInput?.addEventListener('input', () => {
@@ -1022,12 +1090,20 @@ async function bootstrapAuth() {
     try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         const data = await res.json();
+        if (data.banned) {
+            applyBannedCatalogState(true);
+            return;
+        }
+        catalogBanned = false;
+        syncJoinCodePanel();
         if (data.user) signIn(data.user);
     } catch {
         /* guest */
     }
     renderAuthHeader();
 }
+
+syncJoinCodePanel();
 
 window.addEventListener('lobby:locale-change', () => {
     window.LobbyI18n?.applyDom();

@@ -34,6 +34,13 @@ export async function getPublicSession(request, env) {
     return verifyJwt(token, secret);
 }
 
+/**
+ * @param {Record<string, unknown> | null | undefined} session
+ */
+export function isLobbySessionBanned(session) {
+    return Boolean(session?.sub && session.banned);
+}
+
 function json(data, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(data), {
         status,
@@ -141,6 +148,9 @@ export async function handlePublicAuth(request, env) {
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
         const session = await getPublicSession(request, env);
         if (!session) return json({ user: null });
+        if (isLobbySessionBanned(session)) {
+            return json({ user: null, banned: true, message: 'banned' });
+        }
         const avatarUrl = String(session.avatarUrl || '').trim();
         const user = {
             name: session.displayName || session.username,
