@@ -291,12 +291,14 @@
     border:1px solid var(--color-border);border-radius:5px;padding:3px 8px;
   }
   .ph .badge{
-    position:absolute;right:8px;top:8px;
-    display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
-    background:transparent;border:none;border-radius:0;padding:0;color:#166534;
-    text-shadow:0 0 6px rgba(255,255,255,.95),0 1px 2px rgba(255,255,255,.85);
+    position:absolute;right:10px;top:10px;z-index:2;
+    display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;line-height:1.2;
+    background:#fff;border:1px solid rgba(16,22,36,.08);border-radius:var(--radius-pill);
+    padding:5px 11px 5px 9px;color:#166534;
+    box-shadow:var(--shadow-seg),0 2px 8px rgba(16,22,36,.1);
+    pointer-events:none;
   }
-  .ph .badge i{width:5px;height:5px;border-radius:50%;background:var(--color-success);display:block;flex-shrink:0}
+  .ph .badge i{width:6px;height:6px;border-radius:50%;background:var(--color-success);display:block;flex-shrink:0}
   .ph .badge.maint{color:var(--color-warn-ink)}
   .ph .badge.maint i{background:var(--color-primary)}
   .ph .badge.live{color:#9a3412}
