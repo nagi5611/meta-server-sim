@@ -602,9 +602,6 @@ joinCodeInput?.addEventListener('keydown', (e) => {
 
 $('#openLogin')?.addEventListener('click', openAuthModal);
 $('#closeModal')?.addEventListener('click', hideAuthModal);
-authScrim?.addEventListener('click', (e) => {
-    if (e.target === authScrim) hideAuthModal();
-});
 ['#mName', '#mEmail', '#mPass'].forEach((sel) => {
     $(sel)?.addEventListener('input', saveDraft);
 });
@@ -688,7 +685,6 @@ $('#logoutBtn')?.addEventListener('click', signOut);
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (joinScrim?.classList.contains('on')) closeJoin();
-    else if (authScrim?.classList.contains('on')) hideAuthModal();
 });
 
 let mqTimer;
