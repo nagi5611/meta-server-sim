@@ -1,4 +1,4 @@
-import { formatLobbyLocalTime, parseLobbyInstant } from './lobby-time.js';
+import { formatLobbyDate, formatLobbyLocalTime, parseLobbyInstant } from './lobby-time.js';
 
 const POLL_MS = 10_000;
 const $ = (s) => document.querySelector(s);
@@ -10,8 +10,11 @@ const hint = $('#refresh-hint');
 const annPanel = $('#announcements-panel');
 const annList = $('#announcement-list');
 const annEmpty = $('#announcement-empty');
-/** @type {Array<{ id: string, title: string, body: string }>} */
+/** @type {Array<{ id: string, title: string, body: string, createdAt?: string, updatedAt?: string }>} */
 let announcements = [];
+/** @type {Set<string>} */
+const annExpanded = new Set();
+const ANN_COLLAPSE_CHARS = 140;
 /** @type {Date | null} */
 let lastListUpdatedAt = null;
 const joinScrim = $('#join-scrim');
@@ -305,32 +308,90 @@ function paintRefreshHint(at = lastListUpdatedAt) {
     hint.textContent = `${t('common.updatePrefix')}${formatLobbyLocalTime(at)}`;
 }
 
+function announcementDateLabel(a) {
+    const raw = a.createdAt || a.updatedAt;
+    return raw ? formatLobbyDate(raw) : '';
+}
+
+function isLongAnnouncementBody(body) {
+    const text = String(body || '');
+    return text.length > ANN_COLLAPSE_CHARS || text.split('\n').length > 3;
+}
+
 function renderAnnouncements() {
     if (!annPanel || !annList) return;
     const items = announcements.filter((a) => a.title && a.body);
     if (!items.length) {
         annPanel.hidden = true;
         if (annEmpty) annEmpty.hidden = true;
-        annList.innerHTML = '';
+        annList.replaceChildren();
         return;
     }
     annPanel.hidden = false;
     if (annEmpty) annEmpty.hidden = true;
-    annList.innerHTML = items
-        .map(
-            (a) => `<li class="ann-item">
-        <h3 class="ann-title">${escapeHtml(a.title)}</h3>
-        <p class="ann-body">${escapeHtml(a.body).replace(/\n/g, '<br>')}</p>
-      </li>`,
-        )
-        .join('');
+    annList.replaceChildren();
+    for (const a of items) {
+        const id = String(a.id || '');
+        const longBody = isLongAnnouncementBody(a.body);
+        const expanded = annExpanded.has(id);
+        const li = document.createElement('li');
+        li.className = 'ann-item';
+
+        const head = document.createElement('div');
+        head.className = 'ann-head';
+        const title = document.createElement('h3');
+        title.className = 'ann-title';
+        title.textContent = a.title;
+        head.appendChild(title);
+        const dateStr = announcementDateLabel(a);
+        if (dateStr) {
+            const timeEl = document.createElement('time');
+            timeEl.className = 'ann-date';
+            timeEl.dateTime = String(a.createdAt || a.updatedAt || '');
+            timeEl.textContent = dateStr;
+            head.appendChild(timeEl);
+        }
+        li.appendChild(head);
+
+        const body = document.createElement('p');
+        body.className = 'ann-body';
+        if (longBody && !expanded) body.classList.add('is-collapsed');
+        if (longBody) {
+            body.classList.add('is-expandable');
+            body.tabIndex = 0;
+            body.setAttribute('role', 'button');
+            body.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        }
+        body.textContent = a.body;
+        if (longBody) {
+            const toggle = () => {
+                const collapsed = body.classList.toggle('is-collapsed');
+                const nowExpanded = !collapsed;
+                body.setAttribute('aria-expanded', nowExpanded ? 'true' : 'false');
+                if (nowExpanded) annExpanded.add(id);
+                else annExpanded.delete(id);
+            };
+            body.addEventListener('click', toggle);
+            body.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    toggle();
+                }
+            });
+        }
+        li.appendChild(body);
+        annList.appendChild(li);
+    }
 }
 
 async function refresh() {
     try {
         const [metaRes, annRes] = await Promise.all([
             fetch('/api/metaverses', { cache: 'no-store', credentials: 'include' }),
-            fetch('/api/announcements', { cache: 'no-store' }),
+            fetch(
+                `/api/announcements?locale=${encodeURIComponent(window.LobbyI18n?.getLocale?.() || 'ja')}`,
+                { cache: 'no-store' },
+            ),
         ]);
         if (!metaRes.ok) throw new Error(`HTTP ${metaRes.status}`);
         const data = await metaRes.json();
@@ -656,9 +717,7 @@ async function bootstrapAuth() {
 window.addEventListener('lobby:locale-change', () => {
     window.LobbyI18n?.applyDom();
     syncAuthModal();
-    render();
-    renderAnnouncements();
-    paintRefreshHint();
+    refresh();
 });
 
 bootstrapAuth();

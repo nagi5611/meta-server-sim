@@ -43,3 +43,24 @@ export function formatLobbyLocalTime(date, extra = {}) {
         ...extra,
     }).format(d);
 }
+
+/**
+ * Calendar date for lobby lists (e.g. 2026/11/20) in the viewer's local timezone.
+ * @param {unknown} raw
+ * @param {Intl.DateTimeFormatOptions} [extra]
+ */
+export function formatLobbyDate(raw, extra = {}) {
+    const d = raw instanceof Date ? raw : parseLobbyInstant(raw);
+    if (Number.isNaN(d.getTime())) return '';
+    const parts = new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        ...extra,
+    }).formatToParts(d);
+    const y = parts.find((p) => p.type === 'year')?.value;
+    const m = parts.find((p) => p.type === 'month')?.value;
+    const day = parts.find((p) => p.type === 'day')?.value;
+    if (!y || !m || !day) return '';
+    return `${y}/${m}/${day}`;
+}

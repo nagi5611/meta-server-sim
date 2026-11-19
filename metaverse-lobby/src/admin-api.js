@@ -1,6 +1,11 @@
 import { fetchSim } from './sim-client.js';
 import { entryToWorld, worldToEntry } from './catalog-map.js';
 import { readCookie, setCookieHeader, signJwt, verifyJwt } from './jwt.js';
+import { normalizeAnnouncementLocale } from './announcement-i18n.js';
+import {
+    DEFAULT_ANNOUNCEMENT_GEMINI_MODEL,
+    translateAnnouncementFields,
+} from './announcement-translator.js';
 import {
     deleteAnnouncement,
     insertAnnouncement,
@@ -12,6 +17,22 @@ import { handleThumbnailUpload } from './lobby-assets.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
+
+/**
+ * @param {Record<string, unknown>} env
+ * @param {{ sourceLocale: string, title: string, body: string }} input
+ */
+async function buildAnnouncementI18n(env, input) {
+    const apiKey = String(env.GEMINI_API_KEY || '').trim();
+    const model = String(env.GEMINI_MODEL || DEFAULT_ANNOUNCEMENT_GEMINI_MODEL).trim();
+    return translateAnnouncementFields({
+        apiKey,
+        model,
+        sourceLocale: input.sourceLocale,
+        title: input.title,
+        body: input.body,
+    });
+}
 
 function json(data, status = 200, extraHeaders = {}) {
     return new Response(JSON.stringify(data), {
@@ -276,12 +297,22 @@ export async function handleAdminApi(request, env, kv) {
         const title = String(body.title || '').trim();
         const bodyText = String(body.body || '').trim();
         if (!title || !bodyText) return json({ error: 'title_and_body_required' }, 400);
+        const sourceLocale = normalizeAnnouncementLocale(
+            String(body.sourceLocale || body.source_language || 'ja'),
+        );
+        const { i18n } = await buildAnnouncementI18n(env, {
+            sourceLocale,
+            title,
+            body: bodyText,
+        });
         const id = crypto.randomUUID();
         const item = await insertAnnouncement(db, id, {
             title,
             body: bodyText,
             published: body.published !== false,
             sortOrder: body.sortOrder,
+            sourceLocale,
+            i18n,
         });
         await insertAuditLog(db, {
             id: crypto.randomUUID(),
@@ -302,11 +333,36 @@ export async function handleAdminApi(request, env, kv) {
         const title = body.title !== undefined ? String(body.title).trim() : undefined;
         const bodyText = body.body !== undefined ? String(body.body).trim() : undefined;
         if (title === '' || bodyText === '') return json({ error: 'title_and_body_required' }, 400);
+        const sourceLocale =
+            body.sourceLocale !== undefined || body.source_language !== undefined
+                ? normalizeAnnouncementLocale(String(body.sourceLocale || body.source_language || 'ja'))
+                : undefined;
+        const shouldTranslate = title !== undefined || bodyText !== undefined || sourceLocale !== undefined;
+        /** @type {Record<string, { title: string, body: string }> | undefined} */
+        let i18n;
+        if (shouldTranslate) {
+            const prev = (await listAnnouncements(db, { publishedOnly: false, limit: 100 })).find(
+                (a) => a.id === id,
+            );
+            const resolvedTitle = title !== undefined ? title : prev?.title || '';
+            const resolvedBody = bodyText !== undefined ? bodyText : prev?.body || '';
+            const resolvedLocale = sourceLocale ?? prev?.sourceLocale ?? 'ja';
+            if (resolvedTitle && resolvedBody) {
+                const built = await buildAnnouncementI18n(env, {
+                    sourceLocale: resolvedLocale,
+                    title: resolvedTitle,
+                    body: resolvedBody,
+                });
+                i18n = built.i18n;
+            }
+        }
         const item = await updateAnnouncement(db, id, {
             title,
             body: bodyText,
             published: body.published,
             sortOrder: body.sortOrder,
+            sourceLocale,
+            i18n,
         });
         if (!item) return json({ error: 'not_found' }, 404);
         await insertAuditLog(db, {

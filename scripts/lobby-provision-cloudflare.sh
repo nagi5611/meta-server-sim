@@ -389,6 +389,9 @@ fi
 if [[ -n "${LOBBY_ADMIN_SESSION_SECRET:-}" ]]; then
   printf '%s' "$LOBBY_ADMIN_SESSION_SECRET" | npx wrangler secret put LOBBY_ADMIN_SESSION_SECRET
 fi
+if [[ -n "${GEMINI_API_KEY:-}" ]]; then
+  printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
+fi
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
   log "applying D1 migrations (lobby-ops) if database exists …"

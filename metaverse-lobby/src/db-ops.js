@@ -52,8 +52,8 @@ export async function listAnnouncements(db, opts = {}) {
     const publishedOnly = opts.publishedOnly !== false;
     const limit = Math.min(Math.max(Number(opts.limit) || 50, 1), 100);
     const sql = publishedOnly
-        ? `SELECT * FROM announcements WHERE published = 1 ORDER BY updated_at DESC LIMIT ?`
-        : `SELECT * FROM announcements ORDER BY sort_order DESC, updated_at DESC LIMIT ?`;
+        ? `SELECT * FROM announcements WHERE published = 1 ORDER BY created_at DESC LIMIT ?`
+        : `SELECT * FROM announcements ORDER BY created_at DESC LIMIT ?`;
     const rows = await db.prepare(sql).bind(limit).all();
     return (rows.results || []).map(mapAnnouncementRow);
 }
@@ -106,12 +106,19 @@ export async function updateAnnouncement(db, id, input) {
         input.published !== undefined ? (input.published ? 1 : 0) : Number(prev.published);
     const sortOrder =
         input.sortOrder !== undefined ? Number(input.sortOrder) || 0 : Number(prev.sort_order) || 0;
+    const sourceLocale =
+        input.sourceLocale !== undefined
+            ? normalizeAnnouncementLocale(String(input.sourceLocale))
+            : normalizeAnnouncementLocale(prev.source_locale != null ? String(prev.source_locale) : 'ja');
+    const i18nJson =
+        input.i18n !== undefined ? (input.i18n ? JSON.stringify(input.i18n) : null) : prev.i18n_json;
     await db
         .prepare(
-            `UPDATE announcements SET title = ?, body = ?, published = ?, sort_order = ?, updated_at = ?
+            `UPDATE announcements SET title = ?, body = ?, published = ?, sort_order = ?, updated_at = ?,
+             source_locale = ?, i18n_json = ?
              WHERE id = ?`,
         )
-        .bind(title, body, published, sortOrder, now, id)
+        .bind(title, body, published, sortOrder, now, sourceLocale, i18nJson, id)
         .run();
     return mapAnnouncementRow({
         id,
@@ -119,6 +126,8 @@ export async function updateAnnouncement(db, id, input) {
         body,
         published,
         sort_order: sortOrder,
+        source_locale: sourceLocale,
+        i18n_json: i18nJson,
         created_at: prev.created_at,
         updated_at: now,
     });

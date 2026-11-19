@@ -3,7 +3,7 @@
   "use strict";
   const tr = (k, v) => (window.LobbyI18n && window.LobbyI18n.t(k, v)) || k;
   const M = window.MMH, U = window.UI;
-  const { store, AUDIENCE, fmtNum, fmtDateTime, fmtDur } = M;
+  const { store, AUDIENCE, fmtNum, fmtDateTime, fmtLobbyDate, fmtDur } = M;
   const { esc } = U;
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -553,35 +553,59 @@
   function viewAnnouncements() {
     const rows = store.announcements || [];
     const list = rows.length
-      ? rows.map((a) => `<tr class="row" data-ann="${esc(a.id)}">
-          <td class="num dim" style="width:150px">${fmtDateTime(a.updatedAt)}</td>
-          <td><b>${esc(a.title)}</b>${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</td>
-          <td class="dim">${esc(String(a.body || "").slice(0, 80))}${String(a.body || "").length > 80 ? "…" : ""}</td>
-          <td class="r"><button type="button" class="btn btn-quiet btn-sm" data-ann-del="${esc(a.id)}">${esc(tr("admin.announcementsDelete"))}</button></td>
-        </tr>`).join("")
-      : `<tr><td colspan="4" class="dim" style="padding:24px;text-align:center">${esc(tr("admin.announcementsEmpty"))}</td></tr>`;
-  return head(tr("admin.announcementsTitle"), `<button class="btn btn-primary" data-act="ann-new">${esc(tr("admin.announcementsAdd"))}</button>`, null, `${rows.length}${tr("admin.announcementsCountSuffix")}`) +
-      `<div class="sheet"><table>
-        <thead><tr><th style="width:150px">${esc(tr("admin.announcementsUpdated"))}</th><th>${esc(tr("admin.announcementsColTitle"))}</th><th>${esc(tr("admin.announcementsColBody"))}</th><th class="r" style="width:100px"></th></tr></thead>
-        <tbody>${list}</tbody></table></div>`;
+      ? rows.map((a) => {
+          const body = String(a.body || "");
+          const preview = body.length > 120 ? `${body.slice(0, 120)}…` : body;
+          const dateRaw = a.createdAt || a.updatedAt;
+          return `<div class="ann-row" data-ann="${esc(a.id)}" role="button" tabindex="0">
+            <span class="ann-row-date num">${esc(fmtLobbyDate(dateRaw))}</span>
+            <span class="ann-row-main">
+              <span class="ann-row-title">${esc(a.title)}${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</span>
+              <span class="ann-row-preview dim">${esc(preview)}</span>
+            </span>
+            <span class="ann-row-del"><button type="button" class="txt-btn" data-ann-del="${esc(a.id)}">${esc(tr("admin.announcementsDelete"))}</button></span>
+          </div>`;
+        }).join("")
+      : `<p class="empty">${esc(tr("admin.announcementsEmpty"))}</p>`;
+    return head(
+      tr("admin.announcementsTitle"),
+      `<button class="btn btn-primary" data-act="ann-new">${esc(tr("admin.announcementsAdd"))}</button>`,
+      null,
+      `${rows.length}${tr("admin.announcementsCountSuffix")}`,
+    ) + `<div class="sheet ann-sheet"><div class="ann-list-admin">${list}</div></div>`;
   }
 
   function viewAnnEditor() {
     const a = state.annEditing;
     if (!a) return "";
+  const localeOpts = (window.LobbyI18n?.supportedLocales || ["ja", "zh-CN", "zh-TW", "en"])
+      .map(
+        (code) =>
+          `<option value="${esc(code)}"${(a.sourceLocale || window.LobbyI18n?.getLocale?.() || "ja") === code ? " selected" : ""}>${esc(code)}</option>`,
+      )
+      .join("");
     return head(
       state.isNewAnn ? tr("admin.announcementsAdd") : tr("admin.announcementsEdit"),
       `<button class="btn btn-primary" data-act="ann-save">${esc(tr("admin.save"))}</button>`,
       tr("admin.announcementsTitle"),
-    ) + `<div class="sheet form">
-      <form id="annForm" class="form-grid" onsubmit="return false">
-        <label class="fld full"><span>${esc(tr("admin.announcementsColTitle"))}</span>
-          <input id="fAnnTitle" class="inp" type="text" maxlength="120" value="${esc(a.title)}" required></label>
-        <label class="fld full"><span>${esc(tr("admin.announcementsColBody"))}</span>
-          <textarea id="fAnnBody" class="inp" rows="6" maxlength="4000">${esc(a.body)}</textarea></label>
-        <label class="fld chk"><input id="fAnnPub" type="checkbox" ${a.published ? "checked" : ""}> ${esc(tr("admin.announcementsPublished"))}</label>
-        <label class="fld"><span>${esc(tr("admin.announcementsSort"))}</span>
-          <input id="fAnnSort" class="inp num" type="number" value="${Number(a.sortOrder) || 0}"></label>
+    ) + `<div class="sheet ann-editor">
+      <form id="annForm" class="ann-form" onsubmit="return false">
+        <div class="field">
+          <label for="fAnnTitle">${esc(tr("admin.announcementsColTitle"))}</label>
+          <input id="fAnnTitle" class="inp" type="text" maxlength="120" value="${esc(a.title)}" required autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="fAnnBody">${esc(tr("admin.announcementsColBody"))}</label>
+          <textarea id="fAnnBody" class="inp" rows="8" maxlength="4000">${esc(a.body)}</textarea>
+        </div>
+        <div class="field">
+          <label for="fAnnLocale">${esc(tr("admin.announcementsSourceLocale"))}</label>
+          <select id="fAnnLocale" class="inp">${localeOpts}</select>
+        </div>
+        <label class="ann-pub">
+          <input id="fAnnPub" type="checkbox" ${a.published ? "checked" : ""}>
+          <span>${esc(tr("admin.announcementsPublished"))}</span>
+        </label>
         <p class="msg" id="annErr" role="alert"></p>
       </form>
     </div>`;
@@ -794,7 +818,7 @@
     if (vw) { state.viewer = vw.dataset.viewer; $$("[data-viewer]").forEach((b) => b.classList.toggle("on", b === vw)); return refreshPv(); }
     const dd = t.closest("[data-dd]");
     if (dd) { e.preventDefault(); e.stopPropagation(); return openDD(dd); }
-    const annRow = t.closest("tr.row[data-ann]");
+    const annRow = t.closest(".ann-row[data-ann]");
     if (annRow && !t.closest("[data-ann-del]")) return startEditAnn(annRow.dataset.ann);
     const row = t.closest("tr.row[data-id]");
     if (row) return startEdit(row.dataset.id);
@@ -854,7 +878,13 @@
     }).catch(() => toast("保存に失敗しました"));
   }
   function startNewAnn() {
-    state.annEditing = { id: "", title: "", body: "", published: true, sortOrder: 0 };
+    state.annEditing = {
+      id: "",
+      title: "",
+      body: "",
+      published: true,
+      sourceLocale: window.LobbyI18n?.getLocale?.() || "ja",
+    };
     state.isNewAnn = true;
     state.view = "annEditor";
     render();
@@ -874,14 +904,14 @@
     const title = ($("#fAnnTitle")?.value || "").trim();
     const body = ($("#fAnnBody")?.value || "").trim();
     const published = Boolean($("#fAnnPub")?.checked);
-    const sortOrder = Number($("#fAnnSort")?.value) || 0;
     const err = $("#annErr");
     if (!title || !body) {
       if (err) err.textContent = tr("admin.announcementsValidation");
       return;
     }
     if (err) err.textContent = "";
-    const payload = { title, body, published, sortOrder };
+    const sourceLocale = ($("#fAnnLocale")?.value || window.LobbyI18n?.getLocale?.() || "ja").trim();
+    const payload = { title, body, published, sourceLocale };
     const p = state.isNewAnn
       ? store.createAnnouncement(payload)
       : store.updateAnnouncement(a.id, payload);

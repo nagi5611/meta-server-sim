@@ -173,6 +173,17 @@
         hour12: false,
       }).format(d);
     },
+    fmtLobbyDate(iso) {
+      if (window.LobbyTime?.formatLobbyDate) {
+        return window.LobbyTime.formatLobbyDate(iso) || "—";
+      }
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "—";
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}/${m}/${day}`;
+    },
     fmtDur(min) {
       if (!min) return "—";
       if (min < 60) return min + "分";

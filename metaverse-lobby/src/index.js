@@ -2,6 +2,7 @@ import { LobbyPoller } from './lobby-poller.js';
 import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
 import { handleAssetGet } from './lobby-assets.js';
+import { pickAnnouncementText, resolveClientLocale } from './announcement-i18n.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 
 export { LobbyPoller };
@@ -117,10 +118,22 @@ async function handleApi(request, env) {
 
     if (url.pathname === '/api/announcements' && request.method === 'GET') {
         const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
-        const announcements = db
-            ? await listAnnouncements(db, { publishedOnly: true, limit: 3 })
-            : [];
-        return json({ announcements });
+        const locale = resolveClientLocale(request, url);
+        const rows = db ? await listAnnouncements(db, { publishedOnly: true, limit: 3 }) : [];
+        const announcements = rows.map((a) => {
+            const { title, body } = pickAnnouncementText(a.i18n, locale, {
+                title: a.title,
+                body: a.body,
+            });
+            return {
+                id: a.id,
+                title,
+                body,
+                createdAt: a.createdAt,
+                updatedAt: a.updatedAt,
+            };
+        });
+        return json({ announcements, locale });
     }
 
     if (url.pathname === '/api/metaverses' && request.method === 'GET') {
