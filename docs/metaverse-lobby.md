@@ -59,6 +59,21 @@ npm run deploy:pages
 
 **DNS（Xserver）** — `m.mmh-virtual.jp` を Cloudflare Pages のプロジェクト `metaverse-lobby` に CNAME 連携（Deploy ログまたは Dashboard に表示されるターゲット）。別ホストにしたい場合は `LOBBY_CUSTOM_HOSTNAME` を指定。権威 DNS は ns1〜5.xserver.jp。Worker は workers.dev のまま、ブラウザ向け API は Pages 経由で同一オリジンになります。
 
+## sim ユーザー BAN（期限・履歴）
+
+D1 / ローカル `users.db` に次を適用します。
+
+```bash
+npx wrangler d1 execute metaverse-sim --remote --file=./migrations/lobby_users_ban_duration.sql
+```
+
+- カラム: `students.ban_expires_at`, `teachers.ban_expires_at`（`NULL` = 永久 BAN）
+- テーブル: `lobby_ban_history`（who / action / started_at / ends_at）
+- 管理 UI: `metaverse-lobby/public/admin/panel.js`（ユーザー → BAN 期限・履歴）
+- サービス API: `PATCH /service/users/:kind/:id`（`banned`, `banExpiresAt`, `actor`）、`GET .../ban-history`
+
+期限切れ BAN は sim 読み取り時に自動解除され、履歴に `expire` が残ります。
+
 ## 本番 sim への反映
 
 `cursor` SSH では `nagi` の home にアクセスできないため、**自宅サーバー上で root / nagi** が次を実行します:
@@ -71,6 +86,28 @@ sudo LOBBY_ENV_FILE=/path/to/lobby-secrets.env bash /home/nagi/sim-server/meta-s
 または従来どおり `sudo /usr/local/bin/metasim-production-git-sync.sh` のあと、`.env` に `LOBBY_*` を追記して `sudo systemctl restart metasim-server`。
 
 初回は管理画面から tenant を保存するか、`PUT /admin/lobby-catalog` でカタログを登録後、`POST /admin/lobby-catalog/sync`（設定 → ネットワーク）で Worker に反映します。
+
+### 一覧がすべて「診断中」（`degraded`）のとき
+
+`statusUrl` / `presenceUrl` は **テナントパスではなく** `entryUrl` の origin 直下（例: `https://sim.mmh-virtual.jp/api/lobby/status`）です。誤 URL が KV に残っていると `pollStatus` が失敗し `degraded` のままになります。
+
+**復旧（sim 本番）**
+
+1. sim 管理の **ロビーカタログ同期**（`POST /admin/lobby-catalog/sync`）— 内部で Worker へ `POST /api/admin/sync` し、正規化した registry を KV に書き込み、直後に `pollStatus` を実行します。
+2. または Worker 直 URL に Bearer `LOBBY_WORKER_SYNC_SECRET` で同期:
+
+```bash
+curl -sS -X POST "https://metaverse-lobby.<account>.workers.dev/api/admin/sync" \
+  -H "Authorization: Bearer $LOBBY_WORKER_SYNC_SECRET" \
+  -H "Content-Type: application/json" \
+  --data-binary @data/platform/lobby-catalog.json
+```
+
+（ペイロードは `buildLobbyWorkerRegistry` 形式: `{ "metaverses": [...], "updatedAt": "..." }`）
+
+3. `GET https://m.mmh-virtual.jp/api/metaverses` で `status` が `online` になり `statusAt` が更新されることを確認。
+
+Worker は **1 分 Cron** に加え、Durable Object ポーラーが約 60 秒ごとに `pollStatus` をバックアップ実行します。presence が成功したテナントは `degraded` から自動で `online` に戻ります（メンテ・イベント中を除く）。
 
 ## Pages ロビー管理パネル（デザイン handoff）
 

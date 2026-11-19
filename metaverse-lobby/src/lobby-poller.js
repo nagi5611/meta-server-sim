@@ -1,8 +1,15 @@
 /** @typedef {{ id: string, presenceUrl?: string | null, statusUrl?: string | null }} RegistryMetaverse */
 
 import { recordPresenceSample } from './db-ops.js';
+import {
+    normalizeRegistryMetaverse,
+    resolveLobbyPollUrls,
+    statusAfterPresenceSuccess,
+} from './lobby-registry-urls.js';
+import { pollStatus } from './lobby-poll-status.js';
 
 const LIVE_KEY = 'live';
+const STATUS_POLL_EVERY = 6;
 
 /**
  * 10 秒ごとに各メタバースの presence API を叩き KV に集約
@@ -35,6 +42,13 @@ export class LobbyPoller {
 
     async alarm() {
         await this.pollPresence();
+        const tick = Number((await this.state.storage.get('statusPollTick')) || 0) + 1;
+        if (tick >= STATUS_POLL_EVERY) {
+            await this.state.storage.put('statusPollTick', 0);
+            await pollStatus(this.env);
+        } else {
+            await this.state.storage.put('statusPollTick', tick);
+        }
         await this.state.storage.setAlarm(Date.now() + 10_000);
     }
 
@@ -42,7 +56,9 @@ export class LobbyPoller {
         const kv = /** @type {KVNamespace} */ (this.env.LOBBY_KV);
         const secret = String(this.env.LOBBY_PRESENCE_SECRET || '').trim();
         const registry = await kv.get('registry', 'json');
-        const list = Array.isArray(registry?.metaverses) ? registry.metaverses : [];
+        const list = (Array.isArray(registry?.metaverses) ? registry.metaverses : []).map(
+            normalizeRegistryMetaverse,
+        );
         const prevLive = (await kv.get(LIVE_KEY, 'json')) || { worlds: {}, series: {} };
         const worlds = { ...(prevLive.worlds || {}) };
         const series = { ...(prevLive.series || {}) };
@@ -50,10 +66,12 @@ export class LobbyPoller {
         await Promise.all(
             list.map(async (/** @type {RegistryMetaverse} */ world) => {
                 const id = String(world?.id || '');
-                if (!id || !world.presenceUrl) return;
+                if (!id) return;
+                const { presenceUrl } = resolveLobbyPollUrls(world);
+                if (!presenceUrl) return;
                 const headers = secret ? { authorization: `Bearer ${secret}` } : {};
                 try {
-                    const res = await fetch(world.presenceUrl, {
+                    const res = await fetch(presenceUrl, {
                         headers,
                         signal: AbortSignal.timeout(8_000),
                     });
@@ -65,7 +83,7 @@ export class LobbyPoller {
                         ...prev,
                         players,
                         rooms: Number(data.rooms ?? 0) || 0,
-                        status: prev.status || 'online',
+                        status: statusAfterPresenceSuccess(prev),
                         presenceAt: new Date().toISOString(),
                     };
                     const ring = Array.isArray(series[id]) ? [...series[id]] : [];

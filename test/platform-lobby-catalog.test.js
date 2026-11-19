@@ -5,6 +5,23 @@ import {
     upsertLobbyEntryForTenant,
 } from '../lib/platform-lobby-catalog.js';
 
+test('buildLobbyWorkerRegistry normalizes poll URLs from entryUrl origin', () => {
+    const reg = buildLobbyWorkerRegistry({
+        metaverses: [
+            {
+                id: 'tenant-p-01',
+                name: 'One',
+                entryUrl: 'https://sim.mmh-virtual.jp/P-01/',
+                statusUrl: 'https://sim.mmh-virtual.jp/P-01/api/lobby/status',
+                presenceUrl: 'https://sim.mmh-virtual.jp/P-01/api/lobby/presence',
+                enabled: true,
+            },
+        ],
+    });
+    assert.equal(reg.metaverses[0].statusUrl, 'https://sim.mmh-virtual.jp/api/lobby/status');
+    assert.equal(reg.metaverses[0].presenceUrl, 'https://sim.mmh-virtual.jp/api/lobby/presence');
+});
+
 test('buildLobbyWorkerRegistry filters disabled entries', () => {
     const reg = buildLobbyWorkerRegistry({
         metaverses: [
