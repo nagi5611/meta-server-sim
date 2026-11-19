@@ -1,6 +1,7 @@
 import { LobbyPoller } from './lobby-poller.js';
 import { handlePublicAuth, resolveLobbyViewer } from './auth-api.js';
 import { handleAdminApi, handleAdminLogin } from './admin-api.js';
+import { handleAssetGet } from './lobby-assets.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 
 export { LobbyPoller };
@@ -86,6 +87,9 @@ function audienceVisible(audience, viewer) {
 async function handleApi(request, env) {
     const url = new URL(request.url);
     const kv = /** @type {KVNamespace} */ (env.LOBBY_KV);
+
+    const assetRes = await handleAssetGet(request, env);
+    if (assetRes) return assetRes;
 
     const loginRes = await handleAdminLogin(request, env);
     if (loginRes) return loginRes;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cloudflare 上に metaverse-lobby Worker を初回または更新デプロイする。
-# 必要: CLOUDFLARE_API_TOKEN（Workers Scripts Edit + Workers KV Storage Edit + Account Read + Cloudflare Pages Edit）
+# 必要: CLOUDFLARE_API_TOKEN（Workers Scripts Edit + Workers KV Storage Edit + R2 Edit + Account Read + Cloudflare Pages Edit）
 # 任意: CLOUDFLARE_ACCOUNT_ID, LOBBY_KV_NAMESPACE_ID, LOBBY_WORKERS_DEV_SUBDOMAIN,
 #       LOBBY_PRESENCE_SECRET, LOBBY_WORKER_SYNC_SECRET, LOBBY_CUSTOM_HOSTNAME,
 #       LOBBY_PAGES_PROJECT_NAME
@@ -143,6 +143,30 @@ resolve_account_id() {
   local out
   out="$(npx wrangler whoami 2>&1)" || die "wrangler whoami failed. Output:\n${out}"
   echo "$out" | sed -n 's/.*Account ID: \([^ ]*\).*/\1/p' | head -1
+}
+
+ensure_lobby_r2_bucket() {
+  local account_id="$1"
+  local bucket_name="lobby-thumbnails"
+  log "ensuring R2 bucket ${bucket_name} …"
+  local resp
+  resp="$(cf_curl GET "/accounts/${account_id}/r2/buckets/${bucket_name}")"
+  if cf_api_ok "$resp"; then
+    log "R2 bucket ${bucket_name} exists"
+    return 0
+  fi
+  log "creating R2 bucket ${bucket_name} …"
+  resp="$(cf_curl POST "/accounts/${account_id}/r2/buckets" "{\"name\":\"${bucket_name}\"}")"
+  if cf_api_ok "$resp"; then
+    log "R2 bucket ${bucket_name} created"
+    return 0
+  fi
+  if echo "$resp" | grep -qi 'already exists'; then
+    log "R2 bucket ${bucket_name} already exists"
+    return 0
+  fi
+  echo "$resp"
+  die "could not ensure R2 bucket ${bucket_name} (token needs R2 Edit)"
 }
 
 ensure_kv_namespace() {
@@ -343,7 +367,9 @@ log "account id ${ACCOUNT_ID}"
 
 ensure_kv_namespace "$ACCOUNT_ID"
 ensure_lobby_d1_database "$ACCOUNT_ID"
+ensure_lobby_r2_bucket "$ACCOUNT_ID"
 ensure_workers_dev_subdomain "$ACCOUNT_ID"
+ensure_lobby_r2_bucket "$ACCOUNT_ID"
 
 log "deploying worker (API only) …"
 run_wrangler_deploy

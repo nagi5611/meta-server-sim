@@ -15,6 +15,10 @@ binding = "LOBBY_KV"
 # 初回 CI で上書き可。固定 ID: Actions variable LOBBY_KV_NAMESPACE_ID
 id = "cbe06bdf1bf04ab7a6a0c647027dad48"
 
+[[r2_buckets]]
+binding = "LOBBY_ASSETS"
+bucket_name = "lobby-thumbnails"
+
 [[durable_objects.bindings]]
 name = "LOBBY_POLLER"
 class_name = "LobbyPoller"

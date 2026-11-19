@@ -330,10 +330,19 @@
         <textarea class="inp" id="fDesc" maxlength="160">${esc(w.desc)}</textarea>
       </div>
       <div class="field">
-        <label for="fThumb">サムネイル<span class="sub">16:9</span></label>
+        <label for="fThumb">サムネイル<span class="sub">16:9 · JPEG/PNG/WebP/GIF · 最大10MB</span></label>
         <div class="thumb-in">
           <div class="thumb-box" id="thPrev">${w.thumb ? `<img src="${esc(w.thumb)}" alt="">` : ""}</div>
-          <input class="inp" id="fThumb" maxlength="300" value="${esc(w.thumb)}" placeholder="画像のURL">
+          <div class="thumb-side">
+            <div class="thumb-drop" id="thDrop" tabindex="0" role="button" aria-label="画像をドロップまたはクリックして選択">
+              <span class="thumb-drop-t" id="thDropTxt">画像をドロップ、またはクリックして選択</span>
+              <span class="thumb-drop-sub">アップロード後にURLが入力されます</span>
+              <input type="file" id="thFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+            </div>
+            <div class="thumb-prog" id="thProg" hidden><i id="thProgBar" style="width:0%"></i></div>
+            <p class="err" id="thUpErr"></p>
+            <input class="inp" id="fThumb" maxlength="300" value="${esc(w.thumb)}" placeholder="画像のURL（直接入力も可）">
+          </div>
         </div>
       </div>
       <div class="ed-rule"></div>
@@ -630,6 +639,119 @@
       drawChart(true);
       pullChartMetrics();
     }
+    if (v === "editor" && state.editing) bindThumbUpload();
+  }
+
+  function setThumbPreview(url) {
+    const box = $("#thPrev");
+    if (!box) return;
+    box.innerHTML = url ? `<img src="${esc(url)}" alt="">` : "";
+  }
+
+  function bindThumbUpload() {
+    const drop = $("#thDrop");
+    const input = $("#thFile");
+    if (!drop || !input || drop.dataset.bound) return;
+    drop.dataset.bound = "1";
+
+    const pick = () => input.click();
+
+    drop.addEventListener("click", (e) => {
+      if (e.target === input) return;
+      pick();
+    });
+    drop.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        pick();
+      }
+    });
+    ["dragenter", "dragover"].forEach((ev) => {
+      drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        drop.classList.add("drag");
+      });
+    });
+    ["dragleave", "drop"].forEach((ev) => {
+      drop.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (ev === "drop") drop.classList.remove("drag");
+      });
+    });
+    drop.addEventListener("dragleave", (e) => {
+      if (!drop.contains(e.relatedTarget)) drop.classList.remove("drag");
+    });
+    drop.addEventListener("drop", (e) => {
+      drop.classList.remove("drag");
+      const f = e.dataTransfer?.files?.[0];
+      if (f) void uploadThumbFile(f);
+    });
+    input.addEventListener("change", () => {
+      const f = input.files?.[0];
+      input.value = "";
+      if (f) void uploadThumbFile(f);
+    });
+  }
+
+  const THUMB_MAX_BYTES = 10 * 1024 * 1024;
+  const THUMB_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+  function validateThumbFile(file) {
+    const type = String(file?.type || "").toLowerCase();
+    if (!THUMB_TYPES.has(type)) {
+      return "JPEG・PNG・WebP・GIF のみアップロードできます";
+    }
+    const size = Number(file?.size) || 0;
+    if (size <= 0) return "空のファイルはアップロードできません";
+    if (size > THUMB_MAX_BYTES) return "ファイルが大きすぎます（最大10MB）";
+    return "";
+  }
+
+  async function uploadThumbFile(file) {
+    const w = state.editing;
+    if (!w || !window.LobbyAdminApi?.uploadThumbnail) return;
+    const errEl = $("#thUpErr");
+    const prog = $("#thProg");
+    const bar = $("#thProgBar");
+    const dropTxt = $("#thDropTxt");
+  const clientErr = validateThumbFile(file);
+    if (clientErr) {
+      if (errEl) errEl.textContent = clientErr;
+      toast(clientErr);
+      return;
+    }
+    if (errEl) errEl.textContent = "";
+    if (prog) prog.hidden = false;
+    if (bar) bar.style.width = "0%";
+    if (dropTxt) dropTxt.textContent = "アップロード中…";
+    try {
+      const data = await window.LobbyAdminApi.uploadThumbnail(file, (pct) => {
+        if (bar) bar.style.width = pct + "%";
+      });
+      const url = String(data?.url || "").trim();
+      if (!url) throw new Error("no_url");
+      w.thumb = url;
+      const inp = $("#fThumb");
+      if (inp) inp.value = url;
+      setThumbPreview(url);
+      refreshPv();
+      toast("サムネイルをアップロードしました");
+    } catch (err) {
+      const code = err?.data?.error || err?.message || "";
+      const msg =
+        code === "assets_not_configured" ? "画像ストレージが未設定です（運用に連絡してください）" :
+        code === "invalid_type" ? "JPEG・PNG・WebP・GIF のみアップロードできます" :
+        code === "file_too_large" ? "ファイルが大きすぎます（最大10MB）" :
+        "アップロードに失敗しました";
+      if (errEl) errEl.textContent = msg;
+      toast(msg);
+    } finally {
+      if (prog) prog.hidden = true;
+      if (bar) bar.style.width = "0%";
+      if (dropTxt) dropTxt.textContent = "画像をドロップ、またはクリックして選択";
+    }
   }
 
   /* ================= events ================= */
@@ -692,7 +814,7 @@
     else if (t.id === "fDesc") { w.desc = t.value; $("#dCount").textContent = t.value.length + " / 160"; }
     else if (t.id === "fCap") w.cap = +t.value || 0;
     else if (t.id === "fCode") { t.value = t.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""); w.code = t.value; }
-    else if (t.id === "fThumb") { w.thumb = t.value.trim(); $("#thPrev").innerHTML = w.thumb ? `<img src="${esc(w.thumb)}" alt="">` : ""; }
+    else if (t.id === "fThumb") { w.thumb = t.value.trim(); setThumbPreview(w.thumb); }
     refreshPv();
   });
   main.addEventListener("change", (e) => {

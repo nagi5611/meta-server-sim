@@ -21,14 +21,54 @@
 
   async function request(path, opts) {
     const headers = { accept: "application/json", ...(opts?.headers || {}) };
-    if (opts?.body !== undefined) headers["content-type"] = "application/json";
+    const rawBody = opts?.body;
+    const isForm = typeof FormData !== "undefined" && rawBody instanceof FormData;
+    if (rawBody !== undefined && !isForm) headers["content-type"] = "application/json";
     const res = await fetch(`${BASE}${path}`, {
       credentials: "include",
       ...opts,
       headers,
-      body: opts?.body !== undefined ? JSON.stringify(opts.body) : opts?.body,
+      body:
+        rawBody === undefined
+          ? undefined
+          : isForm
+            ? rawBody
+            : JSON.stringify(rawBody),
     });
     return parse(res);
+  }
+
+  function uploadWithProgress(path, formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE}${path}`, true);
+      xhr.withCredentials = true;
+      xhr.responseType = "text";
+      xhr.setRequestHeader("accept", "application/json");
+      if (onProgress) {
+        xhr.upload.onprogress = (ev) => {
+          if (!ev.lengthComputable) return;
+          onProgress(Math.min(100, Math.round((ev.loaded / ev.total) * 100)));
+        };
+      }
+      xhr.onload = () => {
+        let data = null;
+        try {
+          data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+        } catch {
+          data = { raw: xhr.responseText };
+        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else {
+          const err = new Error(data?.error || xhr.statusText || "request_failed");
+          err.status = xhr.status;
+          err.data = data;
+          reject(err);
+        }
+      };
+      xhr.onerror = () => reject(new Error("network_error"));
+      xhr.send(formData);
+    });
   }
 
   window.LobbyAdminApi = {
@@ -54,5 +94,10 @@
       request(`/announcements/${encodeURIComponent(id)}`, { method: 'PUT', body }),
     deleteAnnouncement: (id) =>
       request(`/announcements/${encodeURIComponent(id)}`, { method: 'DELETE', body: {} }),
+    uploadThumbnail: (file, onProgress) => {
+      const fd = new FormData();
+      fd.append("file", file, file.name || "thumbnail");
+      return uploadWithProgress("/upload/thumbnail", fd, onProgress);
+    },
   };
 })();

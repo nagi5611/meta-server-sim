@@ -8,6 +8,7 @@ import {
     listAnnouncements,
     updateAnnouncement,
 } from './db-ops.js';
+import { handleThumbnailUpload } from './lobby-assets.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const LIVE_KEY = 'live';
@@ -93,6 +94,9 @@ export async function handleAdminApi(request, env, kv) {
     if (!session && url.pathname !== '/api/admin/login') {
         return json({ error: 'unauthorized' }, 401);
     }
+
+    const thumbUpload = await handleThumbnailUpload(request, env);
+    if (thumbUpload) return thumbUpload;
 
     if (url.pathname === '/api/admin/catalog' && request.method === 'GET') {
         const sim = await fetchSim(env, '/service/lobby-catalog');
