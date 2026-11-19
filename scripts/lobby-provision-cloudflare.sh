@@ -401,16 +401,15 @@ elif [[ -n "${TYPESAFE_API_KEY:-}" ]]; then
   printf '%s' "$TYPESAFE_API_KEY" | npx wrangler secret put LOBBY_JEV_API_KEY
 fi
 
-LOBBY_GOOGLE_ID="${LOBBY_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}"
-LOBBY_GOOGLE_SECRET="${LOBBY_GOOGLE_CLIENT_SECRET:-${GOOGLE_OAUTH_CLIENT_SECRET:-}}"
+LOBBY_GOOGLE_ID="${GOOGLE_CLIENT_ID:-${LOBBY_GOOGLE_CLIENT_ID:-${GOOGLE_OAUTH_CLIENT_ID:-}}}"
+LOBBY_GOOGLE_SECRET="${GOOGLE_CLIENT_SECRET:-${LOBBY_GOOGLE_CLIENT_SECRET:-${GOOGLE_OAUTH_CLIENT_SECRET:-}}}"
 if [[ -n "$LOBBY_GOOGLE_ID" ]]; then
   esc="${LOBBY_GOOGLE_ID//\\/\\\\}"
   esc="${esc//\"/\\\"}"
-  sed -i "s|^GOOGLE_OAUTH_CLIENT_ID = .*|GOOGLE_OAUTH_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML" 2>/dev/null || true
+  sed -i "s|^GOOGLE_CLIENT_ID = .*|GOOGLE_CLIENT_ID = \"${esc}\"|" "$WRANGLER_TOML" 2>/dev/null || true
 fi
 if [[ -n "$LOBBY_GOOGLE_SECRET" ]]; then
-  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET
-  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put LOBBY_GOOGLE_CLIENT_SECRET
+  printf '%s' "$LOBBY_GOOGLE_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET
 fi
 
 if compgen -G "${LOBBY_DIR}/migrations/*.sql" > /dev/null; then
