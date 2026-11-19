@@ -236,7 +236,7 @@ function openJoin(world) {
     const jPh = $('#jPh');
     if (jPh) {
         if (world.thumbnailUrl) {
-            jPh.innerHTML = `<img src="${escapeHtml(String(world.thumbnailUrl))}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
+            jPh.innerHTML = `<img src="${escapeHtml(String(world.thumbnailUrl))}" alt="">`;
         } else {
             jPh.innerHTML = '<span>サムネ画像</span>';
         }
