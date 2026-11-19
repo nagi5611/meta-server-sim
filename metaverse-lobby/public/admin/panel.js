@@ -573,10 +573,16 @@
     const list = rows.length
       ? rows.map((a) => {
           const dateRaw = a.createdAt || a.updatedAt;
+          const pubLbl = tr("admin.announcementsPublished");
           return `<div class="ann-row" data-ann="${esc(a.id)}" role="button" tabindex="0">
             <span class="ann-row-date num">${esc(fmtLobbyDate(dateRaw))}</span>
             <span class="ann-row-main">
-              <span class="ann-row-title">${esc(a.title)}${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</span>
+              <span class="ann-row-title" data-ann-title="${esc(a.id)}">${esc(a.title)}${a.published ? "" : ` <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`}</span>
+            </span>
+            <span class="ann-row-pub">
+              <label class="ann-list-pub" title="${esc(pubLbl)}">
+                <input type="checkbox" class="ann-pub-cb" data-ann-pub="${esc(a.id)}" ${a.published ? "checked" : ""} aria-label="${esc(pubLbl)}" ${state._annPubBusy === a.id ? "disabled" : ""}>
+              </label>
             </span>
             <span class="ann-row-del"><button type="button" class="txt-btn" data-ann-del="${esc(a.id)}">${esc(tr("admin.announcementsDelete"))}</button></span>
           </div>`;
@@ -830,7 +836,9 @@
     const dd = t.closest("[data-dd]");
     if (dd) { e.preventDefault(); e.stopPropagation(); return openDD(dd); }
     const annRow = t.closest(".ann-row[data-ann]");
-    if (annRow && !t.closest("[data-ann-del]")) return startEditAnn(annRow.dataset.ann);
+    if (annRow && !t.closest("[data-ann-del]") && !t.closest("[data-ann-pub]")) {
+      return startEditAnn(annRow.dataset.ann);
+    }
     const row = t.closest("tr.row[data-id]");
     if (row) return startEdit(row.dataset.id);
     const ur = t.closest("tr.row[data-user]");
@@ -852,8 +860,48 @@
     else if (t.id === "fThumb") { w.thumb = t.value.trim(); setThumbPreview(w.thumb); }
     refreshPv();
   });
+  function syncAnnRowPublished(id, published) {
+    const titleEl = $(`[data-ann-title="${CSS.escape(id)}"]`);
+    if (!titleEl) return;
+    const a = (store.announcements || []).find((x) => x.id === id);
+    if (!a) return;
+    titleEl.innerHTML = published
+      ? esc(a.title)
+      : `${esc(a.title)} <small class="dim">${esc(tr("admin.announcementsDraft"))}</small>`;
+  }
+
+  async function toggleAnnPublished(id, published) {
+    const a = (store.announcements || []).find((x) => x.id === id);
+    if (!a) return;
+    const prev = Boolean(a.published);
+    if (prev === published) return;
+    a.published = published;
+    syncAnnRowPublished(id, published);
+    state._annPubBusy = id;
+    const cb = $(`[data-ann-pub="${CSS.escape(id)}"]`);
+    if (cb) cb.disabled = true;
+    try {
+      await store.updateAnnouncement(id, { published });
+      toast(published ? tr("admin.announcementsPublishedOn") : tr("admin.announcementsPublishedOff"));
+    } catch {
+      a.published = prev;
+      if (cb) cb.checked = prev;
+      syncAnnRowPublished(id, prev);
+      toast(tr("admin.announcementsSaveFail"));
+    } finally {
+      state._annPubBusy = null;
+      if (cb) cb.disabled = false;
+    }
+  }
+
   main.addEventListener("change", (e) => {
-    const t = e.target, w = state.editing;
+    const t = e.target;
+    if (t.matches?.("[data-ann-pub]")) {
+      e.stopPropagation();
+      void toggleAnnPublished(t.dataset.annPub, t.checked);
+      return;
+    }
+    const w = state.editing;
     if (!w || t.type !== "radio") return;
     const key = t.name === "st" ? "status" : "audience";
     w[key] = t.value;
