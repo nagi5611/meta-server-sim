@@ -162,6 +162,30 @@
   .site-footer__link:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px}
   .site-footer__sep{color:var(--color-text-faint);user-select:none;font-weight:400}
 
+  /* ---------- legal / privacy ---------- */
+  .legal-page__home{
+    display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none;min-width:0;
+  }
+  .legal-page__home:hover{color:var(--color-primary-dark)}
+  .legal-page__home:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px;border-radius:var(--radius-xs)}
+  .legal-page__main{padding-top:24px;padding-bottom:48px}
+  .legal-doc{max-width:720px;margin:0 auto}
+  .legal-doc__head{border-bottom:1px solid var(--color-border)}
+  .legal-doc__head h1{font-size:22px;font-weight:800;color:var(--color-heading);letter-spacing:-.02em}
+  .legal-doc__lead{margin:8px 0 0;font-size:var(--fs-caption);color:var(--color-text-muted);line-height:1.55}
+  .legal-doc__body{padding:20px 24px 28px}
+  .legal-doc__section{margin:0 0 22px}
+  .legal-doc__section:last-child{margin-bottom:0}
+  .legal-doc__section h2{
+    margin:0 0 10px;font-size:15px;font-weight:700;color:var(--color-heading);
+  }
+  .legal-doc__section p,.legal-doc__section li{
+    margin:0 0 10px;font-size:var(--fs-body);line-height:var(--lh-body);color:var(--color-text);
+  }
+  .legal-doc__section ul{margin:0 0 10px;padding-left:1.25em}
+  .legal-doc__section li{margin-bottom:6px}
+  .legal-doc__section p:last-child,.legal-doc__section ul:last-child{margin-bottom:0}
+
   /* ---------- layout ---------- */
   main.lobby-main{flex:1;width:100%;max-width:var(--container);margin:0 auto;padding:28px 24px 40px}
   .lobby-layout{
