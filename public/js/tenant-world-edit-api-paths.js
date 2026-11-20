@@ -70,6 +70,15 @@ export function rewriteTenantWorldEditApiUrl(urlStr) {
         return `${adminBase}/client-config${raw.slice('/api/client-config'.length)}`;
     }
 
+    if (
+        raw === '/api/addons/matsuyama-flights/board' ||
+        raw.startsWith('/api/addons/matsuyama-flights/board?')
+    ) {
+        return `/${encodeURIComponent(tenantId)}/api/addons/matsuyama-flights/board${raw.slice(
+            '/api/addons/matsuyama-flights/board'.length
+        )}`;
+    }
+
     if (raw.startsWith('/admin/tenants/')) {
         const afterTenants = raw.slice('/admin/tenants/'.length);
         const firstSeg = afterTenants.split('/')[0] || '';

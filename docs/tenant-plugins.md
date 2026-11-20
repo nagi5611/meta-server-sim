@@ -95,6 +95,14 @@ Port of meta **`qr-ar`**. Static AR UI at **`GET /:tenantId/api/tenant-plugins/a
 
 Backup / rollback addon (ported from meta-server). Platform admin routes at **`/admin/addons/time-machine/*`** when enabled for an allowed tenant (`tenantIds` in `plugin.json`, default **`P-01`**). Config: `ADDON_TIME_MACHINE_MOUNTS`, `ADDON_TIME_MACHINE_ROLLBACK_PIN`, `systemdServiceName` (default **`meta-server-sim`**). Snapshots use mount prefix **`meta-server-sim/`** (not `metaverse-simple`). CloudFront invalidation is a no-op on sim (R2).
 
+## matsuyama-flights (`addons/matsuyama-flights`)
+
+松山空港（MYJ）発着情報を 3D パネルに表示。主データ源は公式 timetable HTML、レイアウト変更時は ODPT/Jetstar バックアップ（`ADDON_MATSUYAMA_FLIGHTS_ODPT_CONSUMER_KEY` またはテナント env `TENANT_<ID>_ADDON_MATSUYAMA_FLIGHTS_ODPT_CONSUMER_KEY`）。キー未設定でも公式 HTML が取れれば動作。
+
+- HTTP: `GET /:tenantId/api/tenant-plugins/matsuyama-flights/board` およびレガシー `GET /:tenantId/api/addons/matsuyama-flights/board`
+- ワールド: `worlds.json` の `flightBoards[]`（管理画面「発着」カテゴリ）
+- 管理プレビュー: `/addons/matsuyama-flights/client/*` 静的配信 + `setting.js` から import
+
 ## meta-bench-r1 (`addons/meta-bench-r1`)
 
 Load-test orchestration (ported from meta-server). Admin UI via **`client/admin.js`** and **`/admin/addons/meta-bench-r1/*`**. Runner socket events use tenant Socket.io from the enabling tenant. Worlds list comes from that tenant's **`worlds.json`**.

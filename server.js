@@ -184,14 +184,11 @@ if (fs.existsSync(SIMPLE_PUBLIC_DIR)) {
             return res.sendFile(abs);
         });
     }
-    app.get('/api/addons/matsuyama-flights/board', (_req, res) => {
-        res.json({
-            departures: [],
-            arrivals: [],
-            dataSource: 'stub',
-            layoutAlert: null,
-        });
-    });
+}
+
+const matsuyamaFlightsClientDir = path.join(__dirname, 'addons', 'matsuyama-flights', 'client');
+if (fs.existsSync(matsuyamaFlightsClientDir)) {
+    app.use('/addons/matsuyama-flights/client', express.static(matsuyamaFlightsClientDir, { index: false }));
 }
 
 

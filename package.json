@@ -24,7 +24,7 @@
         "test:e2e:world-edit": "playwright test e2e/tenant-world-edit.spec.js",
         "test:e2e:agent": "playwright test e2e/agent-metaverse-smoke.spec.js",
         "test:e2e:agent:headed": "playwright test e2e/agent-metaverse-smoke.spec.js --headed",
-        "test:unit": "node --test test/*.test.js metaverse-lobby/test/*.test.mjs",
+        "test:unit": "node --test test/*.test.js addons/matsuyama-flights/test/*.test.js metaverse-lobby/test/*.test.mjs",
         "migrate:r2": "node scripts/migrate-tenant-assets-to-r2.mjs",
         "export:fds-smoke": "python scripts/export-fds-smoke.py",
         "export:fugaku-prod01-smoke": "python scripts/export-fugaku-phase-a-smoke.py --zip"
@@ -44,6 +44,7 @@
         "@web-ar-studio/webar-engine-sdk": "^1.0.24",
         "aws4fetch": "^1.0.20",
         "bcryptjs": "^3.0.3",
+        "cheerio": "^1.2.0",
         "better-sqlite3": "^12.11.1",
         "bootstrap-icons": "^1.13.1",
         "cross-env": "^7.0.3",
