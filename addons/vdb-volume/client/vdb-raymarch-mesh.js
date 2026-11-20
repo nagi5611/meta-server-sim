@@ -12,9 +12,8 @@ void main() {
 
 /**
  * @param {number} steps
- * @param {number} densityScale
  */
-function buildFragmentShader(steps, densityScale) {
+function buildFragmentShader(steps) {
     return `
 precision highp sampler3D;
 uniform sampler3D map;
@@ -37,26 +36,26 @@ void main() {
     for ( int i = 0; i < ${steps}; i++ ) {
         float t = start + float( i ) * stepLen;
         vec3 p = vOrigin + dir * t + 0.5;
-        float d = texture( map, p ).r * densityScale;
-        float sampleAlpha = clamp( d, 0.0, 1.0 );
+        float d = texture( map, p ).r;
+        float sampleAlpha = clamp( d * densityScale, 0.0, 1.0 );
         accum += ( 1.0 - alpha ) * sampleAlpha * tint;
         alpha += ( 1.0 - alpha ) * sampleAlpha;
         if ( alpha > 0.98 ) break;
     }
-    if ( alpha < 0.02 ) discard;
-    gl_FragColor = vec4( accum, clamp( alpha, 0.0, 0.95 ) );
+    if ( alpha < 0.03 ) discard;
+    gl_FragColor = vec4( accum, clamp( alpha, 0.0, 0.98 ) );
 }`;
 }
 
 /**
- * VDBLoader が返す grid からレイマーチ用メッシュを作る
+ * VDBLoader が返す grid からレイマーチ用メッシュを作る（グリッドのワールド姿勢のみ。親 Group で配置する）
  * @param {object} grid
  * @param {{ raySteps?: number, densityScale?: number, tint?: THREE.Color }} [opts]
  */
 export function createVdbRaymarchMesh(grid, opts = {}) {
-    const steps = opts.raySteps ?? 96;
-    const densityScale = opts.densityScale ?? 0.08;
-    const tint = opts.tint ?? new THREE.Color(0.95, 0.55, 0.15);
+    const steps = opts.raySteps ?? 128;
+    const densityScale = opts.densityScale ?? 0.35;
+    const tint = opts.tint ?? new THREE.Color(1.0, 0.72, 0.35);
 
     const material = new THREE.ShaderMaterial({
         uniforms: {
@@ -65,10 +64,11 @@ export function createVdbRaymarchMesh(grid, opts = {}) {
             densityScale: { value: densityScale },
         },
         vertexShader: VERTEX_SHADER,
-        fragmentShader: buildFragmentShader(steps, densityScale),
+        fragmentShader: buildFragmentShader(steps),
         side: THREE.BackSide,
         transparent: true,
         depthWrite: false,
+        depthTest: true,
     });
 
     const center = grid.bbox.getCenter(new THREE.Vector3());
@@ -81,6 +81,7 @@ export function createVdbRaymarchMesh(grid, opts = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
     mesh.name = 'vdb-volume-raymarch';
     mesh.frustumCulled = false;
+    mesh.renderOrder = 950;
     mesh.matrixAutoUpdate = false;
     mesh.matrix
         .copy(grid.transform)
@@ -88,4 +89,27 @@ export function createVdbRaymarchMesh(grid, opts = {}) {
     mesh.updateMatrixWorld(true);
     mesh.userData.vdbGridName = grid.name;
     return mesh;
+}
+
+/**
+ * メッシュのワールド AABB を返す
+ * @param {THREE.Mesh} mesh
+ */
+export function getVdbMeshWorldBox(mesh) {
+    const box = new THREE.Box3();
+    const corners = [
+        new THREE.Vector3(-0.5, -0.5, -0.5),
+        new THREE.Vector3(0.5, -0.5, -0.5),
+        new THREE.Vector3(-0.5, 0.5, -0.5),
+        new THREE.Vector3(0.5, 0.5, -0.5),
+        new THREE.Vector3(-0.5, -0.5, 0.5),
+        new THREE.Vector3(0.5, -0.5, 0.5),
+        new THREE.Vector3(-0.5, 0.5, 0.5),
+        new THREE.Vector3(0.5, 0.5, 0.5),
+    ];
+    for (const c of corners) {
+        c.applyMatrix4(mesh.matrixWorld);
+        box.expandByPoint(c);
+    }
+    return box;
 }

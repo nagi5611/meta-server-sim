@@ -26,10 +26,13 @@ async function fetchPluginConfig() {
 }
 
 registerClientInit(async (app) => {
+    if (app._vdbVolumeManager) {
+        return;
+    }
     const pluginConfig = {
         defaultGridName: 'density',
-        raySteps: 96,
-        densityScale: 0.08,
+        raySteps: 128,
+        densityScale: 0.38,
     };
     await fetchPluginConfig();
     const manager = new VdbVolumeManager(app, pluginConfig);

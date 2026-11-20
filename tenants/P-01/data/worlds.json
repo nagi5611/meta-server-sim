@@ -290,12 +290,13 @@
         "file": "samples/smoke-0016.nvdb",
         "gridName": "density",
         "position": {
-          "x": 30,
-          "y": 6,
-          "z": 22
+          "x": 17.5,
+          "y": -2.5,
+          "z": 13.5
         },
-        "worldScale": 4,
-        "densityScale": 0.12
+        "worldScale": 1,
+        "densityScale": 0.42,
+        "raySteps": 128
       }
     ],
     "floorEnabled": true,

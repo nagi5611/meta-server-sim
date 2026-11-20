@@ -632,6 +632,7 @@ class TenantMetaverseApp {
 
     _publishTenantE2EHarness() {
         window.__tenantE2E = {
+                getMetaverseApp: () => this,
                 getSocket: () => this.networkManager?.socket ?? null,
                 getVoiceChatManager: () => this.voiceChatManager ?? null,
                 getVideoChatManager: () => this.videoChatManager ?? null,

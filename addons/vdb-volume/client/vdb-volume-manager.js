@@ -1,8 +1,8 @@
-// addons/vdb-volume/client/vdb-volume-manager.js — ワールド vdbVolumes[] をシーンに配置
+// addons/vdb-volume/client/vdb-volume-manager.js — ワールド vdbs[] をシーンに配置
 import * as THREE from 'three';
 import { UnsignedByteType } from 'three';
 import { VDBLoader } from './vendor/three-vdb-loader/VDBLoader.js';
-import { createVdbRaymarchMesh } from './vdb-raymarch-mesh.js';
+import { createVdbRaymarchMesh, getVdbMeshWorldBox } from './vdb-raymarch-mesh.js';
 
 /**
  * @param {string} tenantId
@@ -29,16 +29,36 @@ function resolveAddonAssetUrl(tenantId, relPath) {
 }
 
 /**
- * @typedef {object} VdbVolumeConfig
- * @property {string} id
- * @property {string} file
- * @property {string} [gridName]
- * @property {{ x?: number, y?: number, z?: number }} [position]
- * @property {{ x?: number, y?: number, z?: number }} [rotation]
- * @property {number} [worldScale]
- * @property {number} [raySteps]
- * @property {number} [densityScale]
+ * @param {THREE.Object3D} root
+ * @param {THREE.Mesh} mesh
  */
+function mountMeshWithWorldOffset(root, mesh, transform = {}) {
+    const anchor = new THREE.Group();
+    anchor.name = 'vdb-volume-anchor';
+    if (transform.position) {
+        anchor.position.set(
+            transform.position.x ?? 0,
+            transform.position.y ?? 0,
+            transform.position.z ?? 0,
+        );
+    }
+    if (transform.rotation) {
+        anchor.rotation.set(
+            ((transform.rotation.x ?? 0) * Math.PI) / 180,
+            ((transform.rotation.y ?? 0) * Math.PI) / 180,
+            ((transform.rotation.z ?? 0) * Math.PI) / 180,
+            'XYZ',
+        );
+    }
+    const ws = typeof transform.worldScale === 'number' ? transform.worldScale : 1;
+    if (ws !== 1) {
+        anchor.scale.setScalar(ws);
+    }
+    anchor.add(mesh);
+    anchor.updateMatrixWorld(true);
+    root.add(anchor);
+    return anchor;
+}
 
 export class VdbVolumeManager {
     /**
@@ -54,7 +74,7 @@ export class VdbVolumeManager {
         /** @type {THREE.Group} */
         this.root = new THREE.Group();
         this.root.name = 'vdb-volume-root';
-        /** @type {Array<{ id: string, mesh: THREE.Mesh }>} */
+        /** @type {Array<{ id: string, mesh: THREE.Mesh, anchor: THREE.Group }>} */
         this.entries = [];
         this._worldHooked = false;
         this._loading = false;
@@ -109,34 +129,15 @@ export class VdbVolumeManager {
                     densityScale: cfg.densityScale ?? this.pluginConfig.densityScale,
                 });
                 mesh.userData.vdbVolumeId = cfg.id || gridName;
-
-                if (cfg.position) {
-                    const pos = new THREE.Vector3(
-                        cfg.position.x ?? 0,
-                        cfg.position.y ?? 0,
-                        cfg.position.z ?? 0,
-                    );
-                    mesh.matrix.premultiply(new THREE.Matrix4().makeTranslation(pos));
-                    mesh.updateMatrixWorld(true);
-                }
-                if (cfg.rotation) {
-                    const euler = new THREE.Euler(
-                        ((cfg.rotation.x ?? 0) * Math.PI) / 180,
-                        ((cfg.rotation.y ?? 0) * Math.PI) / 180,
-                        ((cfg.rotation.z ?? 0) * Math.PI) / 180,
-                        'XYZ',
-                    );
-                    mesh.matrix.premultiply(new THREE.Matrix4().makeRotationFromEuler(euler));
-                    mesh.updateMatrixWorld(true);
-                }
-                const ws = typeof cfg.worldScale === 'number' ? cfg.worldScale : 1;
-                if (ws !== 1) {
-                    mesh.matrix.premultiply(new THREE.Matrix4().makeScale(ws, ws, ws));
-                    mesh.updateMatrixWorld(true);
-                }
-
-                this.root.add(mesh);
-                this.entries.push({ id: cfg.id || gridName, mesh });
+                const anchor = mountMeshWithWorldOffset(this.root, mesh, cfg);
+                mesh.updateMatrixWorld(true);
+                const worldBox = getVdbMeshWorldBox(mesh);
+                anchor.userData.vdbWorldBox = {
+                    min: worldBox.min.toArray(),
+                    max: worldBox.max.toArray(),
+                    center: worldBox.getCenter(new THREE.Vector3()).toArray(),
+                };
+                this.entries.push({ id: cfg.id || gridName, mesh, anchor });
             } catch (e) {
                 console.warn('[addon:vdb-volume] load failed', cfg, e);
             }
@@ -146,8 +147,8 @@ export class VdbVolumeManager {
     }
 
     disposeMeshes() {
-        for (const { mesh } of this.entries) {
-            this.root.remove(mesh);
+        for (const { mesh, anchor } of this.entries) {
+            anchor.removeFromParent();
             mesh.geometry?.dispose?.();
             if (mesh.material) {
                 const mat = mesh.material;
@@ -169,11 +170,78 @@ export class VdbVolumeManager {
         return this.entries.length > 0;
     }
 
+    /**
+     * @param {string} [id]
+     */
+    getEntryWorldBox(id = 'smoke-demo') {
+        const entry = this.entries.find((e) => e.id === id) ?? this.entries[0];
+        if (!entry?.mesh) return null;
+        entry.mesh.updateMatrixWorld(true);
+        const box = getVdbMeshWorldBox(entry.mesh);
+        return {
+            min: box.min.toArray(),
+            max: box.max.toArray(),
+            center: box.getCenter(new THREE.Vector3()).toArray(),
+            size: box.getSize(new THREE.Vector3()).toArray(),
+        };
+    }
+
+    /**
+     * スクリーンショット用: プレイヤーとカメラをボリュームの手前へ
+     * @param {string} [id]
+     */
+    frameVolumeForView(id = 'smoke-demo') {
+        const box = this.getEntryWorldBox(id);
+        if (!box || !this.app) return null;
+        const center = new THREE.Vector3().fromArray(box.center);
+        const size = Math.max(...box.size, 2);
+        const cam = this.app.sceneManager?.getCamera?.();
+        const eye = center
+            .clone()
+            .add(new THREE.Vector3(size * 0.9, size * 0.35, size * 1.15));
+        if (this.app.characterController?.setPosition) {
+            this.app.characterController.setPosition(eye.x, eye.y, eye.z);
+            this.app.characterController.resetVelocity?.();
+        }
+        if (cam) {
+            cam.position.copy(eye);
+            cam.lookAt(center);
+        }
+        this.app.playerManager?.updateLocalPlayer?.(eye, this.app.characterController?.getRotation?.());
+        return { eye: eye.toArray(), target: center.toArray(), box };
+    }
+
+    /**
+     * 画面中央ピクセル RGBA（WebGL readPixels）
+     */
+    sampleCenterPixel() {
+        const renderer = this.app?.sceneManager?.getRenderer?.();
+        if (!renderer) return null;
+        const canvas = renderer.domElement;
+        const gl = renderer.getContext();
+        const w = canvas.width;
+        const h = canvas.height;
+        if (!w || !h) return null;
+        const buf = new Uint8Array(4);
+        gl.readPixels(Math.floor(w / 2), Math.floor(h / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        return { r: buf[0], g: buf[1], b: buf[2], a: buf[3] };
+    }
+
     _publishState() {
+        const boxes = {};
+        for (const { id, mesh } of this.entries) {
+            mesh.updateMatrixWorld(true);
+            const box = getVdbMeshWorldBox(mesh);
+            boxes[id] = {
+                center: box.getCenter(new THREE.Vector3()).toArray(),
+                size: box.getSize(new THREE.Vector3()).toArray(),
+            };
+        }
         globalThis.__tenantVdbVolume = {
             meshCount: this.entries.length,
             ids: this.entries.map((e) => e.id),
             loading: this._loading,
+            boxes,
         };
     }
 
@@ -185,7 +253,7 @@ export class VdbVolumeManager {
         wm.onWorldChange((world) => {
             void this.loadForWorld(world);
         });
-        const current = wm.getCurrentWorld?.() ?? wm.currentWorld;
+        const current = wm.getCurrentWorld?.();
         if (current) {
             void this.loadForWorld(current);
         }
