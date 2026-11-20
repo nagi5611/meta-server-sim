@@ -7,7 +7,11 @@ import {
     ADMIN_USER,
     ADMIN_PASS,
 } from './helpers/tenant-metaverse.mjs';
-import { enterWorld } from './helpers/tenant-metaverse-agent.mjs';
+import {
+    installTenantE2EHarness,
+    setGuestUsername,
+    expectMetaverseReady,
+} from './helpers/tenant-metaverse.mjs';
 
 const PLUGIN_ID = 'vdb-volume';
 const ARTIFACTS = '/opt/cursor/artifacts';
@@ -120,22 +124,14 @@ test.describe('vdb admin workflow', () => {
 
         const gamePage = await context.newPage();
         const user = `VdbAdminE2E-${Date.now()}`;
-        await enterWorld(gamePage, { tenantId: TENANT_ID, username: user, waitSocket: false });
+        await installTenantE2EHarness(gamePage);
+        await setGuestUsername(gamePage, user);
         await gamePage.goto(`/${TENANT_ID}/?world=${worldId}`, { waitUntil: 'domcontentloaded' });
+        await expectMetaverseReady(gamePage);
         await gamePage.waitForFunction(
-            () =>
-                document.documentElement.dataset.tenantMetaverseReady === 'true'
-                && globalThis.__tenantVdbVolumeManager,
+            () => globalThis.__tenantVdbVolume?.meshCount >= 1 && globalThis.__tenantVdbVolume?.loading === false,
             undefined,
             { timeout: 180_000 },
-        );
-        await gamePage.waitForFunction(
-            () => {
-                const st = globalThis.__tenantVdbVolume;
-                return st && st.meshCount >= 1 && st.loading === false;
-            },
-            undefined,
-            { timeout: 120_000 },
         );
 
         const stats = await gamePage.evaluate(async (entryId) => {
@@ -143,7 +139,7 @@ test.describe('vdb admin workflow', () => {
             mgr?.frameVolumeForView?.(entryId, 'front');
             const app = mgr?.app;
             const renderer = app?.sceneManager?.getRenderer?.();
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < 10; i++) {
                 mgr?.applyCameraLock?.();
                 await new Promise((r) => requestAnimationFrame(r));
                 renderer?.render(app.sceneManager.getScene(), app.sceneManager.getCamera());
@@ -151,7 +147,7 @@ test.describe('vdb admin workflow', () => {
             return mgr?.sampleCloudRegion?.(entryId);
         }, vdbEntry.id);
 
-        expect(stats?.brightRatio ?? 0).toBeGreaterThan(0.12);
+        expect(stats?.brightRatio ?? 0).toBeGreaterThan(0.15);
         await gamePage.screenshot({
             path: path.join(ARTIFACTS, 'vdb-admin-cloud-visible.png'),
             fullPage: false,

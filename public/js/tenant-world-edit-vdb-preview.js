@@ -1,28 +1,8 @@
 // public/js/tenant-world-edit-vdb-preview.js — ワールド編集で VDB 雲をライブプレビュー
 
-/**
- * @param {THREE.Group} editGroup
- * @returns {{ vdbs: object[] }}
- */
-export function collectVdbSnapshotFromEditGroup(editGroup) {
-    const vdbs = [];
-    if (!editGroup) return { vdbs };
-    editGroup.children.forEach((child) => {
-        const cfg = child.userData?.vdbVolumeConfig;
-        if (!cfg) return;
-        const entry = JSON.parse(JSON.stringify(cfg));
-        entry.position = { x: child.position.x, y: child.position.y, z: child.position.z };
-        entry.rotation = {
-            x: (child.rotation.x * 180) / Math.PI,
-            y: (child.rotation.y * 180) / Math.PI,
-            z: (child.rotation.z * 180) / Math.PI,
-        };
-        const ws = typeof entry.worldScale === 'number' ? entry.worldScale : child.scale.x;
-        entry.worldScale = ws;
-        vdbs.push(entry);
-    });
-    return { vdbs };
-}
+import { collectVdbSnapshotFromEditGroup } from './tenant-world-edit-vdb-snapshot.js';
+
+export { collectVdbSnapshotFromEditGroup };
 
 let previewManager = null;
 let previewTenantId = '';

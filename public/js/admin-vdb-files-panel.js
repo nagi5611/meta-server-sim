@@ -155,7 +155,7 @@ export async function initVdbFilesPanel(tenantId) {
         if (t.classList.contains('vdb-add-to-world-btn') && file) {
             if (addStatus) addStatus.textContent = '追加中…';
             try {
-                const { addVdbVolumeFromLibrary } = await import('@metaverse-simple/setting.js');
+                const { addVdbVolumeFromLibrary } = await import('./tenant-world-edit-vdb-shim.js');
                 const result = addVdbVolumeFromLibrary(file);
                 if (addStatus) {
                     addStatus.textContent = result.duplicate

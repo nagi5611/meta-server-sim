@@ -511,6 +511,38 @@
           "yaw": 40,
           "pitch": 58
         }
+      },
+      {
+        "id": "e2e-vdb-1795151863655",
+        "file": "vdbs/e2e-cloud-1795151863582.nvdb",
+        "gridName": "density",
+        "position": {
+          "x": 28,
+          "y": 26,
+          "z": 18
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "worldScale": 3.2,
+        "densityScale": 0.78,
+        "raySteps": 44,
+        "lightSteps": 5,
+        "extinction": 1.4,
+        "scattering": 0.85,
+        "ambient": 0.22,
+        "anisotropy": 0.55,
+        "tint": [
+          0.93,
+          0.96,
+          1
+        ],
+        "sun": {
+          "yaw": 40,
+          "pitch": 58
+        }
       }
     ],
     "floorEnabled": true,

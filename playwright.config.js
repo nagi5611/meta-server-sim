@@ -44,7 +44,7 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: `npx cross-env ADMIN_PASSWORD=${adminPassword} STORAGE_BACKEND=local node server.js`,
+            command: `npx cross-env ADMIN_PASSWORD=${adminPassword} STORAGE_BACKEND=local FDS_SMOKE_BULK_DISABLE=1 node server.js`,
             url: 'http://localhost:3002/api/health',
             reuseExistingServer: true,
             timeout: 60_000,

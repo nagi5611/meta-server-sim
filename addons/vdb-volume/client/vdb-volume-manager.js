@@ -304,9 +304,9 @@ export class VdbVolumeManager {
         const center = new THREE.Vector3().fromArray(box.center);
         const sx = Math.max(...box.size, 4);
         const offsets = {
-            front: new THREE.Vector3(sx * 0.55, sx * 0.02, sx * 1.05),
-            oblique: new THREE.Vector3(sx * 1.35, sx * 0.35, sx * 0.25),
-            backlit: new THREE.Vector3(sx * -1.15, sx * 0.12, sx * -1.05),
+            front: new THREE.Vector3(sx * 0.15, sx * 0.08, sx * 1.35),
+            oblique: new THREE.Vector3(sx * 1.05, sx * 0.45, sx * 0.55),
+            backlit: new THREE.Vector3(sx * -0.95, sx * 0.2, sx * -1.2),
         };
         const eye = center.clone().add(offsets[view] ?? offsets.front);
 
@@ -314,10 +314,6 @@ export class VdbVolumeManager {
         if (cc?.setFlyMode) cc.setFlyMode(true);
         if (cc?.setViewMode) cc.setViewMode('first');
         if (cc?.setSuspendPhysicsUntilGameplayInput) cc.setSuspendPhysicsUntilGameplayInput(true);
-        if (cc?.setPosition) {
-            cc.setPosition(eye.x, eye.y, eye.z);
-            cc.resetVelocity?.();
-        }
 
         this.setCameraLock({ eye, target: center, ms: 30_000 });
 
@@ -327,7 +323,14 @@ export class VdbVolumeManager {
             cam.lookAt(center);
             cam.updateMatrixWorld();
         }
-        this.app.playerManager?.updateLocalPlayer?.(eye, cc?.getRotation?.());
+        const localRoot = this.app?.playerManager?.localPlayer?.model
+            || this.app?.playerManager?.localPlayer?.object;
+        if (localRoot) {
+            localRoot.visible = false;
+            this._hideLocalPlayerForShot = () => {
+                localRoot.visible = true;
+            };
+        }
 
         return {
             eye: eye.toArray(),
