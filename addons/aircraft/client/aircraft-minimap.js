@@ -1,6 +1,6 @@
 // addons/aircraft/client/aircraft-minimap.js — 操縦中の円形ミニマップ（geo時 Google 2D / それ以外 3D俯瞰）
 
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import { parseFlightMapConfig, isGeoMapReady } from '../lib/flight-map-schema.js';
 import {
     aircraftIconRotationRad,

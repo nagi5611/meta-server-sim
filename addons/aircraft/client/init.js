@@ -2,6 +2,9 @@
 
 import AircraftController from './aircraft-controller.js';
 import AircraftManager from './aircraft-manager.js';
+import { ensureAircraftSlotVisuals } from './aircraft-slot-visual.js';
+import { viewpointIndexFromLegacyMode } from '/metaverse-simple-static/js/aircraft/camera-viewpoints.js';
+import { resolveSlotCameraViewpoints } from './camera-viewpoint-runtime.js';
 
 /** @type {Promise<{ MobileAircraftControls: object, MobileJoystickManager: object }> | null} */
 let mobileModulesPromise = null;
@@ -84,6 +87,10 @@ export async function initAircraftSubsystem(app) {
         if (app.aircraftManager?.isPiloting) {
             void app.aircraftManager.loadFlightMapForWorld(world?.id);
         }
+        void app.sceneManager?.hydrateAircraftSlotsFromLibrary?.().then(() => {
+            app.aircraftManager?.refreshSlotsFromScene?.();
+            ensureAircraftSlotVisuals(app.sceneManager);
+        });
     });
     try {
         await app.sceneManager.hydrateAircraftSlotsFromLibrary();
@@ -91,6 +98,7 @@ export async function initAircraftSubsystem(app) {
         console.warn('[Aircraft] hydrateAircraftSlotsFromLibrary failed', e);
     }
     app.aircraftManager.refreshSlotsFromScene();
+    ensureAircraftSlotVisuals(app.sceneManager);
 
     const tryBoardFromUi = () => app.aircraftManager?.tryBoardNearest();
     app.uiManager.setAircraftBoardHandler(() => {

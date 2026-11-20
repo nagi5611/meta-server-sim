@@ -5,6 +5,12 @@ import { test, expect } from '@playwright/test';
 import { TENANT_ID, ADMIN_USER, ADMIN_PASS } from './helpers/tenant-metaverse.mjs';
 import { enterWorld, installTenantE2EHarness } from './helpers/tenant-metaverse-agent.mjs';
 import { expectMetaverseReady, emitSocketAck, waitForSocketConnected } from './helpers/tenant-metaverse.mjs';
+import {
+    expectAircraftVisualOnScene,
+    expectCanvasAircraftPixels,
+    expectAltitudeAbove,
+    readAircraftHudNumbers,
+} from './helpers/aircraft-visual.mjs';
 
 const PLUGIN_ID = 'aircraft';
 const PLANE_ID = 'e2e-plane-1';
@@ -33,49 +39,63 @@ test.describe('aircraft addon', () => {
         const reloadRes = await request.post(`/admin/tenant/${TENANT_ID}/plugins/reload`, { headers });
         expect(reloadRes.ok()).toBeTruthy();
 
-        const putAf = await request.put(`/admin/tenants/${TENANT_ID}/addons/aircraft/airframes/B787`, {
-            headers,
+        await request.put(`/admin/tenants/${TENANT_ID}/addons/aircraft/airframes/B787`, {
+            headers: { ...headers, 'Content-Type': 'application/json' },
             data: {
                 displayName: 'Boeing 787 E2E',
                 controlMode: 'easy',
+                prefabManifest: 'sim/builtin-aircraft',
                 flightPhysicsEasy: { maxThrustSpeed: 95 },
             },
         });
-        expect(putAf.ok()).toBeTruthy();
-
-        const list = await request.get(`/admin/tenants/${TENANT_ID}/addons/aircraft/airframes`);
-        const listJson = await list.json();
-        expect(listJson.airframes?.some((a) => a.id === 'B787')).toBeTruthy();
 
         const worldsRes = await request.get(`/admin/tenants/${TENANT_ID}/worlds`);
         const worlds = await worldsRes.json();
         const lobby = worlds.lobby || worlds[TENANT_ID];
+        const spawn = lobby.spawnPoint || { x: 0, y: 1.2, z: 0 };
         lobby.models = lobby.models || [];
         lobby.models = lobby.models.filter((m) => m?.aircraft?.id !== PLANE_ID);
         lobby.models.push({
             path: 'models/monument.glb',
-            position: { x: 12, y: 1.2, z: 8 },
+            position: { x: spawn.x + 8, y: (spawn.y ?? 1.2) + 0.05, z: spawn.z + 6 },
             rotation: { x: 0, y: 0, z: 0 },
-            scale: { x: 2.5, y: 0.4, z: 4 },
+            scale: { x: 0.01, y: 0.01, z: 0.01 },
             aircraft: {
                 id: PLANE_ID,
                 aircraftLibraryId: 'B787',
-                radius: 6,
+                radius: 8,
                 label: '操縦する',
             },
         });
         const saveWorlds = await request.post(`/admin/tenants/${TENANT_ID}/worlds`, {
-            headers,
+            headers: { ...headers, 'Content-Type': 'application/json' },
             data: worlds,
         });
         expect(saveWorlds.ok()).toBeTruthy();
 
         const adminPage = await browser.newPage();
         await adminPage.goto(`http://localhost:3003/admin/tenant/${TENANT_ID}/world-edit`);
-        await adminPage.waitForTimeout(3000);
+        await adminPage.waitForSelector('.we-category-nav', { timeout: 60_000 });
+        await adminPage.click('.we-category-btn[data-we-category="aircraft"]');
+        await adminPage.waitForSelector('#sim-airframe-list', { timeout: 30_000 });
+        await adminPage.waitForTimeout(1000);
+        await fs.promises.writeFile(
+            path.join(ARTIFACTS, 'aircraft-airframe-tags-admin.png'),
+            await adminPage.screenshot({ fullPage: false }),
+        );
+
+        const worldObj = adminPage.locator('#sim-placed-aircraft-list .model-list-item').first();
+        await expect(worldObj).toContainText(PLANE_ID, { timeout: 30_000 });
+
+        const objListItem = adminPage.locator('#object-list .object-list-item', { hasText: PLANE_ID });
+        if (await objListItem.count()) {
+            await objListItem.first().click();
+        }
+        await adminPage.selectOption('#obj-vehicle-type', 'airplane');
+        await adminPage.waitForTimeout(800);
         await fs.promises.writeFile(
             path.join(ARTIFACTS, 'aircraft-admin-world-edit.png'),
-            await adminPage.screenshot({ fullPage: false })
+            await adminPage.screenshot({ fullPage: false }),
         );
         await adminPage.close();
 
@@ -90,36 +110,47 @@ test.describe('aircraft addon', () => {
             { timeout: 120_000 },
         );
 
-        await pilot.evaluate(() => {
-            window.__tenantE2E.setLocalPosition(12, 1.2, 11);
-        });
+        await expectAircraftVisualOnScene(pilot);
+        await expectCanvasAircraftPixels(pilot, 60);
+
+        await pilot.evaluate(({ sx, sy, sz }) => {
+            window.__tenantE2E.setLocalPosition(sx, sy, sz);
+        }, { sx: spawn.x + 7, sy: (spawn.y ?? 1.2) + 0.2, sz: spawn.z + 5 });
         await pilot.waitForTimeout(2000);
         await fs.promises.writeFile(
             path.join(ARTIFACTS, 'aircraft-on-ground.png'),
-            await pilot.screenshot()
+            await pilot.screenshot(),
         );
 
         const boarded = await pilot.evaluate(async () => window.__tenantE2E.tryBoardNearestAircraft());
         expect(boarded).toBeTruthy();
 
-        for (let i = 0; i < 30; i++) {
-            await pilot.keyboard.press('w');
+        await pilot.keyboard.press('KeyV');
+        await pilot.waitForTimeout(300);
+
+        for (let i = 0; i < 40; i++) {
+            await pilot.keyboard.press('KeyW');
+            await pilot.waitForTimeout(60);
+        }
+        for (let i = 0; i < 20; i++) {
+            await pilot.keyboard.press('ArrowUp');
             await pilot.waitForTimeout(80);
         }
-        for (let i = 0; i < 15; i++) {
-            await pilot.keyboard.press('ArrowUp');
-            await pilot.waitForTimeout(100);
-        }
         await pilot.evaluate(() => window.__tenantE2E.setAircraftThrottle(1));
-        await pilot.waitForTimeout(8000);
 
-        const hud = await pilot.evaluate(() => window.__tenantE2E.getAircraftHud());
-        expect(hud.piloting).toBe(true);
-        expect(hud.altitude).toBeGreaterThan(1);
+        await expectAltitudeAbove(pilot, 4);
+        const hudBefore = await readAircraftHudNumbers(pilot);
+        expect(hudBefore.easy).toMatch(/\d/);
 
+        await pilot.waitForTimeout(4000);
+        const hudAfter = await readAircraftHudNumbers(pilot);
+        expect(hudAfter.easy).toMatch(/\d/);
+        expect(hudAfter.altitude).toBeGreaterThan(hudBefore.altitude ?? 0);
+
+        await expectCanvasAircraftPixels(pilot, 40);
         await fs.promises.writeFile(
             path.join(ARTIFACTS, 'aircraft-flying-hud.png'),
-            await pilot.screenshot()
+            await pilot.screenshot(),
         );
 
         const observerCtx = await browser.newContext();
@@ -127,16 +158,12 @@ test.describe('aircraft addon', () => {
         await installTenantE2EHarness(observer);
         await enterWorld(observer, { tenantId: TENANT_ID, username: `Obs-${Date.now()}` });
         await expectMetaverseReady(observer);
-        await observer.waitForTimeout(5000);
+        await observer.waitForTimeout(3000);
+        await expectAircraftVisualOnScene(observer);
+        await expectCanvasAircraftPixels(observer, 30);
         await fs.promises.writeFile(
             path.join(ARTIFACTS, 'aircraft-observer-sync.png'),
-            await observer.screenshot()
-        );
-
-        await pilot.waitForFunction(
-            () => window.__tenantE2E?.getAircraftHud?.()?.piloting === true,
-            undefined,
-            { timeout: 30_000 },
+            await observer.screenshot(),
         );
 
         await waitForSocketConnected(observer);

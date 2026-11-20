@@ -32,14 +32,14 @@ export function seedDefaultAirframes(db) {
 
     const cameraDefault = JSON.stringify({
         cockpitOffset: { x: 0, y: 1.4, z: 0.3 },
-        chaseOffset: { x: 0, y: 4, z: 14 },
+        chaseOffset: { x: 0, y: 5.5, z: 18 },
     });
 
     const stmt = db.prepare(
         `INSERT INTO aircraft_airframe (
             id, display_name, prefab_manifest, bindings_json, animation_json,
             physics_json, camera_json, control_mode, physics_easy_json, camera_easy_json
-        ) VALUES (?, ?, '', '{}', '{}', ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, 'sim/builtin-aircraft', '{}', '{}', ?, ?, ?, ?, ?)`
     );
 
     stmt.run(

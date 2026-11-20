@@ -1,6 +1,6 @@
 // addons/aircraft/client/runtime-prefab-aircraft-anim.js — 機体ライブラリ定義に基づくローカル表示用アニメ（操縦中）
 
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 
 const TWO_PI = Math.PI * 2;
 

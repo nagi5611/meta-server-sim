@@ -3,7 +3,7 @@
 // 直線運動は AIRCRAFT_PHYSICS_INTERNAL.linearWorldScale（既定 0.4）でワールド移動のみ縮小。パラメータ・HUD は名目 m/s。
 // 推力=機首 -Z 方向、揚力=機体 +Y、重力=ワールド -Y。姿勢は角速度上限のみ（姿勢角ハード上限なし）。Vfe 近似。
 
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import {
     mergeAircraftPhysicsFromWorld,
     flapAuthorityMultipliers,

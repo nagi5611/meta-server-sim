@@ -1,6 +1,6 @@
 // addons/aircraft/client/flight-map-coords.js — 北固定トップダウン用 XZ 座標変換・ジオリファレンス
 
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import { isGeoMapReady } from '../lib/flight-map-schema.js';
 
 const METERS_PER_DEG_LAT = 111320;

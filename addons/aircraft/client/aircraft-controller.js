@@ -1,5 +1,5 @@
 // addons/aircraft/client/aircraft-controller.js — hard/easy 操縦ファサード
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import {
     resolveSlotCameraViewpoints,
     viewpointAtIndex,

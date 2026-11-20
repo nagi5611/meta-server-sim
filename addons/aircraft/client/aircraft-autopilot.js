@@ -1,5 +1,5 @@
 // addons/aircraft/client/aircraft-autopilot.js — オートパイロット状態と慣性運動
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _axisX = new THREE.Vector3(1, 0, 0);

@@ -1,5 +1,5 @@
 // addons/aircraft/client/aircraft-controller-easy.js — easy 操縦（W/S 推力・A/D ヨー・矢印ピッチ/ロール）
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import { mergeEasyAircraftPhysicsFromWorld } from './aircraft-physics-easy-defaults.js';
 import {
     highSpeedAngularRateScale,

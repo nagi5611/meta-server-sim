@@ -14,9 +14,6 @@ registerClientInit(async (app) => {
 
 registerFrameUpdate(
     (app, deltaTime) => {
-        if (app.aircraftController?.isPiloting) {
-            app.aircraftController.update(deltaTime);
-        }
         if (app.aircraftManager?.isPiloting) {
             app.syncMobileAircraftControls?.();
         } else if (app.aircraftManager && app.characterController) {

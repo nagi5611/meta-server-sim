@@ -1,5 +1,5 @@
 // addons/aircraft/client/camera-viewpoint-runtime.js — 機体視点のカメラ適用（hard/easy 共通）
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import {
     resolveSlotCameraViewpoints,
     viewpointAtIndex,

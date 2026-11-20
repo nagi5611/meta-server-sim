@@ -214,6 +214,10 @@ export default {
     async register(ctx) {
         const db = ctx.openDatabase();
         seedDefaultAirframes(db);
+        db.prepare(
+            `UPDATE aircraft_airframe SET prefab_manifest = 'sim/builtin-aircraft'
+             WHERE prefab_manifest IS NULL OR TRIM(prefab_manifest) = ''`
+        ).run();
         setAircraftServerDepsForTenant(ctx.tenantId, {
             getRoomState: (roomId) => getTenantRoomState(ctx.tenantId, roomId),
             readWorlds: () => readTenantWorlds(ctx.tenant),

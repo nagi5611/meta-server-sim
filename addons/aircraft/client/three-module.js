@@ -1,2 +1,7 @@
-// Vite 未経由の addons-client 配信でも bare `three` を使わず解決する
-export * from '../deps/three/build/three.module.js';
+// addons/aircraft/client/three-module.js — メインビューアと同一の Three インスタンス
+import { getSharedThree } from './three-shared.js';
+
+/** @type {typeof import('three')} */
+const THREE = getSharedThree();
+
+export default THREE;

@@ -1,6 +1,6 @@
 // addons/aircraft/client/aircraft-manager.js — 近接・搭乗・サーバー同期・駐機位置リセット
 
-import * as THREE from './three-module.js';
+import THREE from './three-module.js';
 import {
     resolveSlotCameraViewpoints,
     viewpointAtIndex,
@@ -760,7 +760,13 @@ export default class AircraftManager {
             getQuaternion: (out) => this.aircraftController.getAvatarQuaternion(out)
         });
         this.aircraftController.bindSlot(slot);
-        this._applyStoredViewpointForSlot(slot);
+        const vps = resolveSlotCameraViewpoints(slot);
+        const chaseIdx = viewpointIndexFromLegacyMode('chase', vps);
+        if (chaseIdx >= 0) {
+            this.aircraftController.setViewpointIndex(chaseIdx);
+        } else {
+            this._applyStoredViewpointForSlot(slot);
+        }
         this.aircraftController.snapPilotCamera();
         this._showFlightUiForSlot(slot);
         this.uiManager.hideAircraftBoardPrompt();
