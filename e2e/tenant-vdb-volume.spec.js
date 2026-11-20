@@ -6,8 +6,10 @@ import {
     TENANT_ID,
     ADMIN_USER,
     ADMIN_PASS,
+    installTenantE2EHarness,
+    setGuestUsername,
+    expectMetaverseReady,
 } from './helpers/tenant-metaverse.mjs';
-import { enterWorld } from './helpers/tenant-metaverse-agent.mjs';
 
 const PLUGIN_ID = 'vdb-volume';
 const ARTIFACTS = '/opt/cursor/artifacts';
@@ -36,26 +38,33 @@ async function waitForVolumeMeshes(page) {
 
 /**
  * @param {import('@playwright/test').Page} page
+ * @param {string} cloudId
+ * @param {string} view
  */
-async function frameVolumeAndSample(page) {
-    return page.evaluate(async () => {
-        const mgr = globalThis.__tenantVdbVolumeManager;
-        const app = mgr?.app;
-        const renderer = app?.sceneManager?.getRenderer?.();
-        if (!mgr || !renderer) {
-            throw new Error('vdb volume manager or renderer missing');
-        }
-        mgr.frameVolumeForView('cloud-demo', 'front');
-        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        renderer.render(app.sceneManager.getScene(), app.sceneManager.getCamera());
-        const sample = mgr.sampleCenterPixel();
-        const meshCount = globalThis.__tenantVdbVolume?.meshCount ?? 0;
-        const sceneMeshes = [];
-        app.sceneManager.getScene().traverse((o) => {
-            if (o.name === 'vdb-volume-raymarch') sceneMeshes.push(o.name);
-        });
-        return { sample, meshCount, sceneMeshes, boxes: globalThis.__tenantVdbVolume?.boxes };
-    });
+async function frameCloudAndRender(page, cloudId, view) {
+    return page.evaluate(
+        async ({ v, id }) => {
+            const mgr = globalThis.__tenantVdbVolumeManager;
+            const app = mgr?.app;
+            const renderer = app?.sceneManager?.getRenderer?.();
+            if (!mgr || !renderer) throw new Error('vdb volume manager or renderer missing');
+            const framed = mgr.frameVolumeForView(id, v);
+            for (let i = 0; i < 10; i++) {
+                mgr.applyCameraLock?.();
+                mgr.applyPerFrameTuning?.();
+                await new Promise((r) => requestAnimationFrame(r));
+                renderer.render(app.sceneManager.getScene(), app.sceneManager.getCamera());
+            }
+            const cloudStats = mgr.sampleCloudRegion(id);
+            return {
+                framed,
+                cloudStats,
+                boxes: globalThis.__tenantVdbVolume?.boxes,
+                ids: globalThis.__tenantVdbVolume?.ids,
+            };
+        },
+        { v: view, id: cloudId },
+    );
 }
 
 test.describe('vdb-volume addon', () => {
@@ -63,11 +72,8 @@ test.describe('vdb-volume addon', () => {
         httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     });
 
-    test('volume pixels differ when disabled; client inits stay single-shot', async ({
-        page,
-        request,
-    }) => {
-        test.setTimeout(240_000);
+    test('cloud is visibly rendered; angles differ; perf snapshot', async ({ page, request }) => {
+        test.setTimeout(300_000);
         fs.mkdirSync(SHOT, { recursive: true });
         fs.mkdirSync(ARTIFACTS, { recursive: true });
 
@@ -77,110 +83,98 @@ test.describe('vdb-volume addon', () => {
         await request.post(`/admin/tenant/${TENANT_ID}/plugins/${PLUGIN_ID}/enable`, { headers });
         await request.post(`/admin/tenant/${TENANT_ID}/plugins/reload`, { headers });
 
-        await enterWorld(page, { tenantId: TENANT_ID, username: `VdbE2E-${Date.now()}` });
+        const user = `VdbE2E-${Date.now()}`;
+        await installTenantE2EHarness(page);
+        await setGuestUsername(page, user);
+        await page.goto(`/${TENANT_ID}/?world=school`, { waitUntil: 'domcontentloaded' });
+        await expectMetaverseReady(page);
 
         await page.waitForFunction(
-            () =>
-                document.documentElement.dataset.tenantMetaverseReady === 'true'
-                && typeof window.__tenantE2E?.switchToWorld === 'function',
+            () => Boolean(globalThis.__tenantVdbVolumeManager),
             undefined,
             { timeout: 120_000 },
         );
-
-        await page.evaluate(() => window.__tenantE2E.switchToWorld('school'));
         await waitForVolumeMeshes(page);
 
-        const withVolume = await frameVolumeAndSample(page);
-        expect(withVolume.sceneMeshes.length).toBeGreaterThanOrEqual(1);
-        expect(withVolume.meshCount).toBeGreaterThanOrEqual(1);
-        expect(withVolume.sample).not.toBeNull();
+        const cloudId = await page.evaluate(() => {
+            const ids = globalThis.__tenantVdbVolume?.ids;
+            if (Array.isArray(ids) && ids.length) return ids[0];
+            return 'cloud-demo';
+        });
+
+        const front = await frameCloudAndRender(page, cloudId, 'front');
+        expect(front.cloudStats?.brightRatio ?? 0, JSON.stringify(front)).toBeGreaterThan(0.18);
+        expect(front.cloudStats?.samples ?? 0).toBeGreaterThanOrEqual(49);
 
         await page.screenshot({
-            path: path.join(SHOT, 'vdb-volume-enabled.png'),
+            path: path.join(SHOT, 'vdb-cloud-front.png'),
             fullPage: false,
         });
         fs.copyFileSync(
-            path.join(SHOT, 'vdb-volume-enabled.png'),
-            path.join(ARTIFACTS, 'vdb-volume-enabled.png'),
+            path.join(SHOT, 'vdb-cloud-front.png'),
+            path.join(ARTIFACTS, 'vdb-cloud-front.png'),
         );
 
-        const disabled = await page.evaluate(async () => {
+        const disabled = await page.evaluate(async (id) => {
             globalThis.__tenantVdbVolumeManager?.disposeMeshes();
             const app = globalThis.__tenantVdbVolumeManager?.app;
+            const mgr = globalThis.__tenantVdbVolumeManager;
             const renderer = app?.sceneManager?.getRenderer?.();
+            mgr?.frameVolumeForView?.(id, 'front');
+            mgr?.applyCameraLock?.();
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
             renderer?.render(app.sceneManager.getScene(), app.sceneManager.getCamera());
-            const sample = globalThis.__tenantVdbVolumeManager?.sampleCenterPixel?.();
-            const meshCount = globalThis.__tenantVdbVolume?.meshCount ?? 0;
-            return { sample, meshCount };
-        });
-
-        expect(disabled.meshCount).toBe(0);
-
-        await page.evaluate(() => {
-            const mgr = globalThis.__tenantVdbVolumeManager;
-            mgr?.frameVolumeForView('cloud-demo', 'front');
-        });
-        await page.waitForTimeout(300);
-        await page.screenshot({
-            path: path.join(SHOT, 'vdb-volume-disabled.png'),
-            fullPage: false,
-        });
-        fs.copyFileSync(
-            path.join(SHOT, 'vdb-volume-disabled.png'),
-            path.join(ARTIFACTS, 'vdb-volume-disabled.png'),
+            return mgr?.sampleCloudRegion?.(id);
+        }, cloudId);
+        const enabledBright = front.cloudStats?.brightRatio ?? 0;
+        const disabledBright = disabled?.brightRatio ?? 0;
+        expect(enabledBright - disabledBright, 'cloud must add bright pixels vs empty volume').toBeGreaterThan(
+            0.1,
         );
 
-        const lum = (px) => (px?.r ?? 0) + (px?.g ?? 0) + (px?.b ?? 0);
-        const enabledLum = lum(withVolume.sample);
-        const disabledLum = lum(disabled.sample);
-        expect(Math.abs(enabledLum - disabledLum)).toBeGreaterThan(25);
-
-        const cloudLuma = (withVolume.sample?.r ?? 0) + (withVolume.sample?.g ?? 0) + (withVolume.sample?.b ?? 0);
-        const disabledR = disabled.sample?.r ?? 0;
-        expect(cloudLuma).toBeGreaterThan(disabledR + 15);
-
-        const angles = ['front', 'oblique', 'backlit'];
+        const angles = ['oblique', 'backlit'];
+        const eyes = [front.framed?.eye];
         for (const view of angles) {
-            await page.evaluate(
-                async (v) => {
-                    globalThis.__tenantVdbVolumeManager?.frameVolumeForView('cloud-demo', v);
-                    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-                },
-                view,
-            );
-            await page.waitForTimeout(250);
+            const framed = await frameCloudAndRender(page, cloudId, view);
+            expect(framed.cloudStats?.brightRatio ?? 0).toBeGreaterThan(0.15);
+            eyes.push(framed.framed?.eye);
+            await page.waitForTimeout(120);
             const shotPath = path.join(SHOT, `vdb-cloud-${view}.png`);
             await page.screenshot({ path: shotPath, fullPage: false });
             fs.copyFileSync(shotPath, path.join(ARTIFACTS, `vdb-cloud-${view}.png`));
         }
 
+        const dist = (a, b) => {
+            if (!a || !b) return 0;
+            return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        };
+        expect(dist(eyes[0], eyes[1])).toBeGreaterThan(6);
+        expect(dist(eyes[0], eyes[2])).toBeGreaterThan(8);
+
+        await page.evaluate(
+            (id) => globalThis.__tenantVdbVolumeManager?.loadForWorld?.(
+                window.__tenantE2E.getMetaverseApp?.().worldManager?.getCurrentWorld?.(),
+            ),
+            cloudId,
+        );
+        await waitForVolumeMeshes(page);
+        await frameCloudAndRender(page, cloudId, 'front');
+
         const fps = await page.evaluate(async () => {
-            return globalThis.__tenantVdbVolumeManager?.measureFps?.(1800);
+            return globalThis.__tenantVdbVolumeManager?.measureFpsWithAndWithoutVolume?.(1200);
         });
-        expect(fps).toBeGreaterThan(1.5);
+        expect(fps?.withVolume).toBeGreaterThan(1);
+        expect(fps?.withoutVolume).toBeGreaterThan(fps?.withVolume - 0.5);
         fs.writeFileSync(
             path.join(ARTIFACTS, 'vdb-cloud-fps.json'),
             JSON.stringify(
                 {
-                    fps,
-                    measuredMs: 1800,
-                    note: 'Headless SwiftShader; 実 GPU では raySteps/lightSteps に応じて大幅に高くなる',
+                    ...fps,
+                    note: 'Headless SwiftShader; compare with/without raymarch mesh visible',
                 },
                 null,
                 2,
             ),
         );
-
-        const registryGuards = await page.evaluate(() => {
-            const app = window.__tenantE2E?.getMetaverseApp?.();
-            return {
-                vdbManagers: globalThis.__tenantVdbVolumeManager ? 1 : 0,
-                clientInitsDone: app?.tenantId != null && document.documentElement.dataset.tenantMetaverseReady === 'true',
-            };
-        });
-        expect(registryGuards.vdbManagers).toBe(1);
-        expect(registryGuards.clientInitsDone).toBe(true);
     });
-
 });

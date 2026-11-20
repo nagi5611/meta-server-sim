@@ -25,6 +25,8 @@ uniform float extinction;
 uniform float scattering;
 uniform float ambient;
 uniform float anisotropy;
+uniform float rayStride;
+uniform float lightStride;
 varying vec3 vOrigin;
 varying vec3 vDirection;
 
@@ -45,7 +47,8 @@ float lightTransmittance( vec3 p, vec3 sunDir, float lightStepLen ) {
     float optical = 0.0;
     vec3 pos = p;
     for ( int i = 0; i < ${lightSteps}; i++ ) {
-        pos += sunDir * lightStepLen;
+        if ( lightStride > 1.5 && mod( float( i ), lightStride ) >= 0.5 ) continue;
+        pos += sunDir * lightStepLen * max( lightStride, 1.0 );
         if ( any( lessThan( pos, vec3( 0.0 ) ) ) || any( greaterThan( pos, vec3( 1.0 ) ) ) ) {
             break;
         }
@@ -77,6 +80,7 @@ void main() {
     float phase = henyeyGreenstein( cosTheta, anisotropy );
 
     for ( int i = 0; i < ${raySteps}; i++ ) {
+        if ( rayStride > 1.5 && mod( float( i ), rayStride ) >= 0.5 ) continue;
         float t = start + float( i ) * stepLen;
         vec3 p = vOrigin + dir * t + 0.5;
         float density = rawDensity( p );
@@ -91,9 +95,33 @@ void main() {
     }
 
     float alpha = 1.0 - transmittance;
-    if ( alpha < 0.02 ) discard;
+    if ( alpha < 0.008 ) discard;
+    radiance *= 1.15;
     gl_FragColor = vec4( radiance, clamp( alpha, 0.0, 0.98 ) );
 }`;
+}
+
+/**
+ * カメラ距離に応じてレイ stride を上げる
+ * @param {THREE.ShaderMaterial} material
+ * @param {number} distance
+ * @param {number} radius
+ */
+export function applyPerformanceUniforms(material, distance, radius) {
+    if (!material?.uniforms?.rayStride) return;
+    let rayStride = 1;
+    let lightStride = 1;
+    const near = radius * 2.5;
+    const mid = radius * 6;
+    if (distance > mid) {
+        rayStride = 3;
+        lightStride = 2;
+    } else if (distance > near) {
+        rayStride = 2;
+        lightStride = 2;
+    }
+    material.uniforms.rayStride.value = rayStride;
+    material.uniforms.lightStride.value = lightStride;
 }
 
 /**
@@ -175,6 +203,8 @@ export function createVdbRaymarchMesh(grid, opts = {}) {
             scattering: { value: scattering },
             ambient: { value: ambient },
             anisotropy: { value: anisotropy },
+            rayStride: { value: 1 },
+            lightStride: { value: 1 },
         },
         vertexShader: VERTEX_SHADER,
         fragmentShader: buildFragmentShader(raySteps, lightSteps),

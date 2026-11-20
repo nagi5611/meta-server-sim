@@ -1,8 +1,11 @@
 // public/js/tenant-setting-editor.js — metaverse-simple setting.js を Tenant 管理で起動
 
 import { initFdsSmokePanel } from './admin-fds-smoke-panel.js';
+import { initVdbFilesPanel } from './admin-vdb-files-panel.js';
 import { initTenantWorldEditFdsSmokePreview } from './tenant-world-edit-fds-smoke.js';
 import { initTenantWorldEditFdsSmokePanel } from './tenant-world-edit-fds-smoke-panel.js';
+import { initTenantWorldEditVdbPreview } from './tenant-world-edit-vdb-preview.js';
+import { installTenantWorldEditVdbShim } from './tenant-world-edit-vdb-shim.js';
 
 /**
  * アセットタブ表示時にアバター／HDR 情報を更新する
@@ -48,6 +51,9 @@ export async function initTenantSettingEditor(tenantId) {
     await initSettingEditor();
     wireAssetsTabRefresh(tenantId);
     await initFdsSmokePanel(tenantId);
+    await installTenantWorldEditVdbShim(tenantId);
+    await initVdbFilesPanel(tenantId);
     await initTenantWorldEditFdsSmokePreview();
     await initTenantWorldEditFdsSmokePanel();
+    await initTenantWorldEditVdbPreview(tenantId);
 }

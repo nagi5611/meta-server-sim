@@ -1,5 +1,6 @@
 // addons/vdb-volume/client/game.js — NanoVDB / OpenVDB ボリューム描画
-import { registerClientInit } from './metaverse-registry-shim.js';
+import * as THREE from 'three';
+import { registerClientInit, registerFrameUpdate, registerPixelRatioOverride } from './metaverse-registry-shim.js';
 import { VdbVolumeManager } from './vdb-volume-manager.js';
 
 export async function initTenantPlugin() {
@@ -48,6 +49,22 @@ registerClientInit(async (app) => {
     manager.hookWorldChanges();
     app._vdbVolumeManager = manager;
     globalThis.__tenantVdbVolumeManager = manager;
+
+    registerFrameUpdate(() => {
+        manager.applyPerFrameTuning();
+    }, { order: 9000 });
+
+    registerPixelRatioOverride((base) => {
+        if (!manager.isCloudOnScreen?.('cloud-demo')) return base;
+        const cam = app.sceneManager?.getCamera?.();
+        const box = manager.getEntryWorldBox?.('cloud-demo');
+        if (!cam || !box) return base * 0.9;
+        const center = new THREE.Vector3().fromArray(box.center);
+        const dist = cam.position.distanceTo(center);
+        const size = Math.max(...box.size, 4);
+        if (dist < size * 2.2) return base * 0.72;
+        return base * 0.88;
+    });
 });
 
 console.info('[addon:vdb-volume] client registered');

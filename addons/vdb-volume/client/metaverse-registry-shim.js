@@ -14,3 +14,7 @@ export function registerClientInit(fn) {
 export function registerFrameUpdate(fn, opts) {
     return bridge().registerFrameUpdate(fn, opts);
 }
+
+export function registerPixelRatioOverride(fn) {
+    return bridge().registerPixelRatioOverride(fn);
+}
