@@ -426,6 +426,8 @@ class TenantMetaverseApp {
 
         await this.networkManager.connect();
         if (isTenantE2EHarnessEnabled()) {
+            this.networkManager.NO_RESPONSE_THRESHOLD_MS = 60_000;
+            this.networkManager.lastPongTime = Date.now();
             window.__tenantInitPhase = 'after-socket-connect';
             this._publishTenantE2EHarness();
         }
@@ -899,6 +901,35 @@ class TenantMetaverseApp {
                             );
                         }, ms);
                     }),
+                tryBoardNearestAircraft: async () => {
+                    const mgr = this.aircraftManager;
+                    if (!mgr) throw new Error('aircraftManager missing');
+                    mgr.refreshSlotsFromScene();
+                    const feet = this.characterController?.getPosition?.();
+                    if (feet) {
+                        mgr.updateProximity(feet);
+                    }
+                    return mgr.tryBoardNearest();
+                },
+                setAircraftThrottle: (value) => {
+                    const v = Math.max(0, Math.min(1, Number(value)));
+                    const ctrl = this.aircraftController?._active;
+                    if (ctrl && '_throttle' in ctrl) {
+                        ctrl._throttle = v;
+                    }
+                },
+                getAircraftHud: () => {
+                    const root = this.aircraftManager?.activeSlot?.root;
+                    const y =
+                        root?.position?.y ??
+                        this.aircraftController?.aircraft?.position?.y ??
+                        this.characterController?.getPosition?.()?.y ??
+                        null;
+                    return {
+                        piloting: Boolean(this.aircraftManager?.isPiloting),
+                        altitude: typeof y === 'number' && Number.isFinite(y) ? y : null,
+                    };
+                },
         };
     }
 
