@@ -6,6 +6,7 @@ import { initTenantWorldEditFdsSmokePreview } from './tenant-world-edit-fds-smok
 import { initTenantWorldEditFdsSmokePanel } from './tenant-world-edit-fds-smoke-panel.js';
 import { initTenantWorldEditVdbPreview } from './tenant-world-edit-vdb-preview.js';
 import { installTenantWorldEditVdbShim } from './tenant-world-edit-vdb-shim.js';
+import { initTenantWorldEditAircraft } from './tenant-world-edit-aircraft.js';
 
 /**
  * アセットタブ表示時にアバター／HDR 情報を更新する
@@ -56,4 +57,5 @@ export async function initTenantSettingEditor(tenantId) {
     await initTenantWorldEditFdsSmokePreview();
     await initTenantWorldEditFdsSmokePanel();
     await initTenantWorldEditVdbPreview(tenantId);
+    await initTenantWorldEditAircraft(tenantId);
 }

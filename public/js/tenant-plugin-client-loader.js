@@ -13,8 +13,13 @@ function ensureTenantPluginClientBridge() {
  * @param {string} pluginId
  */
 function ensurePluginClientImportMap(tenantId, pluginId) {
-    if (pluginId !== 'xr' && pluginId !== 'vdb-volume') return;
-    const mapId = pluginId === 'xr' ? 'tenant-xr-three-importmap' : 'tenant-vdb-volume-three-importmap';
+    if (pluginId !== 'xr' && pluginId !== 'vdb-volume' && pluginId !== 'aircraft') return;
+    const mapId =
+        pluginId === 'xr'
+            ? 'tenant-xr-three-importmap'
+            : pluginId === 'vdb-volume'
+              ? 'tenant-vdb-volume-three-importmap'
+              : 'tenant-aircraft-three-importmap';
     if (document.getElementById(mapId)) return;
     const imports =
         pluginId === 'xr'
@@ -27,7 +32,7 @@ function ensurePluginClientImportMap(tenantId, pluginId) {
                   };
               })()
             : (() => {
-                  const base = `/${encodeURIComponent(tenantId)}/addons-client/vdb-volume/deps`;
+                  const base = `/${encodeURIComponent(tenantId)}/addons-client/${encodeURIComponent(pluginId)}/deps`;
                   return {
                       three: `${base}/three/build/three.module.js`,
                       'three/addons/': `${base}/three/examples/jsm/`,
