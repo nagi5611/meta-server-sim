@@ -10,6 +10,7 @@
                             <button type="button" class="we-category-btn" data-we-category="assets">アセット</button>
                             <button type="button" class="we-category-btn" data-we-category="flights">発着</button>
                             <button type="button" class="we-category-btn" data-we-category="fds-smoke">FDS煙</button>
+                            <button type="button" class="we-category-btn" data-we-category="vdb-volume">VDB雲</button>
                             <button type="button" class="we-category-btn" data-we-category="file">保存・管理</button>
                         </nav>
                         <div class="we-left-content">
@@ -121,6 +122,26 @@
                                     <p id="fds-smoke-add-status" class="status-text" role="status"></p>
                                 </section>
                             </div>
+                            <div id="we-cat-vdb-volume" class="we-category-pane">
+                                <section class="section" id="vdb-upload-section">
+                                    <h2 class="section-title">VDB / NanoVDB ライブラリ</h2>
+                                    <p class="hint"><code>.vdb</code> / <code>.nvdb</code> をアップロードし、ワールドに雲ボリュームとして配置できます。最大 64 MiB。ヘッダーを検証します。</p>
+                                    <div class="field-row">
+                                        <label class="prop-label" for="vdb-upload-file">ファイル</label>
+                                        <input type="file" id="vdb-upload-file" class="prop-input full" accept=".vdb,.nvdb,application/octet-stream">
+                                    </div>
+                                    <div class="btn-row">
+                                        <button type="button" id="vdb-upload-btn" class="btn-primary">アップロード</button>
+                                    </div>
+                                    <p id="vdb-upload-status" class="status-text" role="status"></p>
+                                </section>
+                                <section class="section">
+                                    <h2 class="section-title">登録済み / サンプル</h2>
+                                    <div id="vdb-file-list" class="model-list vdb-file-list" aria-live="polite"></div>
+                                    <p id="vdb-list-status" class="status-text" role="status"></p>
+                                    <p id="vdb-add-status" class="status-text" role="status"></p>
+                                </section>
+                            </div>
                             <div id="we-cat-file" class="we-category-pane">
                                 <section class="section">
                                     <h2 class="section-title">保存</h2>
@@ -211,6 +232,69 @@
                                         <div class="prop-row">
                                             <label class="prop-label" for="obj-scale-z">スケール Z</label>
                                             <input type="number" id="obj-scale-z" class="prop-input num" step="0.01">
+                                        </div>
+                                    </div>
+                                </details>
+                                <details class="block" id="object-props-vdb-volume" style="display:none;margin-top:10px;">
+                                    <summary class="block-header">VDB雲（見た目）</summary>
+                                    <div class="block-content">
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-id">ID</label>
+                                            <input type="text" id="obj-vdb-id" class="prop-input full" readonly>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-file">ファイル</label>
+                                            <input type="text" id="obj-vdb-file" class="prop-input full" readonly>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-grid">グリッド名</label>
+                                            <input type="text" id="obj-vdb-grid" class="prop-input full" placeholder="density">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-world-scale">ワールドスケール</label>
+                                            <input type="number" id="obj-vdb-world-scale" class="prop-input num" min="0.01" step="0.01" value="3">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-density">密度スケール</label>
+                                            <input type="number" id="obj-vdb-density" class="prop-input num" min="0.01" step="0.01" value="0.78">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-ray-steps">レイステップ</label>
+                                            <input type="number" id="obj-vdb-ray-steps" class="prop-input num" min="8" max="128" step="1" value="44">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-light-steps">ライトステップ</label>
+                                            <input type="number" id="obj-vdb-light-steps" class="prop-input num" min="1" max="32" step="1" value="5">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-extinction">減衰</label>
+                                            <input type="number" id="obj-vdb-extinction" class="prop-input num" min="0" step="0.05" value="1.4">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-scattering">散乱</label>
+                                            <input type="number" id="obj-vdb-scattering" class="prop-input num" min="0" step="0.05" value="0.85">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-ambient">環境光</label>
+                                            <input type="number" id="obj-vdb-ambient" class="prop-input num" min="0" step="0.02" value="0.22">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-anisotropy">異方性 (HG)</label>
+                                            <input type="number" id="obj-vdb-anisotropy" class="prop-input num" min="-0.99" max="0.99" step="0.01" value="0.55">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-tint">色 (hex)</label>
+                                            <input type="text" id="obj-vdb-tint" class="prop-input full" placeholder="eef6ff" maxlength="6">
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-sun-yaw">太陽ヨー</label>
+                                            <input type="number" id="obj-vdb-sun-yaw" class="prop-input num" step="1" value="40">
+                                            <span class="prop-unit">°</span>
+                                        </div>
+                                        <div class="prop-row">
+                                            <label class="prop-label" for="obj-vdb-sun-pitch">太陽ピッチ</label>
+                                            <input type="number" id="obj-vdb-sun-pitch" class="prop-input num" step="1" value="58">
+                                            <span class="prop-unit">°</span>
                                         </div>
                                     </div>
                                 </details>
