@@ -7,6 +7,7 @@ import {
     getVdbMeshWorldBox,
     resolveRaymarchRenderOpts,
     updateSunDirectionUniform,
+    applyPerformanceUniforms,
 } from './vdb-raymarch-mesh.js';
 
 /**
@@ -27,9 +28,16 @@ function tenantIdFromPath(tenantId) {
  * @param {string} tenantId
  * @param {string} relPath
  */
-function resolveAddonAssetUrl(tenantId, relPath) {
+/**
+ * @param {string} tenantId
+ * @param {string} relPath
+ */
+export function resolveVdbVolumeFileUrl(tenantId, relPath) {
     const tid = encodeURIComponent(tenantIdFromPath(tenantId));
     const clean = String(relPath || '').replace(/^\/+/, '');
+    if (clean.startsWith('vdbs/')) {
+        return `/${tid}/${clean}`;
+    }
     return `/${tid}/addons-client/vdb-volume/${clean}`;
 }
 
@@ -82,7 +90,15 @@ export class VdbVolumeManager {
         /** @type {Array<{ id: string, mesh: THREE.Mesh, anchor: THREE.Group }>} */
         this.entries = [];
         this._worldHooked = false;
+        this._worldsPollHooked = false;
+        this._worldsPollDispose = null;
         this._loading = false;
+        /** @type {{ eye: THREE.Vector3, target: THREE.Vector3, until: number } | null} */
+        this._cameraLock = null;
+        this._halfResRt = null;
+        this._halfResScene = null;
+        this._halfResCam = null;
+        this._composerHooked = false;
     }
 
     /**
@@ -122,7 +138,7 @@ export class VdbVolumeManager {
                     ? cfg.gridName
                     : this.pluginConfig.defaultGridName || 'density';
             try {
-                const url = resolveAddonAssetUrl(this.tenantId, cfg.file);
+                const url = resolveVdbVolumeFileUrl(this.tenantId, cfg.file);
                 const grids = await loader.setGridNames([gridName]).loadAsync(url);
                 const grid = grids[0];
                 if (!grid) {
@@ -136,7 +152,13 @@ export class VdbVolumeManager {
                 anchor.updateMatrixWorld(true);
                 mesh.updateMatrixWorld(true);
                 updateSunDirectionUniform(mesh, renderOpts.sunWorld, mesh.material);
+                mesh.frustumCulled = false;
                 const worldBox = getVdbMeshWorldBox(mesh);
+                const sphere = worldBox.getBoundingSphere(new THREE.Sphere());
+                mesh.userData.vdbWorldSphere = {
+                    center: sphere.center.toArray(),
+                    radius: sphere.radius,
+                };
                 anchor.userData.vdbWorldBox = {
                     min: worldBox.min.toArray(),
                     max: worldBox.max.toArray(),
@@ -166,9 +188,13 @@ export class VdbVolumeManager {
     }
 
     dispose() {
+        this._worldsPollDispose?.();
+        this._worldsPollDispose = null;
         this.disposeMeshes();
         this.root.removeFromParent();
         this.scene = null;
+        this._halfResRt?.dispose?.();
+        this._halfResRt = null;
     }
 
     hasEntries() {
@@ -192,38 +218,211 @@ export class VdbVolumeManager {
     }
 
     /**
-     * スクリーンショット用: プレイヤーとカメラをボリュームの手前へ
+     * CharacterController のピッチ制限を迂回し雲を直視するカメラ拘束
+     * @param {{ eye: THREE.Vector3, target: THREE.Vector3, ms?: number }} opts
+     */
+    setCameraLock(opts) {
+        const until = performance.now() + (opts.ms ?? 12_000);
+        this._cameraLock = {
+            eye: opts.eye.clone(),
+            target: opts.target.clone(),
+            until,
+        };
+    }
+
+    clearCameraLock() {
+        this._cameraLock = null;
+    }
+
+    /**
+     * フレーム更新用: カメラロックと距離別ステップ
+     */
+    applyPerFrameTuning() {
+        this.applyCameraLock();
+        const cam = this.app?.sceneManager?.getCamera?.();
+        if (!cam || !this.entries.length) return;
+
+        const camPos = cam.position;
+        for (const { mesh } of this.entries) {
+            const center = mesh.userData.vdbWorldSphere?.center;
+            const radius = mesh.userData.vdbWorldSphere?.radius ?? 8;
+            if (!center) continue;
+            const dist = camPos.distanceTo(new THREE.Vector3().fromArray(center));
+            applyPerformanceUniforms(mesh.material, dist, radius);
+        }
+    }
+
+    applyCameraLock() {
+        if (!this._cameraLock || performance.now() > this._cameraLock.until) {
+            this._cameraLock = null;
+            return;
+        }
+        const cam = this.app?.sceneManager?.getCamera?.();
+        if (!cam) return;
+        cam.position.copy(this._cameraLock.eye);
+        cam.lookAt(this._cameraLock.target);
+        cam.updateMatrixWorld();
+    }
+
+    /**
+     * 雲の bbox が画面内か（簡易）
+     */
+    isCloudOnScreen(id = 'cloud-demo') {
+        const box = this.getEntryWorldBox(id);
+        const cam = this.app?.sceneManager?.getCamera?.();
+        if (!box || !cam) return false;
+        const corners = [
+            new THREE.Vector3().fromArray(box.min),
+            new THREE.Vector3().fromArray(box.max),
+        ];
+        const ndcMin = new THREE.Vector3(Infinity, Infinity, 1);
+        const ndcMax = new THREE.Vector3(-Infinity, -Infinity, -1);
+        for (const ox of [0, 1]) {
+            for (const oy of [0, 1]) {
+                for (const oz of [0, 1]) {
+                    const p = new THREE.Vector3(
+                        ox ? corners[1].x : corners[0].x,
+                        oy ? corners[1].y : corners[0].y,
+                        oz ? corners[1].z : corners[0].z,
+                    );
+                    p.project(cam);
+                    ndcMin.min(p);
+                    ndcMax.max(p);
+                }
+            }
+        }
+        return ndcMax.x > -1.05 && ndcMin.x < 1.05 && ndcMax.y > -1.05 && ndcMin.y < 1.05 && ndcMax.z < 1;
+    }
+
+    /**
+     * スクリーンショット用: カメラを雲ボリュームの中心へ（三人称の pitch 制限を回避）
      * @param {string} [id]
      */
     frameVolumeForView(id = 'cloud-demo', view = 'front') {
         const box = this.getEntryWorldBox(id);
         if (!box || !this.app) return null;
         const center = new THREE.Vector3().fromArray(box.center);
-        const size = Math.max(...box.size, 2);
-        const cam = this.app.sceneManager?.getCamera?.();
+        const sx = Math.max(...box.size, 4);
         const offsets = {
-            front: new THREE.Vector3(size * 0.85, size * 0.25, size * 1.1),
-            oblique: new THREE.Vector3(size * 1.05, size * 0.45, size * 0.55),
-            backlit: new THREE.Vector3(size * -0.75, size * 0.2, size * -0.9),
+            front: new THREE.Vector3(sx * 0.55, sx * 0.02, sx * 1.05),
+            oblique: new THREE.Vector3(sx * 1.35, sx * 0.35, sx * 0.25),
+            backlit: new THREE.Vector3(sx * -1.15, sx * 0.12, sx * -1.05),
         };
         const eye = center.clone().add(offsets[view] ?? offsets.front);
-        if (this.app.characterController?.setPosition) {
-            this.app.characterController.setPosition(eye.x, eye.y, eye.z);
-            this.app.characterController.resetVelocity?.();
+
+        const cc = this.app.characterController;
+        if (cc?.setFlyMode) cc.setFlyMode(true);
+        if (cc?.setViewMode) cc.setViewMode('first');
+        if (cc?.setSuspendPhysicsUntilGameplayInput) cc.setSuspendPhysicsUntilGameplayInput(true);
+        if (cc?.setPosition) {
+            cc.setPosition(eye.x, eye.y, eye.z);
+            cc.resetVelocity?.();
         }
+
+        this.setCameraLock({ eye, target: center, ms: 30_000 });
+
+        const cam = this.app.sceneManager?.getCamera?.();
         if (cam) {
             cam.position.copy(eye);
             cam.lookAt(center);
+            cam.updateMatrixWorld();
         }
-        this.app.playerManager?.updateLocalPlayer?.(eye, this.app.characterController?.getRotation?.());
-        return { eye: eye.toArray(), target: center.toArray(), box, view };
+        this.app.playerManager?.updateLocalPlayer?.(eye, cc?.getRotation?.());
+
+        return {
+            eye: eye.toArray(),
+            target: center.toArray(),
+            box,
+            view,
+        };
     }
 
     /**
-     * 描画負荷計測（requestAnimationFrame ベースの FPS 推定）
-     * @param {number} [ms]
+     * 雲領域のピクセルが白っぽいかをグリッドサンプル（0〜1）
+     * @param {string} [id]
      */
-    async measureFps(ms = 1500) {
+    sampleCloudRegion(id = 'cloud-demo') {
+        const renderer = this.app?.sceneManager?.getRenderer?.();
+        const cam = this.app?.sceneManager?.getCamera?.();
+        const box = this.getEntryWorldBox(id);
+        if (!renderer || !cam || !box) return null;
+
+        const canvas = renderer.domElement;
+        const gl = renderer.getContext();
+        const w = canvas.width;
+        const h = canvas.height;
+        if (!w || !h) return null;
+
+        const worldMin = new THREE.Vector3().fromArray(box.min);
+        const worldMax = new THREE.Vector3().fromArray(box.max);
+        let pxMinX = w;
+        let pxMinY = h;
+        let pxMaxX = 0;
+        let pxMaxY = 0;
+        let anyInFront = false;
+
+        for (const ox of [0, 1]) {
+            for (const oy of [0, 1]) {
+                for (const oz of [0, 1]) {
+                    const p = new THREE.Vector3(
+                        ox ? worldMax.x : worldMin.x,
+                        oy ? worldMax.y : worldMin.y,
+                        oz ? worldMax.z : worldMin.z,
+                    );
+                    p.project(cam);
+                    if (p.z < 1) anyInFront = true;
+                    const sx = Math.round(((p.x + 1) * 0.5) * (w - 1));
+                    const sy = Math.round(((1 - p.y) * 0.5) * (h - 1));
+                    pxMinX = Math.min(pxMinX, sx);
+                    pxMinY = Math.min(pxMinY, sy);
+                    pxMaxX = Math.max(pxMaxX, sx);
+                    pxMaxY = Math.max(pxMaxY, sy);
+                }
+            }
+        }
+        if (!anyInFront) {
+            return { cloudPixelRatio: 0, brightRatio: 0, samples: 0, rect: null };
+        }
+
+        const pad = 4;
+        pxMinX = Math.max(0, pxMinX - pad);
+        pxMinY = Math.max(0, pxMinY - pad);
+        pxMaxX = Math.min(w - 1, pxMaxX + pad);
+        pxMaxY = Math.min(h - 1, pxMaxY + pad);
+
+        const grid = 7;
+        let bright = 0;
+        let total = 0;
+        const buf = new Uint8Array(4);
+        for (let gy = 0; gy < grid; gy++) {
+            for (let gx = 0; gx < grid; gx++) {
+                const sx = Math.round(pxMinX + ((pxMaxX - pxMinX) * gx) / Math.max(grid - 1, 1));
+                const sy = Math.round(pxMinY + ((pxMaxY - pxMinY) * gy) / Math.max(grid - 1, 1));
+                gl.readPixels(sx, sy, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+                const lum = buf[0] + buf[1] + buf[2];
+                const whiteish = buf[0] > 175 && buf[1] > 175 && buf[2] > 185 && lum > 520;
+                if (whiteish) bright += 1;
+                total += 1;
+            }
+        }
+
+        return {
+            cloudPixelRatio: bright / total,
+            brightRatio: bright / total,
+            samples: total,
+            rect: [pxMinX, pxMinY, pxMaxX, pxMaxY],
+        };
+    }
+
+    /**
+     * @param {number} [ms]
+     * @param {{ volumesVisible?: boolean }} [opts]
+     */
+    async measureFps(ms = 1500, opts = {}) {
+        const volumesVisible = opts.volumesVisible !== false;
+        for (const { mesh } of this.entries) {
+            mesh.visible = volumesVisible;
+        }
         const renderer = this.app?.sceneManager?.getRenderer?.();
         const scene = this.app?.sceneManager?.getScene?.();
         const camera = this.app?.sceneManager?.getCamera?.();
@@ -231,6 +430,7 @@ export class VdbVolumeManager {
         let frames = 0;
         await new Promise((resolve) => {
             const tick = () => {
+                this.applyCameraLock();
                 if (renderer && scene && camera) {
                     renderer.render(scene, camera);
                 }
@@ -243,13 +443,22 @@ export class VdbVolumeManager {
             };
             requestAnimationFrame(tick);
         });
+        for (const { mesh } of this.entries) {
+            mesh.visible = true;
+        }
         const elapsed = Math.max(performance.now() - t0, 1);
-        const fps = (frames * 1000) / elapsed;
-        globalThis.__tenantVdbVolume = {
-            ...(globalThis.__tenantVdbVolume || {}),
-            lastFps: fps,
-        };
-        return fps;
+        return (frames * 1000) / elapsed;
+    }
+
+    /**
+     * @param {number} [ms]
+     */
+    async measureFpsWithAndWithoutVolume(ms = 1200) {
+        const withVolume = await this.measureFps(ms, { volumesVisible: true });
+        const withoutVolume = await this.measureFps(ms, { volumesVisible: false });
+        const result = { withVolume, withoutVolume, measuredMs: ms };
+        globalThis.__tenantVdbVolume = { ...(globalThis.__tenantVdbVolume || {}), lastFps: result };
+        return result;
     }
 
     /**
@@ -276,6 +485,8 @@ export class VdbVolumeManager {
             boxes[id] = {
                 center: box.getCenter(new THREE.Vector3()).toArray(),
                 size: box.getSize(new THREE.Vector3()).toArray(),
+                min: box.min.toArray(),
+                max: box.max.toArray(),
             };
         }
         globalThis.__tenantVdbVolume = {
@@ -298,5 +509,47 @@ export class VdbVolumeManager {
         if (current) {
             void this.loadForWorld(current);
         }
+        this.hookWorldsJsonPolling();
+    }
+
+    hookWorldsJsonPolling() {
+        if (this._worldsPollHooked) return;
+        this._worldsPollHooked = true;
+        const wm = this.app?.worldManager;
+        const tid = this.tenantId || tenantIdFromPath();
+        const pollMs = 8000;
+        let lastKey = '';
+        const tick = async () => {
+            const worldId = wm?.getCurrentWorldId?.() || this.app?.currentWorldId;
+            if (!worldId || !tid) return;
+            try {
+                const res = await fetch(`/${encodeURIComponent(tid)}/api/worlds`, {
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const world = data?.[worldId] || data?.worlds?.[worldId];
+                if (!world) return;
+                const vdbs = Array.isArray(world.vdbs) ? world.vdbs : [];
+                const key = JSON.stringify(vdbs);
+                if (key !== lastKey) {
+                    lastKey = key;
+                    if (wm?.worlds && typeof wm.worlds === 'object') {
+                        wm.worlds[worldId] = { ...wm.worlds[worldId], ...world, vdbs };
+                    }
+                    void this.loadForWorld({ ...world, vdbs });
+                }
+            } catch {
+                /* ignore transient network errors */
+            }
+        };
+        const intervalId = setInterval(tick, pollMs);
+        globalThis.addEventListener('visibilitychange', () => {
+            if (globalThis.document?.visibilityState === 'visible') {
+                void tick();
+            }
+        });
+        this._worldsPollDispose = () => clearInterval(intervalId);
+        void tick();
     }
 }
