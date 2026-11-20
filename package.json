@@ -46,7 +46,7 @@
         "bcryptjs": "^3.0.3",
         "cheerio": "^1.2.0",
         "better-sqlite3": "^12.11.1",
-        "bootstrap-icons": "^1.13.1",
+        "bootstrap-icons": "^1.13.2",
         "cross-env": "^7.0.3",
         "dotenv": "^17.2.3",
         "draco3dgltf": "^1.5.7",
