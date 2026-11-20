@@ -13,13 +13,8 @@ function ensureTenantPluginClientBridge() {
  * @param {string} pluginId
  */
 function ensurePluginClientImportMap(tenantId, pluginId) {
-    if (pluginId !== 'xr' && pluginId !== 'vdb-volume' && pluginId !== 'matsuyama-flights') return;
-    const mapId =
-        pluginId === 'xr'
-            ? 'tenant-xr-three-importmap'
-            : pluginId === 'vdb-volume'
-              ? 'tenant-vdb-volume-three-importmap'
-              : 'tenant-matsuyama-flights-three-importmap';
+    if (pluginId !== 'xr' && pluginId !== 'vdb-volume') return;
+    const mapId = pluginId === 'xr' ? 'tenant-xr-three-importmap' : 'tenant-vdb-volume-three-importmap';
     if (document.getElementById(mapId)) return;
     const imports =
         pluginId === 'xr'
@@ -31,23 +26,14 @@ function ensurePluginClientImportMap(tenantId, pluginId) {
                       'three/examples/jsm/': `${base}/three/examples/jsm/`,
                   };
               })()
-            : pluginId === 'vdb-volume'
-              ? (() => {
-                    const base = `/${encodeURIComponent(tenantId)}/addons-client/vdb-volume/deps`;
-                    return {
-                        three: `${base}/three/build/three.module.js`,
-                        'three/addons/': `${base}/three/examples/jsm/`,
-                        'three/examples/jsm/': `${base}/three/examples/jsm/`,
-                    };
-                })()
-              : (() => {
-                    const base = `/${encodeURIComponent(tenantId)}/addons-client/matsuyama-flights/deps`;
-                    return {
-                        three: `${base}/three/build/three.module.js`,
-                        'three/addons/': `${base}/three/examples/jsm/`,
-                        'three/examples/jsm/': `${base}/three/examples/jsm/`,
-                    };
-                })();
+            : (() => {
+                  const base = `/${encodeURIComponent(tenantId)}/addons-client/vdb-volume/deps`;
+                  return {
+                      three: `${base}/three/build/three.module.js`,
+                      'three/addons/': `${base}/three/examples/jsm/`,
+                      'three/examples/jsm/': `${base}/three/examples/jsm/`,
+                  };
+              })();
     const script = document.createElement('script');
     script.type = 'importmap';
     script.id = mapId;

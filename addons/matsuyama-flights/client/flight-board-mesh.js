@@ -1,5 +1,5 @@
 // addons/matsuyama-flights/client/flight-board-mesh.js — 発着情報 Canvas テクスチャ板（電光掲示板風・横 6.5:縦 4）
-import * as THREE from 'three';
+import { getSharedThree } from './three-shared.js';
 import { getMetaverseLocale, t } from './flight-board-i18n.js';
 import {
     boardFilterCanvasTag,
@@ -440,6 +440,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
  * @returns {THREE.Mesh}
  */
 export function createFlightBoardMesh(config) {
+    const THREE = getSharedThree();
     const pos = config.position || { x: 0, y: 2, z: -5 };
     const rot = config.rotation || { x: 0, y: 0, z: 0 };
     const scale = config.scale || { x: 2, y: 2, z: 1 };
@@ -553,7 +554,7 @@ export function repaintFlightBoardsForLocale() {
     }
 }
 
-export function startFlightBoardPolling(meshes) {
+export function startFlightBoardPolling(meshes, onPainted) {
     const list = meshes.filter((m) => m.userData?.flightBoardCanvas);
     activeBoardMeshes = list;
     if (!list.length) {
@@ -576,6 +577,9 @@ export function startFlightBoardPolling(meshes) {
             for (const m of list) {
                 updateFlightBoardMesh(m).catch(() => {});
             }
+        }
+        if (typeof onPainted === 'function') {
+            onPainted();
         }
     };
     tick();

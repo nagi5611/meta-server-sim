@@ -3,6 +3,7 @@ import './tenant-runtime-shim.js';
 import '../../../metaverse-simple/public/css/style.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import * as THREE from 'three';
+globalThis.__metaverseSharedThree = THREE;
 import '../../../metaverse-simple/public/js/addons/registry-game.js';
 import SceneManager from '../../../metaverse-simple/public/js/scene-manager.js';
 import PhysicsManager from '../../../metaverse-simple/public/js/physics-manager.js';

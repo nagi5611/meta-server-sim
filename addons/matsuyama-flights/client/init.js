@@ -4,6 +4,16 @@ import {
     repaintFlightBoardsForLocale,
     startFlightBoardPolling,
 } from './flight-board-mesh.js';
+import {
+    canvasHasLedContent,
+    findFirstFlightBoardMesh,
+    frameFlightBoardForView,
+    sampleViewportCenterPixel,
+    viewportCenterHasLedYellow,
+    countViewportLedYellowPixels,
+    measureViewportLedYellow,
+    captureFramedViewportPng,
+} from './flight-board-view.js';
 
 /** @type {(() => void)|null} */
 let stopPolling = null;
@@ -49,8 +59,28 @@ async function loadWorldFlightBoards(app, world) {
     }
 
     if (meshes.length) {
-        stopPolling = startFlightBoardPolling(meshes);
+        stopPolling = startFlightBoardPolling(meshes, () => publishMatsuyamaDebugState(app, meshes));
     }
+
+    publishMatsuyamaDebugState(app, meshes);
+}
+
+/**
+ * @param {object} app
+ * @param {object[]} meshes
+ */
+function publishMatsuyamaDebugState(app, meshes) {
+    globalThis.__tenantMatsuyamaFlights = {
+        meshCount: meshes.length,
+        hasCanvasLed: meshes.some((m) => canvasHasLedContent(m.userData?.flightBoardCanvas)),
+        frameBoard: () => frameFlightBoardForView(app),
+        sampleCenterPixel: () => sampleViewportCenterPixel(app),
+        viewportHasLedYellow: () => viewportCenterHasLedYellow(app),
+        countViewportLedYellow: () => countViewportLedYellowPixels(app),
+        measureViewportLedYellow: () => measureViewportLedYellow(app),
+        captureFramedPng: () => captureFramedViewportPng(app),
+        findBoard: () => findFirstFlightBoardMesh(app),
+    };
 }
 
 /**
