@@ -284,7 +284,28 @@
         }
       }
     ],
-    "vdbs": [],
+    "vdbs": [
+      {
+        "id": "cloud-demo",
+        "file": "samples/cloud-cumulus.nvdb",
+        "gridName": "density",
+        "position": {
+          "x": 22,
+          "y": 4,
+          "z": 18
+        },
+        "worldScale": 2.2,
+        "densityScale": 0.62,
+        "raySteps": 36,
+        "lightSteps": 4,
+        "extinction": 1.35,
+        "scattering": 0.9,
+        "ambient": 0.2,
+        "anisotropy": 0.58,
+        "tint": [0.94, 0.97, 1.0],
+        "sun": { "yaw": 48, "pitch": 62 }
+      }
+    ],
     "floorEnabled": true,
     "floorWidth": 1000,
     "floorDepth": 1000,

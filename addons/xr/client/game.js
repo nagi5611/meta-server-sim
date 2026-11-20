@@ -51,9 +51,14 @@ export async function initTenantPlugin() {
 }
 
 registerClientInit(async (app) => {
+    app._xrRegisterClientInitCalls = (app._xrRegisterClientInitCalls ?? 0) + 1;
     const enabled = await isXrEnabled();
     if (!enabled) {
         console.info('[addon:xr] disabled or unavailable, skipping init');
+        return;
+    }
+    if (app._webxrVrLocomotion) {
+        console.info('[addon:xr] already initialized, skipping duplicate registerClientInit');
         return;
     }
     initWebXrVrSubsystem(app);
