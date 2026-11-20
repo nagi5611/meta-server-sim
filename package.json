@@ -60,7 +60,8 @@
         "socket.io-client": "^4.8.1",
         "three": "^0.160.0",
         "three-mesh-bvh": "^0.9.3",
-        "three-mesh-ui": "^6.5.4"
+        "three-mesh-ui": "^6.5.4",
+        "three-vdb-loader": "^0.4.2"
     },
     "overrides": {
         "minimatch": "11.0.9"

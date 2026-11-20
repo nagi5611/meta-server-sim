@@ -1,0 +1,13 @@
+{
+    "id": "vdb-volume",
+    "version": "0.1.0",
+    "main": "server/main.js",
+    "engines": {
+        "meta-server-sim": "^1.0.0"
+    },
+    "scope": "platform",
+    "client": {
+        "game": "client/game.js",
+        "admin": "client/admin.js"
+    }
+}

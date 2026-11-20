@@ -1,0 +1,5 @@
+{
+    "defaultGridName": "density",
+    "raySteps": 96,
+    "densityScale": 0.08
+}

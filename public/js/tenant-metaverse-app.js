@@ -28,7 +28,7 @@ import {
     ensureControlSchemeChosen,
     isMobile,
 } from '../../../metaverse-simple/public/js/mobile-utils.js';
-import { runFrameUpdates } from '../../../metaverse-simple/lib/client-addon-registry.js';
+import { runFrameUpdates, runClientInits } from '../../../metaverse-simple/lib/client-addon-registry.js';
 import { DEFAULT_HDR_PATH } from '../../../metaverse-simple/public/js/ibl-setup.js';
 import { TenantFdsSmokeManager } from './tenant-fds-smoke-manager.js';
 import { ensureFdsSmokeBulkConfig } from './fds/fds-smoke-fetch-client.js';
@@ -619,6 +619,9 @@ class TenantMetaverseApp {
                 canvas.removeEventListener('pointerdown', this._onRemotePlayerAvatarPointerDown);
             }
         });
+
+        this.tenantId = tenantId;
+        await runClientInits(this);
 
         console.log(`[tenant-metaverse] initialized for ${tenantId}`);
         document.documentElement.dataset.tenantMetaverseReady = 'true';

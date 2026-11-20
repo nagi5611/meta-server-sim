@@ -284,7 +284,20 @@
         }
       }
     ],
-    "vdbs": [],
+    "vdbs": [
+      {
+        "id": "smoke-demo",
+        "file": "samples/smoke-0016.nvdb",
+        "gridName": "density",
+        "position": {
+          "x": 30,
+          "y": 6,
+          "z": 22
+        },
+        "worldScale": 4,
+        "densityScale": 0.12
+      }
+    ],
     "floorEnabled": true,
     "floorWidth": 1000,
     "floorDepth": 1000,

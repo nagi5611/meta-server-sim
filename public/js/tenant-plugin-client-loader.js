@@ -13,20 +13,31 @@ function ensureTenantPluginClientBridge() {
  * @param {string} pluginId
  */
 function ensurePluginClientImportMap(tenantId, pluginId) {
-    if (pluginId !== 'xr') return;
-    const mapId = 'tenant-xr-three-importmap';
+    if (pluginId !== 'xr' && pluginId !== 'vdb-volume') return;
+    const mapId = pluginId === 'xr' ? 'tenant-xr-three-importmap' : 'tenant-vdb-volume-three-importmap';
     if (document.getElementById(mapId)) return;
-    const base = `/${encodeURIComponent(tenantId)}/api/tenant-plugins/xr/deps`;
+    const imports =
+        pluginId === 'xr'
+            ? (() => {
+                  const base = `/${encodeURIComponent(tenantId)}/api/tenant-plugins/xr/deps`;
+                  return {
+                      three: `${base}/three/build/three.module.js`,
+                      'three/addons/': `${base}/three/examples/jsm/`,
+                      'three/examples/jsm/': `${base}/three/examples/jsm/`,
+                  };
+              })()
+            : (() => {
+                  const base = `/${encodeURIComponent(tenantId)}/addons-client/vdb-volume/deps`;
+                  return {
+                      three: `${base}/three/build/three.module.js`,
+                      'three/addons/': `${base}/three/examples/jsm/`,
+                      'three/examples/jsm/': `${base}/three/examples/jsm/`,
+                  };
+              })();
     const script = document.createElement('script');
     script.type = 'importmap';
     script.id = mapId;
-    script.textContent = JSON.stringify({
-        imports: {
-            three: `${base}/three/build/three.module.js`,
-            'three/addons/': `${base}/three/examples/jsm/`,
-            'three/examples/jsm/': `${base}/three/examples/jsm/`,
-        },
-    });
+    script.textContent = JSON.stringify({ imports });
     document.head.prepend(script);
 }
 
