@@ -45,7 +45,7 @@ async function frameVolumeAndSample(page) {
         if (!mgr || !renderer) {
             throw new Error('vdb volume manager or renderer missing');
         }
-        mgr.frameVolumeForView('smoke-demo');
+        mgr.frameVolumeForView('cloud-demo', 'front');
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         renderer.render(app.sceneManager.getScene(), app.sceneManager.getCamera());
         const sample = mgr.sampleCenterPixel();
@@ -119,7 +119,7 @@ test.describe('vdb-volume addon', () => {
 
         await page.evaluate(() => {
             const mgr = globalThis.__tenantVdbVolumeManager;
-            mgr?.frameVolumeForView('smoke-demo');
+            mgr?.frameVolumeForView('cloud-demo', 'front');
         });
         await page.waitForTimeout(300);
         await page.screenshot({
@@ -136,8 +136,41 @@ test.describe('vdb-volume addon', () => {
         const disabledLum = lum(disabled.sample);
         expect(Math.abs(enabledLum - disabledLum)).toBeGreaterThan(25);
 
-        const warmTint = (withVolume.sample?.r ?? 0) + (withVolume.sample?.g ?? 0) * 0.5;
-        expect(warmTint).toBeGreaterThan((disabled.sample?.r ?? 0) + 5);
+        const cloudLuma = (withVolume.sample?.r ?? 0) + (withVolume.sample?.g ?? 0) + (withVolume.sample?.b ?? 0);
+        const disabledR = disabled.sample?.r ?? 0;
+        expect(cloudLuma).toBeGreaterThan(disabledR + 15);
+
+        const angles = ['front', 'oblique', 'backlit'];
+        for (const view of angles) {
+            await page.evaluate(
+                async (v) => {
+                    globalThis.__tenantVdbVolumeManager?.frameVolumeForView('cloud-demo', v);
+                    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+                },
+                view,
+            );
+            await page.waitForTimeout(250);
+            const shotPath = path.join(SHOT, `vdb-cloud-${view}.png`);
+            await page.screenshot({ path: shotPath, fullPage: false });
+            fs.copyFileSync(shotPath, path.join(ARTIFACTS, `vdb-cloud-${view}.png`));
+        }
+
+        const fps = await page.evaluate(async () => {
+            return globalThis.__tenantVdbVolumeManager?.measureFps?.(1800);
+        });
+        expect(fps).toBeGreaterThan(1.5);
+        fs.writeFileSync(
+            path.join(ARTIFACTS, 'vdb-cloud-fps.json'),
+            JSON.stringify(
+                {
+                    fps,
+                    measuredMs: 1800,
+                    note: 'Headless SwiftShader; 実 GPU では raySteps/lightSteps に応じて大幅に高くなる',
+                },
+                null,
+                2,
+            ),
+        );
 
         const registryGuards = await page.evaluate(() => {
             const app = window.__tenantE2E?.getMetaverseApp?.();

@@ -8,6 +8,7 @@ import { parseNanoVDB, isNanoVDB } from '../client/vendor/three-vdb-loader/NanoV
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = path.join(__dirname, '..', 'samples', 'smoke-0016.nvdb');
+const CLOUD = path.join(__dirname, '..', 'samples', 'cloud-cumulus.nvdb');
 
 test('smoke-0016.nvdb is NanoVDB', () => {
     const buf = fs.readFileSync(SAMPLE);
@@ -23,4 +24,13 @@ test('parseNanoVDB returns density grid with voxels', () => {
     assert.equal(grid.name, 'density');
     assert.ok(grid.width > 0 && grid.height > 0 && grid.depth > 0);
     assert.ok(grid.data && grid.data.length > 0);
+});
+
+test('cloud-cumulus.nvdb parses density grid', () => {
+    const buf = fs.readFileSync(CLOUD);
+    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    assert.equal(isNanoVDB(ab), true);
+    const grids = parseNanoVDB(ab, { gridNames: ['density'] });
+    assert.ok(grids.length >= 1);
+    assert.ok(grids[0].data.length > 0);
 });

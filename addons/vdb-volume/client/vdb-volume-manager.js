@@ -2,7 +2,12 @@
 import * as THREE from 'three';
 import { UnsignedByteType } from 'three';
 import { VDBLoader } from './vendor/three-vdb-loader/VDBLoader.js';
-import { createVdbRaymarchMesh, getVdbMeshWorldBox } from './vdb-raymarch-mesh.js';
+import {
+    createVdbRaymarchMesh,
+    getVdbMeshWorldBox,
+    resolveRaymarchRenderOpts,
+    updateSunDirectionUniform,
+} from './vdb-raymarch-mesh.js';
 
 /**
  * @param {string} tenantId
@@ -124,13 +129,13 @@ export class VdbVolumeManager {
                     console.warn('[addon:vdb-volume] grid not found', gridName, url);
                     continue;
                 }
-                const mesh = createVdbRaymarchMesh(grid, {
-                    raySteps: cfg.raySteps ?? this.pluginConfig.raySteps,
-                    densityScale: cfg.densityScale ?? this.pluginConfig.densityScale,
-                });
+                const renderOpts = resolveRaymarchRenderOpts(cfg, this.pluginConfig);
+                const mesh = createVdbRaymarchMesh(grid, renderOpts);
                 mesh.userData.vdbVolumeId = cfg.id || gridName;
                 const anchor = mountMeshWithWorldOffset(this.root, mesh, cfg);
+                anchor.updateMatrixWorld(true);
                 mesh.updateMatrixWorld(true);
+                updateSunDirectionUniform(mesh, renderOpts.sunWorld, mesh.material);
                 const worldBox = getVdbMeshWorldBox(mesh);
                 anchor.userData.vdbWorldBox = {
                     min: worldBox.min.toArray(),
@@ -173,7 +178,7 @@ export class VdbVolumeManager {
     /**
      * @param {string} [id]
      */
-    getEntryWorldBox(id = 'smoke-demo') {
+    getEntryWorldBox(id = 'cloud-demo') {
         const entry = this.entries.find((e) => e.id === id) ?? this.entries[0];
         if (!entry?.mesh) return null;
         entry.mesh.updateMatrixWorld(true);
@@ -190,15 +195,18 @@ export class VdbVolumeManager {
      * スクリーンショット用: プレイヤーとカメラをボリュームの手前へ
      * @param {string} [id]
      */
-    frameVolumeForView(id = 'smoke-demo') {
+    frameVolumeForView(id = 'cloud-demo', view = 'front') {
         const box = this.getEntryWorldBox(id);
         if (!box || !this.app) return null;
         const center = new THREE.Vector3().fromArray(box.center);
         const size = Math.max(...box.size, 2);
         const cam = this.app.sceneManager?.getCamera?.();
-        const eye = center
-            .clone()
-            .add(new THREE.Vector3(size * 0.9, size * 0.35, size * 1.15));
+        const offsets = {
+            front: new THREE.Vector3(size * 0.85, size * 0.25, size * 1.1),
+            oblique: new THREE.Vector3(size * 1.05, size * 0.45, size * 0.55),
+            backlit: new THREE.Vector3(size * -0.75, size * 0.2, size * -0.9),
+        };
+        const eye = center.clone().add(offsets[view] ?? offsets.front);
         if (this.app.characterController?.setPosition) {
             this.app.characterController.setPosition(eye.x, eye.y, eye.z);
             this.app.characterController.resetVelocity?.();
@@ -208,7 +216,40 @@ export class VdbVolumeManager {
             cam.lookAt(center);
         }
         this.app.playerManager?.updateLocalPlayer?.(eye, this.app.characterController?.getRotation?.());
-        return { eye: eye.toArray(), target: center.toArray(), box };
+        return { eye: eye.toArray(), target: center.toArray(), box, view };
+    }
+
+    /**
+     * 描画負荷計測（requestAnimationFrame ベースの FPS 推定）
+     * @param {number} [ms]
+     */
+    async measureFps(ms = 1500) {
+        const renderer = this.app?.sceneManager?.getRenderer?.();
+        const scene = this.app?.sceneManager?.getScene?.();
+        const camera = this.app?.sceneManager?.getCamera?.();
+        const t0 = performance.now();
+        let frames = 0;
+        await new Promise((resolve) => {
+            const tick = () => {
+                if (renderer && scene && camera) {
+                    renderer.render(scene, camera);
+                }
+                frames += 1;
+                if (performance.now() - t0 >= ms) {
+                    resolve(undefined);
+                    return;
+                }
+                requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+        const elapsed = Math.max(performance.now() - t0, 1);
+        const fps = (frames * 1000) / elapsed;
+        globalThis.__tenantVdbVolume = {
+            ...(globalThis.__tenantVdbVolume || {}),
+            lastFps: fps,
+        };
+        return fps;
     }
 
     /**

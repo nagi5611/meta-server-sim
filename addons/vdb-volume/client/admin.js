@@ -24,8 +24,8 @@ function initVdbVolumeAdmin() {
         <p>ワールド JSON の <code>vdbs[]</code> に NanoVDB（<code>.nvdb</code>）または OpenVDB（<code>.vdb</code>）を指定すると、メタバース内でレイマーチ表示されます。</p>
         <pre style="white-space:pre-wrap;font-size:0.85rem;">"vdbs": [
   {
-    "id": "smoke-demo",
-    "file": "samples/smoke-0016.nvdb",
+    "id": "cloud-demo",
+    "file": "samples/cloud-cumulus.nvdb",
     "gridName": "density",
     "position": { "x": 30, "y": 6, "z": 22 },
     "worldScale": 4

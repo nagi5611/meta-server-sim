@@ -13,7 +13,7 @@ OpenVDB 単体の木構造＋blosc はブラウザでは重いが、ローダー
 
 ## 描画方式
 
-`three-vdb-loader` がアクティブボクセルを **Data3DTexture** に展開し、**BackSide Box + レイマーチ GLSL** で密度を表示（FDS の `VolumeRenderer` とは別パス。シーン内にメッシュとして配置）。
+`three-vdb-loader` がアクティブボクセルを **Data3DTexture** に展開し、**BackSide Box + レイマーチ GLSL** で表示する。Beer–Lambert 透過、太陽方向のライトマーチ（自己影）、Henyey–Greenstein 位相、環境光、レイ開始ジッター、線形サンプリング。FDS の `VolumeRenderer` とは別パス。
 
 ## 有効化
 
@@ -26,22 +26,33 @@ OpenVDB 単体の木構造＋blosc はブラウザでは重いが、ローダー
 ```json
 "vdbs": [
   {
-    "id": "smoke-demo",
-    "file": "samples/smoke-0016.nvdb",
+    "id": "cloud-demo",
+    "file": "samples/cloud-cumulus.nvdb",
     "gridName": "density",
-    "position": { "x": 30, "y": 6, "z": 22 },
-    "worldScale": 4,
-    "densityScale": 0.12
+    "position": { "x": 22, "y": 4, "z": 18 },
+    "worldScale": 2.2,
+    "densityScale": 0.62,
+    "raySteps": 72,
+    "lightSteps": 10,
+    "extinction": 1.35,
+    "scattering": 0.9,
+    "ambient": 0.2,
+    "anisotropy": 0.58,
+    "tint": [0.94, 0.97, 1.0],
+    "sun": { "yaw": 48, "pitch": 62 }
   }
 ]
 ```
 
 - `file`: `addons/vdb-volume/` からの相対パス（`/{tenantId}/addons-client/vdb-volume/...` で配信）
 - `gridName`: 省略時 `density`
+- `sun` / `sunDirection`: 太陽（自己影の向き）
+- `tint`, `ambient`, `anisotropy`（HG の g）, `lightSteps` で見た目と負荷を調整
 
 ## サンプルデータ
 
-- `samples/smoke-0016.nvdb` — `meta-server` の smoke-view 検証用サンプル（約 93KB、zlib 圧縮 NanoVDB）を同梱
+- `samples/cloud-cumulus.nvdb` — 手続き生成の積雲型フォグボリューム（約 66KB、zlib 圧縮 NanoVDB。リポジトリ内 `scripts/gen-cloud-vdb.cpp` で生成、ライセンス: 本リポジトリ由来・再利用自由）
+- `samples/smoke-0016.nvdb` — 煙検証用サンプル（約 93KB）
 
 ## 依存
 

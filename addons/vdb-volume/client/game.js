@@ -31,8 +31,15 @@ registerClientInit(async (app) => {
     }
     const pluginConfig = {
         defaultGridName: 'density',
-        raySteps: 128,
-        densityScale: 0.38,
+        raySteps: 72,
+        lightSteps: 10,
+        densityScale: 0.55,
+        extinction: 1.4,
+        scattering: 0.85,
+        ambient: 0.22,
+        anisotropy: 0.55,
+        tint: [0.93, 0.96, 1.0],
+        sun: { yaw: 40, pitch: 58 },
     };
     await fetchPluginConfig();
     const manager = new VdbVolumeManager(app, pluginConfig);
