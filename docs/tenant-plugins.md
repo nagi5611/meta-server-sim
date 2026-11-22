@@ -120,6 +120,26 @@ Backup / rollback addon (ported from meta-server). Platform admin routes at **`/
 
 Load-test orchestration (ported from meta-server). Admin UI via **`client/admin.js`** and **`/admin/addons/meta-bench-r1/*`**. Runner socket events use tenant Socket.io from the enabling tenant. Worlds list comes from that tenant's **`worlds.json`**.
 
+## meta-server テナント推奨プラグイン（移行 WS-4）
+
+テナント ID **`meta-server`** では meta-server 本番の有効アドオンを sim 形式へ写す。本番 `tenant_plugins.db` への反映は **`node scripts/enable-tenant-plugins.mjs`**（WS-8 で実行）。`admin-reboot` / `nfc-spawn` は WS-7。`aircraft` / **`qr-ar`（sim では `arxr`）** はユーザー指示により **移行対象外**（有効化・マッピングしない）。
+
+| meta-server（legacy） | sim `plugin_id` | 既定 enabled |
+|-----------------------|-----------------|--------------|
+| （ディレクトリのみ）松山フライツ | matsuyama-flights | 1 |
+| aircraft | — | **対象外（ユーザー指示）** |
+| qr-ar | — | **対象外（ユーザー指示・`arxr` も有効化しない）** |
+| webxr-vr | xr | 1 |
+| meta-bench-r1 | meta-bench-r1 | 1 |
+| time-machine | time-machine | 1 |
+| smoke-view / play_vdb | vdb-volume | 1 |
+
+煙・雲は `worlds.json` の `vdbs[]` と vdb-volume クライアント（meta `smoke-view` の sim 置換）。
+
+## vdb-volume (`addons/vdb-volume`)
+
+meta **`smoke-view`** の後継。NanoVDB / OpenVDB を `worlds.json` の **`vdbs[]`** からレイマーチ表示。サンプル `addons/vdb-volume/samples/cloud-cumulus.nvdb`。
+
 ## Platform admin bridge
 
 Plugins may implement **`ctx.registerPlatformAdmin((app, guards) => …)`** for global admin routes. **`client.admin`** modules load on **`admin-tenant.html`** via **`tenant-plugin-admin-client-loader.js`**.
