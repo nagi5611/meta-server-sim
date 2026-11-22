@@ -2,7 +2,7 @@
 # WS-8: 本番 sim ホスト上の API + Playwright（sim.mmh-virtual.jp）
 set -euo pipefail
 PROD="${METASIM_PROD_DIR:-/home/nagi/sim-server/meta-server-sim}"
-PORT="${METASIM_PROD_PORT:-3002}"
+PORT="${METASIM_PROD_PORT:-3004}"
 METASIM_REMOTE_PORT="$PORT"
 export METASIM_REMOTE_PORT
 export PLAYWRIGHT_FORWARD_HOST="sim.mmh-virtual.jp"
@@ -14,7 +14,7 @@ CURL_TLS=( -H "X-Forwarded-Proto: https" -H "Host: sim.mmh-virtual.jp" )
 mkdir -p "$ART"
 
 cd "$PROD"
-export E2E_BASE_URL="$PUBLIC_SIM"
+export E2E_BASE_URL="http://127.0.0.1:${PORT}"
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 echo "=== API checks $BASE ==="
