@@ -1,6 +1,7 @@
 // public/js/tenant-teleport-manager.js — FDS煙ボタン近接インタラクトを TeleportManager に追加
 
 import TeleportManager from '../../../metaverse-simple/public/js/teleport-manager.js';
+import { normalizeExternalTeleporterUrl } from '../../lib/tenant-external-teleporter.js';
 
 /**
  * テナント向け TeleportManager（FDS煙ボタンゾーン対応）
@@ -99,5 +100,45 @@ export class TenantTeleportManager extends TeleportManager {
         super.clearZones();
         this.fdsSmokeInteractZones = [];
         this.nearestFdsSmokeInteractZone = null;
+    }
+
+    /**
+     * 外部 URL テレポーター（destinationUrl）を許可する
+     * @override
+     */
+    addZone(zone) {
+        const destinationUrl = normalizeExternalTeleporterUrl(zone?.destinationUrl);
+        this.teleportZones.push({
+            id: zone.id,
+            position: zone.position,
+            radius: zone.radius || 3,
+            destinationWorld: zone.destinationWorld,
+            destinationUrl: destinationUrl || '',
+            label: zone.label || zone.destinationWorld || (destinationUrl ? '外部へ' : ''),
+            worldId: zone.worldId,
+            access: zone.access || 'public',
+            autoTeleport: !!zone.autoTeleport,
+            autoTeleportOnContact: !!zone.autoTeleportOnContact,
+        });
+    }
+
+    /**
+     * @override
+     */
+    _runInteractAfterAircraftCheck() {
+        if (this.nearestFdsSmokeInteractZone && this._fdsSmokeInteractPlayHandler) {
+            this.uiManager.hideTeleportPrompt();
+            this._fdsSmokeInteractPlayHandler(this.nearestFdsSmokeInteractZone);
+            return;
+        }
+        if (this.nearestZone?.destinationUrl) {
+            const url = normalizeExternalTeleporterUrl(this.nearestZone.destinationUrl);
+            if (url) {
+                this.uiManager.hideTeleportPrompt();
+                window.location.assign(url);
+                return;
+            }
+        }
+        super._runInteractAfterAircraftCheck();
     }
 }

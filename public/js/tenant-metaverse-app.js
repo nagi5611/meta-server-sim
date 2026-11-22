@@ -45,6 +45,7 @@ import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js'
 import { runTenantLoginGate } from './tenant-login-gate.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
+import { collectTeleporterDestinationUrls } from '../../lib/tenant-external-teleporter.js';
 
 const DEFAULT_ROOM = 'lobby';
 
@@ -208,6 +209,8 @@ class TenantMetaverseApp {
     updateTeleportZones() {
         const teleporters = this.sceneManager.getTeleporters();
         const currentWorldId = this.worldManager.getCurrentWorldId();
+        const worldConfig = this.worldManager.getWorld(currentWorldId);
+        const externalUrlById = collectTeleporterDestinationUrls(worldConfig);
 
         const existingZones = this.teleportManager.getZonesForWorld(currentWorldId);
         if (existingZones.length > 0) {
@@ -217,11 +220,13 @@ class TenantMetaverseApp {
         }
 
         teleporters.forEach((teleporter) => {
+            const destinationUrl = externalUrlById.get(teleporter.id) || '';
             this.teleportManager.addZone({
                 id: teleporter.id,
                 position: teleporter.position,
                 radius: teleporter.radius,
                 destinationWorld: teleporter.destinationWorld,
+                destinationUrl,
                 label: teleporter.label,
                 worldId: currentWorldId,
                 access: teleporter.access || 'public',
@@ -401,6 +406,11 @@ class TenantMetaverseApp {
             });
         });
         this.teleportManager.setTeleportCallback((destinationWorld, teleporterId) => {
+            const zone = this.teleportManager.teleportZones.find((z) => z.id === teleporterId);
+            if (zone?.destinationUrl) {
+                window.location.assign(zone.destinationUrl);
+                return;
+            }
             this.networkManager.changeWorld(destinationWorld, { teleporterId }, (err) => {
                 if (err) {
                     alert(err.message || t('main.teleporterError'));
