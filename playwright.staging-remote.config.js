@@ -14,6 +14,7 @@ export default defineConfig({
     retries: 0,
     use: {
         baseURL,
+        ignoreHTTPSErrors: true,
         trace: 'on-first-retry',
         httpCredentials: {
             username: process.env.ADMIN_USERNAME || 'admin',
