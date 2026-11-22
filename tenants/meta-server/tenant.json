@@ -1,5 +1,6 @@
 {
   "id": "meta-server",
   "displayName": "meta-server",
-  "enabled": true
+  "enabled": true,
+  "chartFeaturesEnabled": true
 }
