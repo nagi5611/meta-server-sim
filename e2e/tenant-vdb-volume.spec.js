@@ -6,10 +6,9 @@ import {
     TENANT_ID,
     ADMIN_USER,
     ADMIN_PASS,
-    installTenantE2EHarness,
-    setGuestUsername,
     expectMetaverseReady,
 } from './helpers/tenant-metaverse.mjs';
+import { enterWorld } from './helpers/tenant-metaverse-agent.mjs';
 
 const PLUGIN_ID = 'vdb-volume';
 const ARTIFACTS = '/opt/cursor/artifacts';
@@ -84,9 +83,14 @@ test.describe('vdb-volume addon', () => {
         await request.post(`/admin/tenant/${TENANT_ID}/plugins/reload`, { headers });
 
         const user = `VdbE2E-${Date.now()}`;
-        await installTenantE2EHarness(page);
-        await setGuestUsername(page, user);
-        await page.goto(`/${TENANT_ID}/?world=school`, { waitUntil: 'domcontentloaded' });
+        await enterWorld(page, { username: user });
+        await page.evaluate(async () => {
+            const app = window.__tenantE2E?.getMetaverseApp?.();
+            if (!app?.worldManager?.loadWorld) {
+                throw new Error('worldManager.loadWorld missing');
+            }
+            await app.worldManager.loadWorld('school');
+        });
         await expectMetaverseReady(page);
 
         await page.waitForFunction(
