@@ -313,3 +313,6 @@ export async function openStampMenu(page) {
         )
         .toBe(true);
 }
+
+/** WS-9 e2e 互換 alias */
+export const enableTenantE2EHarness = installTenantE2EHarness;

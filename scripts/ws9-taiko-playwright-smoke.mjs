@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const artifactDir = process.env.ARTIFACT_DIR || '/opt/cursor/artifacts';
 const overlayMatch = fs
     .readFileSync(path.join(root, 'public/tenant.html'), 'utf8')
     .match(/<div id="taiko-game-overlay"[\s\S]*?<\/div>\s*\n\s*<canvas/);
@@ -31,7 +32,7 @@ const ul = document.getElementById('taiko-chart-list');
 const browser = await chromium.launch();
 const page = await browser.newPage();
 await page.setContent(html, { waitUntil: 'load' });
-await page.screenshot({ path: '/opt/cursor/artifacts/tenant-taiko-song-select.png', fullPage: true });
+await page.screenshot({ path: path.join(artifactDir, 'tenant-taiko-song-select.png'), fullPage: true });
 await page.evaluate(() => {
     document.getElementById('taiko-song-select').style.display = 'none';
     document.getElementById('taiko-game-container').style.display = 'block';
@@ -45,6 +46,6 @@ await page.evaluate(() => {
     document.getElementById('taiko-score').textContent = '1200';
     document.getElementById('taiko-score-max').textContent = '3000';
 });
-await page.screenshot({ path: '/opt/cursor/artifacts/tenant-taiko-play-smoke.png', fullPage: true });
+await page.screenshot({ path: path.join(artifactDir, 'tenant-taiko-play-smoke.png'), fullPage: true });
 await browser.close();
 console.log('wrote tenant-taiko-song-select.png and tenant-taiko-play-smoke.png');
