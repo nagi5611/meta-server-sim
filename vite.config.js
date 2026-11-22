@@ -128,6 +128,8 @@ export default defineConfig({
             [`^/${TENANT_SEGMENT}/models`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/avatars`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/images`]: tenantProxy,
+            [`^/${TENANT_SEGMENT}/music`]: tenantProxy,
+            [`^/${TENANT_SEGMENT}/chart-bgm`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/pdfs`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/env`]: tenantProxy,
             [`^/${TENANT_SEGMENT}/simulations`]: {

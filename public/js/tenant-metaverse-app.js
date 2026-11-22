@@ -43,6 +43,8 @@ import {
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
 import { tryResolveClientSpawn, applyClientSpawnPlan } from './client-spawn-registry.js';
+import { loadClientConfigOnce } from './tenant-client-config.js';
+import { applyTenantSceneTaikoPatch } from './tenant-scene-taiko-patch.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
@@ -142,6 +144,10 @@ class TenantMetaverseApp {
         this.fdsSmokeExposureMonitor = null;
         /** @type {string | null} */
         this._pendingVcRoomId = null;
+        /** @type {import('./tenant-taiko-game-manager.js').default | null} */
+        this.taikoGameManager = null;
+        /** @type {boolean} */
+        this.chartFeaturesEnabled = false;
         this.menuManager = null;
         this.voiceChatManager = null;
         this.videoChatManager = null;
@@ -207,6 +213,63 @@ class TenantMetaverseApp {
         }
     }
 
+    /**
+     * chartFeaturesEnabled 時のみ太鼓マネージャを初期化する
+     */
+    async _initTaikoIfEnabled() {
+        if (!this.chartFeaturesEnabled) {
+            this.teleportManager?.setTaikoCallback?.(null);
+            return;
+        }
+        const { default: TaikoGameManager } = await import('./tenant-taiko-game-manager.js');
+        this.taikoGameManager = new TaikoGameManager();
+        this.taikoGameManager.init();
+        this.teleportManager.setTaikoCallback((zone) => {
+            this.taikoGameManager?.open(zone || null);
+            try {
+                document.exitPointerLock();
+            } catch {
+                /* ignore */
+            }
+            this.characterController?.resetMovement();
+        });
+        if (this.networkManager?.socket) {
+            this.taikoGameManager.setSocket(this.networkManager.socket);
+        }
+        this.updateTaikoZones();
+    }
+
+    updateTaikoZones() {
+        if (!this.taikoGameManager || !this.teleportManager?.addTaikoZone) {
+            this.teleportManager?.clearTaikoZones?.();
+            return;
+        }
+        const getTaikos = this.sceneManager.getTaikos?.bind(this.sceneManager);
+        const taikos = typeof getTaikos === 'function' ? getTaikos() : [];
+        const currentWorldId = this.worldManager.getCurrentWorldId();
+        const world = this.worldManager.getWorld(currentWorldId);
+        const models = world && Array.isArray(world.models) ? world.models : [];
+        const countGroup = (gid) =>
+            models.filter(
+                (m) => m.taiko && m.taiko.multiplayer && String(m.taiko.groupId || '').trim() === gid,
+            ).length;
+        this.teleportManager.clearTaikoZones();
+        taikos.forEach((taiko) => {
+            const gid = taiko.groupId || '';
+            const n = taiko.multiplayer && gid ? countGroup(gid) : 1;
+            const slotCount = Math.min(3, Math.max(1, n));
+            this.teleportManager.addTaikoZone({
+                position: taiko.position,
+                radius: taiko.radius,
+                worldId: currentWorldId,
+                multiplayer: taiko.multiplayer,
+                groupId: gid,
+                multiplayerChartId: taiko.multiplayerChartId || '',
+                slotCount,
+            });
+        });
+    }
+
     updateTeleportZones() {
         const teleporters = this.sceneManager.getTeleporters();
         const currentWorldId = this.worldManager.getCurrentWorldId();
@@ -235,6 +298,7 @@ class TenantMetaverseApp {
                 autoTeleportOnContact: !!teleporter.autoTeleportOnContact,
             });
         });
+        this.updateTaikoZones();
     }
 
     /**
@@ -319,6 +383,14 @@ class TenantMetaverseApp {
         }
         void registerTenantAssetCacheServiceWorker();
         await ensureFdsSmokeBulkConfig();
+        applyTenantSceneTaikoPatch();
+        try {
+            const cfg = await loadClientConfigOnce();
+            this.chartFeaturesEnabled =
+                cfg && typeof cfg === 'object' && cfg.chartFeaturesEnabled === true;
+        } catch {
+            this.chartFeaturesEnabled = false;
+        }
         ensureGuestUsername();
         await this._resolveUserRole();
         await loadTenantPluginClientModules();
@@ -408,6 +480,8 @@ class TenantMetaverseApp {
                 }
             });
         });
+        await this._initTaikoIfEnabled();
+
         this.teleportManager.setTeleportCallback((destinationWorld, teleporterId) => {
             const zone = this.teleportManager.teleportZones.find((z) => z.id === teleporterId);
             if (zone?.destinationUrl) {
@@ -442,6 +516,9 @@ class TenantMetaverseApp {
         });
 
         await this.networkManager.connect();
+        if (this.taikoGameManager?.setSocket) {
+            this.taikoGameManager.setSocket(this.networkManager.socket);
+        }
         if (isTenantE2EHarnessEnabled()) {
             this.networkManager.NO_RESPONSE_THRESHOLD_MS = 60_000;
             this.networkManager.lastPongTime = Date.now();
@@ -941,6 +1018,11 @@ class TenantMetaverseApp {
                         ctrl._throttle = v;
                     }
                 },
+                openTaikoSongSelect: () => {
+                    this.taikoGameManager?.open(null);
+                },
+                isTaikoOverlayOpen: () => Boolean(this.taikoGameManager?.isOpen()),
+                getChartFeaturesEnabled: () => this.chartFeaturesEnabled,
                 getAircraftHud: () => {
                     const root = this.aircraftManager?.activeSlot?.root;
                     const y =
@@ -992,6 +1074,7 @@ class TenantMetaverseApp {
         );
         this.networkManager.changeWorld(world.id);
         this.updateTeleportZones();
+        this.updateTaikoZones();
 
         this._pendingVcRoomId = world.id;
     }
@@ -1140,6 +1223,10 @@ class TenantMetaverseApp {
                 && this.fdsSmokePanelManager.shouldShowCrosshair()
             ) {
                 this.uiManager.hideTeleportPrompt();
+            } else if (this.taikoGameManager?.isOpen()) {
+                this.uiManager.hideTeleportPrompt();
+            } else if (this.teleportManager?.nearestTaikoZone) {
+                this.uiManager.showTaikoPrompt();
             } else if (this.teleportManager?.nearestFdsSmokeInteractZone) {
                 this.uiManager.showGlbAnimInteractPrompt(
                     this.formatFdsSmokeButtonPrompt(this.teleportManager.nearestFdsSmokeInteractZone),
