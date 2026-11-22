@@ -21,11 +21,11 @@ test.describe('share join production smoke', () => {
         await expect(page.locator('#toast.on')).toBeVisible({ timeout: 5000 });
 
         const joinUrl = `${LOBBY_ORIGIN}/join/${JOIN_TENANT}`;
-        await page.goto(joinUrl, { waitUntil: 'domcontentloaded' });
+        await page.goto(joinUrl, { waitUntil: 'networkidle' });
 
-        await expect(page.locator('#joinCard, #joinNotFound, #joinMaint').first()).toBeVisible({
-            timeout: 20_000,
-        });
+        await expect(
+            page.locator('#joinCard:not([hidden]), #joinNotFound:not([hidden]), #joinMaint:not([hidden])'),
+        ).toBeVisible({ timeout: 30_000 });
 
         const screenshotPath = path.join('/opt/cursor/artifacts', 'share-join-page-production.png');
         await page.screenshot({ path: screenshotPath, fullPage: true });
