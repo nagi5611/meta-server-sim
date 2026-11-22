@@ -39,9 +39,8 @@ test.describe('share join production smoke', () => {
 
         await page.goto(joinUrl, { waitUntil: 'networkidle' });
 
-        await expect(
-            page.locator('#joinCard:not([hidden]), #joinNotFound:not([hidden]), #joinMaint:not([hidden])'),
-        ).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('#joinCard:not([hidden])')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('#joinWorldName')).not.toBeEmpty();
 
         await page.screenshot({
             path: path.join('/opt/cursor/artifacts', 'share-join-page-production.png'),
