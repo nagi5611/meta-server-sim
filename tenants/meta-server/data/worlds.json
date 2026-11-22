@@ -1,0 +1,446 @@
+{
+  "lobby": {
+    "id": "lobby",
+    "name": "Lobby",
+    "models": [
+      {
+        "path": "models/monument.glb",
+        "position": {
+          "x": 0,
+          "y": 12.222114588158398,
+          "z": -0.17975247231698255
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.492397606206786,
+          "y": 1.492397606206786,
+          "z": 1.492397606206786
+        },
+        "animate": {
+          "rotation": {
+            "x": 0,
+            "y": 0.1,
+            "z": 0
+          }
+        }
+      },
+      {
+        "path": "models/taiko.glb",
+        "position": {
+          "x": 9.217857539287117,
+          "y": 10.51108341537891,
+          "z": 4.629485097037101
+        },
+        "rotation": {
+          "x": 0,
+          "y": 85.65999999999998,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.4328786451913782,
+          "y": 1.4328786451913782,
+          "z": 1.4328786451913782
+        },
+        "taiko": {
+          "radius": 3
+        }
+      },
+      {
+        "path": "models/gate.glb",
+        "position": {
+          "x": -6.178461211183408,
+          "y": 9.474679395421795,
+          "z": -12.693174133519715
+        },
+        "rotation": {
+          "x": 0,
+          "y": 37.24225668350354,
+          "z": 0
+        },
+        "scale": {
+          "x": 2.2610821462082504,
+          "y": 2.2610821462082504,
+          "z": 2.2610821462082504
+        }
+      },
+      {
+        "path": "models/gate.glb",
+        "position": {
+          "x": 0,
+          "y": 2,
+          "z": -5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      },
+      {
+        "path": "models/lobby-island.glb",
+        "position": {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 30,
+          "y": 30,
+          "z": 30
+        }
+      },
+      {
+        "path": "models/mirror.glb",
+        "position": {
+          "x": 0,
+          "y": 11.56281193856741,
+          "z": -5
+        },
+        "rotation": {
+          "x": -180,
+          "y": 83.17013262289086,
+          "z": -180
+        },
+        "scale": {
+          "x": 1,
+          "y": 1,
+          "z": 1
+        }
+      }
+    ],
+    "spawnPoint": {
+      "x": 0,
+      "y": 11,
+      "z": 5
+    },
+    "lights": [
+      {
+        "type": "ambient",
+        "intensity": 0.5,
+        "color": 16777215,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
+      {
+        "type": "directional",
+        "intensity": 0.8,
+        "color": 16777215,
+        "position": {
+          "x": 50,
+          "y": 100,
+          "z": 50
+        },
+        "castShadow": true
+      },
+      {
+        "type": "point",
+        "intensity": 5,
+        "color": 16772829,
+        "distance": 50,
+        "position": {
+          "x": 6,
+          "y": 2,
+          "z": -10
+        }
+      },
+      {
+        "type": "point",
+        "intensity": 5,
+        "color": 16772829,
+        "distance": 50,
+        "position": {
+          "x": 6,
+          "y": 4.5,
+          "z": -10
+        }
+      }
+    ],
+    "pdfs": [
+      {
+        "path": "pdfs/一般_ポスター原稿_松山南（物理１）.pdf",
+        "position": {
+          "x": -13.703078880392095,
+          "y": 12.668731270137613,
+          "z": -0.13736536627004625
+        },
+        "rotation": {
+          "x": 0,
+          "y": 79.64113352318493,
+          "z": 0
+        },
+        "scale": {
+          "x": 4.152233711527907,
+          "y": 5.813127196139075,
+          "z": 2.0761168557639533
+        }
+      },
+      {
+        "path": "pdfs/new_school.pdf",
+        "position": {
+          "x": 0.05763118815739343,
+          "y": 16.191782941664773,
+          "z": -20.591085650851376
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 6.472501382736458,
+          "y": 9.061501935831043,
+          "z": 3.236250691368229
+        },
+        "teleporter": {
+          "id": "n2",
+          "destinationWorld": "school",
+          "radius": 5,
+          "label": "新校舎",
+          "access": "public",
+          "autoTeleport": false,
+          "autoTeleportOnContact": true
+        }
+      },
+      {
+        "path": "pdfs/postor_ad.pdf",
+        "position": {
+          "x": -6.072466887893665,
+          "y": 11.96764766064166,
+          "z": -12.455390099107838
+        },
+        "rotation": {
+          "x": 0,
+          "y": 36.96,
+          "z": 0
+        },
+        "scale": {
+          "x": 2.482943176305452,
+          "y": 3.476120446827638,
+          "z": 1.241471588152726
+        }
+      },
+      {
+        "path": "pdfs/mainschool.pdf",
+        "position": {
+          "x": -14.110383907551432,
+          "y": 14.576303206953884,
+          "z": -15.239058095613036
+        },
+        "rotation": {
+          "x": 0,
+          "y": 35.81,
+          "z": 0
+        },
+        "scale": {
+          "x": 4.421327661049922,
+          "y": 6.189858725469882,
+          "z": 2.210663830524961
+        },
+        "teleporter": {
+          "id": "m1",
+          "destinationWorld": "main",
+          "radius": 3,
+          "label": "",
+          "access": "public",
+          "autoTeleport": false,
+          "autoTeleportOnContact": true
+        }
+      }
+    ],
+    "flightBoards": [],
+    "vdbs": [],
+    "floorEnabled": false,
+    "floorWidth": 1000,
+    "floorDepth": 1000,
+    "aircraftPhysics": {
+      "gravity": 9.81,
+      "maxThrustSpeed": 45,
+      "yawMaxDeg": 12,
+      "yawMaxRate": 1.1,
+      "yawMaxAccel": 5,
+      "pitchMaxDeg": 25,
+      "pitchMaxRate": 0.9,
+      "pitchMaxAccel": 4,
+      "rollMaxDeg": 67,
+      "rollMaxRate": 1.2,
+      "rollMaxAccel": 5,
+      "tireStaticFriction": 0.78,
+      "tireKineticFriction": 0,
+      "flapLiftCoeff0": 0.35,
+      "flapLiftCoeff1": 0.3675,
+      "flapLiftCoeff2": 0.385,
+      "flapLiftCoeff3": 0.40599999999999997,
+      "flapLiftCoeff4": 0.42,
+      "flapLiftCoeff5": 0.434,
+      "flapLiftCoeff6": 0.44799999999999995,
+      "engineMaxRpm": 10500,
+      "throttleSpoolPerS": 0.18,
+      "engineRpmAccel": 1890,
+      "thrustAccelPerEngineRpm": 18,
+      "tireBrakeAccel": 32
+    },
+    "lodSystem": {
+      "ids": [],
+      "thresholdsById": {}
+    }
+  },
+  "school": {
+    "id": "school",
+    "name": "新校舎",
+    "models": [
+      {
+        "position": {
+          "x": 0,
+          "y": -0.20634892598972066,
+          "z": -5
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.33,
+          "y": 0.33,
+          "z": 0.33
+        },
+        "path": "models/all_midium_ll_v_momistre_42301bd299_prefab/A03_CurtainRail.glb",
+        "prefabManifest": "models/all_midium_ll_v_momistre_42301bd299-prefab-manifest.json",
+        "prefabGroupId": "220dd0ea-66fa-4f4c-b8f0-eb206e20606e"
+      }
+    ],
+    "spawnPoint": {
+      "x": 0,
+      "y": 15,
+      "z": 0
+    },
+    "lights": [
+      {
+        "type": "ambient",
+        "intensity": 0.4,
+        "color": 16777215,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
+      {
+        "type": "directional",
+        "intensity": 0.9,
+        "color": 16777164,
+        "position": {
+          "x": 30,
+          "y": 80,
+          "z": 20
+        },
+        "castShadow": true
+      },
+      {
+        "type": "point",
+        "intensity": 0.6,
+        "color": 16777215,
+        "distance": 30,
+        "position": {
+          "x": 5,
+          "y": 5,
+          "z": 5
+        }
+      }
+    ],
+    "pdfs": [],
+    "flightBoards": [],
+    "vdbs": [],
+    "floorEnabled": false,
+    "floorWidth": 1000,
+    "floorDepth": 1000,
+    "aircraftPhysics": {
+      "gravity": 9.81,
+      "maxThrustSpeed": 45,
+      "yawMaxDeg": 12,
+      "yawMaxRate": 1.1,
+      "yawMaxAccel": 5,
+      "pitchMaxDeg": 25,
+      "pitchMaxRate": 0.9,
+      "pitchMaxAccel": 4,
+      "rollMaxDeg": 67,
+      "rollMaxRate": 1.2,
+      "rollMaxAccel": 5,
+      "tireStaticFriction": 0.78,
+      "tireKineticFriction": 0,
+      "flapLiftCoeff0": 0.35,
+      "flapLiftCoeff1": 0.3675,
+      "flapLiftCoeff2": 0.385,
+      "flapLiftCoeff3": 0.40599999999999997,
+      "flapLiftCoeff4": 0.42,
+      "flapLiftCoeff5": 0.434,
+      "flapLiftCoeff6": 0.44799999999999995,
+      "engineMaxRpm": 10500,
+      "throttleSpoolPerS": 0.18,
+      "engineRpmAccel": 1890,
+      "thrustAccelPerEngineRpm": 18,
+      "tireBrakeAccel": 32
+    },
+    "lodSystem": {
+      "ids": [],
+      "thresholdsById": {}
+    }
+  },
+  "main": {
+    "id": "main",
+    "name": "本館",
+    "models": [
+      {
+        "position": {
+          "x": -55.2237579456589,
+          "y": 9.066702893824695,
+          "z": 2.629423433335525
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 1.6,
+          "y": 1.6,
+          "z": 1.6
+        },
+        "path": "models/本館統合_ani.glb"
+      }
+    ],
+    "spawnPoint": {
+      "x": 0,
+      "y": 10,
+      "z": 0
+    },
+    "lights": [],
+    "pdfs": [],
+    "flightBoards": [],
+    "vdbs": [],
+    "floorEnabled": false,
+    "floorWidth": 1000,
+    "floorDepth": 1000,
+    "lodSystem": {
+      "ids": [],
+      "thresholdsById": {}
+    }
+  }
+}

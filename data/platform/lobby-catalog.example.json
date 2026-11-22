@@ -27,6 +27,20 @@
       "sortOrder": 1,
       "enabled": true,
       "tenantId": "P-99"
+    },
+    {
+      "id": "tenant-meta-server",
+      "name": "meta-server（sim テナント）",
+      "entryUrl": "https://sim.mmh-virtual.jp/meta-server/",
+      "joinCode": "META",
+      "statusUrl": "https://sim.mmh-virtual.jp/api/lobby/status",
+      "presenceUrl": "https://sim.mmh-virtual.jp/api/lobby/presence",
+      "description": "本番 meta-server から移行する sim テナント（staging は entryUrl を https://staging.mmh-virtual.jp:3104/meta-server/ に差し替え）",
+      "maintenance": false,
+      "capacity": 5000,
+      "sortOrder": 2,
+      "enabled": true,
+      "tenantId": "meta-server"
     }
   ],
   "updatedAt": "2026-11-18T00:53:15.790Z"
