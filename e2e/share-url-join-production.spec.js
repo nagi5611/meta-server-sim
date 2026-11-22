@@ -14,20 +14,38 @@ test.describe('share join production smoke', () => {
         await expect(firstMenuBtn).toBeVisible({ timeout: 30_000 });
         await firstMenuBtn.click();
 
-        const copyItem = page.locator('[data-share-action="copy"]').first();
+        const copyItem = page.locator('.card-menu [data-share-action="copy"]').first();
         await expect(copyItem).toBeVisible();
+        await expect(copyItem).toHaveText(/共有URL|Copy share|共享/);
+        await page.screenshot({
+            path: path.join('/opt/cursor/artifacts', 'share-join-dropdown-open.png'),
+            fullPage: false,
+        });
+
         await copyItem.click();
 
         await expect(page.locator('#toast.on')).toBeVisible({ timeout: 5000 });
 
         const joinUrl = `${LOBBY_ORIGIN}/join/${JOIN_TENANT}`;
+        const clipboardText = await page.evaluate(async () => navigator.clipboard.readText());
+        expect(clipboardText).toBe(joinUrl);
+
+        const fs = await import('node:fs');
+        fs.writeFileSync(
+            path.join('/opt/cursor/artifacts', 'share-join-copied-url.txt'),
+            `${clipboardText}\n`,
+            'utf8',
+        );
+
         await page.goto(joinUrl, { waitUntil: 'networkidle' });
 
         await expect(
             page.locator('#joinCard:not([hidden]), #joinNotFound:not([hidden]), #joinMaint:not([hidden])'),
         ).toBeVisible({ timeout: 30_000 });
 
-        const screenshotPath = path.join('/opt/cursor/artifacts', 'share-join-page-production.png');
-        await page.screenshot({ path: screenshotPath, fullPage: true });
+        await page.screenshot({
+            path: path.join('/opt/cursor/artifacts', 'share-join-page-production.png'),
+            fullPage: true,
+        });
     });
 });
