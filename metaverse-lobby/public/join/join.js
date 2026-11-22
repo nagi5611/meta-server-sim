@@ -1,3 +1,4 @@
+// public/join/join.js — 共有 URL 参加ページ（/join/<tenantId>）
 import { isLobbyEntryUrlAllowed } from '../lobby-entry-url-policy.js';
 
 const $ = (s) => document.querySelector(s);
