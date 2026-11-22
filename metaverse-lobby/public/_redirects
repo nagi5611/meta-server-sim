@@ -4,4 +4,5 @@
 /terms.html           /terms.html           200
 /admin                /admin/index.html       301
 /admin/               /admin/index.html       200
-/join/*               /join/index.html        200
+/join/:tenantId        /join/index.html        200
+/join/*                /join/index.html        200
