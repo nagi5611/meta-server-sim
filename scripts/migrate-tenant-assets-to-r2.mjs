@@ -21,6 +21,7 @@ const STORES = [
     { name: 'images', dir: 'images' },
     { name: 'env', dir: 'env' },
     { name: 'avatars', dir: 'avatars' },
+    { name: 'chart-bgm', dir: path.join('data', 'chart-bgm') },
 ];
 
 /**
