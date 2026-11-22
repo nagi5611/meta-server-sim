@@ -8,6 +8,7 @@ import { handleProfileAvatarGet } from './lobby-profile-assets.js';
 import { pickAnnouncementText, resolveClientLocale } from './announcement-i18n.js';
 import { listAnnouncements, rollupDailyMetrics } from './db-ops.js';
 import { handleJoinByCodeRequest } from './join-by-code-api.js';
+import { handleShareJoinRequest } from './share-join-api.js';
 import { normalizeRegistryMetaverseList } from './lobby-registry-urls.js';
 import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 import { pollStatus } from './lobby-poll-status.js';
@@ -92,6 +93,9 @@ async function handleApi(request, env) {
         return json({ announcements, locale });
     }
 
+    const shareJoinRes = await handleShareJoinRequest(request, env);
+    if (shareJoinRes) return shareJoinRes;
+
     const joinByCodeRes = await handleJoinByCodeRequest(request, env);
     if (joinByCodeRes) return joinByCodeRes;
 
@@ -128,6 +132,7 @@ async function handleApi(request, env) {
                     id,
                     name: m.name,
                     joinCode: m.joinCode || null,
+                    tenantId: m.tenantId || null,
                     entryUrl: m.entryUrl,
                     description: m.description || '',
                     thumbnailUrl: m.thumbnailUrl || null,

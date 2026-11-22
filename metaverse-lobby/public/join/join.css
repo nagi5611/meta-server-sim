@@ -1,0 +1,52 @@
+@import url("../colors_and_type.css");
+
+.join-page {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.join-main {
+  width: 100%;
+  max-width: 420px;
+}
+
+.join-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.join-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: var(--color-heading);
+  word-break: break-word;
+}
+
+.join-muted {
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+.join-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.join-back {
+  color: var(--color-link, #1a5fb4);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.join-back:hover {
+  text-decoration: underline;
+}
