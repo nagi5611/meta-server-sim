@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="shareJoin.pageTitle">メタバースに参加</title>
+  <link rel="stylesheet" href="/colors_and_type.css">
+  <link rel="stylesheet" href="/lobby.css">
+  <link rel="stylesheet" href="/join/join.css">
+  <script type="module" src="/i18n.js"></script>
+  <script type="module" src="/join/join.js"></script>
+</head>
+<body class="join-page">
+  <main class="join-main" id="joinMain">
+    <div class="join-card" id="joinCard" hidden>
+      <h1 class="join-title" id="joinWorldName"></h1>
+      <div class="fld">
+        <label for="share-display-name" data-i18n="lobby.displayName">参加時の表示名</label>
+        <div class="iwrap">
+          <input id="share-display-name" class="inp" type="text" maxlength="64" autocomplete="nickname" data-i18n-placeholder="lobby.displayName">
+          <span class="cnt num" id="shareNameCount">0/64</span>
+        </div>
+        <p class="msg" id="shareJoinMsg" role="alert"></p>
+      </div>
+      <div class="join-actions">
+        <button type="button" class="btn btn-primary" id="share-join-go">
+          <span class="join-btn-label" data-i18n="common.join">参加</span>
+          <span class="join-dot-loader" aria-hidden="true"><i></i><i></i><i></i></span>
+        </button>
+      </div>
+    </div>
+    <div class="join-card join-state" id="joinNotFound" hidden>
+      <h1 class="join-title" data-i18n="shareJoin.notFoundTitle">見つかりません</h1>
+      <p class="join-muted" data-i18n="shareJoin.notFoundBody">このメタバースは存在しないか、参加できません。</p>
+      <p><a class="join-back" href="/" data-i18n="shareJoin.backToLobby">一覧へ戻る</a></p>
+    </div>
+    <div class="join-card join-state" id="joinMaint" hidden>
+      <h1 class="join-title" data-i18n="toast.maintServer">このサーバーはメンテナンス中です</h1>
+      <p><a class="join-back" href="/" data-i18n="shareJoin.backToLobby">一覧へ戻る</a></p>
+    </div>
+    <div class="join-card join-state" id="joinLoading">
+      <p class="join-muted" data-i18n="common.syncing">同期中…</p>
+    </div>
+  </main>
+</body>
+</html>

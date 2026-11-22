@@ -139,6 +139,67 @@ function fmtNum(n) {
     return new Intl.NumberFormat('ja-JP').format(Number(n) || 0);
 }
 
+/**
+ * @param {Record<string, unknown>} world
+ * @returns {string}
+ */
+function resolveWorldTenantId(world) {
+    const direct = String(world?.tenantId || '').trim();
+    if (direct) return direct;
+    const entry = String(world?.entryUrl || '');
+    try {
+        const path = new URL(entry, window.location.href).pathname.replace(/\/$/, '');
+        const seg = path.split('/').filter(Boolean).pop() || '';
+        if (/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(seg)) return seg;
+    } catch {
+        /* ignore */
+    }
+    return '';
+}
+
+/**
+ * @param {string} text
+ * @returns {Promise<boolean>}
+ */
+async function copyTextToClipboard(text) {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        }
+    } catch {
+        /* fallback */
+    }
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        return ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} world
+ */
+async function copyShareJoinUrlForWorld(world) {
+    const tenantId = resolveWorldTenantId(world);
+    if (!tenantId) {
+        showToast(t('toast.shareUrlFail'));
+        return;
+    }
+    const url = `${window.location.origin}/join/${encodeURIComponent(tenantId)}`;
+    const ok = await copyTextToClipboard(url);
+    showToast(ok ? t('toast.shareUrlCopied') : t('toast.shareUrlFail'));
+}
+
 function showToast(msg) {
     const el = $('#toast');
     const txt = $('#toastTxt');
@@ -443,6 +504,7 @@ function render() {
             <div class="card-menu-wrap">
               <button type="button" class="card-menu-btn" aria-label="${escapeHtml(t('favorites.menu'))}" aria-haspopup="menu" aria-expanded="false">⋯</button>
               <div class="card-menu" role="menu" hidden>
+                <button type="button" role="menuitem" class="card-menu-item" data-share-action="copy">${escapeHtml(t('shareJoin.copyMenu'))}</button>
                 <button type="button" role="menuitem" class="card-menu-item" data-favorite-action="toggle">${escapeHtml(fav ? t('favorites.remove') : t('favorites.add'))}</button>
               </div>
             </div>
@@ -468,9 +530,15 @@ function render() {
         });
         const menuWrap = card.querySelector('.card-menu-wrap');
         const menuItem = card.querySelector('[data-favorite-action="toggle"]');
+        const shareItem = card.querySelector('[data-share-action="copy"]');
         card.querySelector('.card-menu-btn')?.addEventListener('click', (ev) => {
             ev.stopPropagation();
             toggleCardMenu(w.id, menuWrap);
+        });
+        shareItem?.addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            await copyShareJoinUrlForWorld(w);
+            closeCardMenu();
         });
         menuItem?.addEventListener('click', async (ev) => {
             ev.stopPropagation();

@@ -46,6 +46,7 @@ import { isValidTenantId } from './lib/tenant-id.js';
 
 import { registerPlatformAdmin } from './lib/platform-admin.js';
 import { registerPlatformLobbyRoutes } from './lib/platform-lobby-routes.js';
+import { registerPlatformShareJoinRoutes } from './lib/platform-share-join-routes.js';
 import { registerPlatformLobbyServiceRoutes } from './lib/platform-lobby-service-routes.js';
 import { registerPlatformLobbyAuthRoutes } from './lib/platform-lobby-auth-routes.js';
 import { ensureLobbyCatalogSeeded } from './lib/platform-lobby-bootstrap.js';
@@ -198,6 +199,7 @@ initPlatformRuntime(httpServer, { corsOrigins: socketCorsOrigins });
 
 
 registerPlatformLobbyRoutes(app);
+registerPlatformShareJoinRoutes(app);
 
 app.get('/api/health', (_req, res) => {
 
