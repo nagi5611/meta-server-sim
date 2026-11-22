@@ -10,7 +10,9 @@ CURL_TLS=( -H "X-Forwarded-Proto: https" -H "Host: staging.mmh-virtual.jp" )
 mkdir -p "$ART"
 
 cd "$STAGING"
-export E2E_BASE_URL="$PUBLIC_BASE"
+export METASIM_REMOTE_PORT="$PORT"
+export PLAYWRIGHT_FORWARD_HOST="staging.mmh-virtual.jp"
+export E2E_BASE_URL="http://127.0.0.1:${PORT}"
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
 
 echo "=== API checks $BASE ==="

@@ -3,6 +3,9 @@
 set -euo pipefail
 PROD="${METASIM_PROD_DIR:-/home/nagi/sim-server/meta-server-sim}"
 PORT="${METASIM_PROD_PORT:-3002}"
+METASIM_REMOTE_PORT="$PORT"
+export METASIM_REMOTE_PORT
+export PLAYWRIGHT_FORWARD_HOST="sim.mmh-virtual.jp"
 BASE="http://127.0.0.1:${PORT}"
 PUBLIC_SIM="${WS8_PROD_PUBLIC_URL:-https://sim.mmh-virtual.jp}"
 PUBLIC_LOBBY="${WS8_LOBBY_PUBLIC_URL:-https://m.mmh-virtual.jp}"
