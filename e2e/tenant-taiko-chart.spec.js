@@ -6,7 +6,7 @@ import { enableTenantE2EHarness } from './helpers/tenant-metaverse.mjs';
 test.describe('tenant taiko chart UI', () => {
     test('meta-server opens song select and lists charts', async ({ page }) => {
         await enableTenantE2EHarness(page);
-        await page.goto('http://localhost:3003/meta-server/');
+        await page.goto('/meta-server/');
 
         const controlOverlay = page.locator('#control-scheme-keyboard-btn');
         if (await controlOverlay.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -91,7 +91,7 @@ test.describe('tenant taiko chart UI', () => {
 
         await scoreWait;
         const art2 = process.env.ARTIFACT_DIR || '/opt/cursor/artifacts';
-        await fs.promises.writeFile(
+        await fs.writeFile(
             `${art2}/staging-meta-server-taiko.url.txt`,
             `${base.replace(/\/$/, '')}/meta-server/\n`
         ).catch(() => {});

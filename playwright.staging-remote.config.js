@@ -20,7 +20,6 @@ export default defineConfig({
         ignoreHTTPSErrors: true,
         extraHTTPHeaders: {
             'X-Forwarded-Proto': 'https',
-            Host: forwardHost,
         },
         trace: 'on-first-retry',
         httpCredentials: {
