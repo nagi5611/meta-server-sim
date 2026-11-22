@@ -2,7 +2,11 @@ import { isLobbyEntryUrlAllowed } from '../lobby-entry-url-policy.js';
 
 const $ = (s) => document.querySelector(s);
 const t = (key) => window.LobbyI18n?.t(key) ?? key;
-await window.LobbyI18n?.ready;
+if (window.LobbyI18n?.ready) {
+    await window.LobbyI18n.ready;
+} else if (document.readyState === 'loading') {
+    await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+}
 
 /**
  * @returns {string}
