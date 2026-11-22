@@ -87,6 +87,19 @@ Enable **`sample-echo`** for a tenant in admin, POST reload, then:
 
 Port of meta **`webxr-vr`**. Client hooks into `metaverse-simple` via `__tenantPluginClientBridge` (set in `tenant-plugin-client-loader.js`). Enable **`xr`** for a tenant; legacy `/api/addons/enabled` exposes `{ "xr": true }`.
 
+## NFC spawn (`addons/nfc-spawn`)
+
+Port of meta **`nfc-spawn`**. Teleport / instance spawns stored in per-tenant SQLite (`tenants/<id>/db/plugins/nfc-spawn.db`) and baked GLB under `tenants/<id>/data/nfc-instances/`.
+
+- HTTP: `GET /:tenantId/api/tenant-plugins/nfc-spawn/spawn/:token` (legacy also `.../api/addons/nfc-spawn/spawn/:token`)
+- Game client: `?spawn=TOKEN` on `/:tenantId/` via `client-spawn-registry.js`
+- Instance viewer: `GET /:tenantId/instance/?token=TOKEN` (A-Frame vendored under addon `static/vendor/`, no CSP change)
+- Admin: `/admin/tenants/:tenantId/addons/nfc-spawn/spawns`
+
+## Admin reboot (`addons/admin-reboot`)
+
+Tenant-safe replacement for meta **`admin-reboot`**: **no** `systemctl` or `restart.sh`. Only `POST .../reload-tenant-plugins` for the current tenant (optional PIN via plugin config `pin`). Host restart remains Fleet ops / WS-8.
+
 ## ARXR (`addons/arxr`)
 
 Port of meta **`qr-ar`**. Static AR UI at **`GET /:tenantId/api/tenant-plugins/arxr/`** (import map + `/deps/` for Three.js and `@web-ar-studio/webar-engine-sdk`). Client **`client/game.js`** sets `window.__tenantArxrEntryUrl` for in-world links. Optional env: **`VITE_WEBAR_API_KEY`** (falls back to meta test key in `ar-app.js`).

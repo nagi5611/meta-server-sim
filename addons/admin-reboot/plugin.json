@@ -1,0 +1,12 @@
+{
+    "id": "admin-reboot",
+    "version": "1.0.5",
+    "main": "server/main.js",
+    "engines": {
+        "meta-server-sim": "^1.0.0"
+    },
+    "scope": "platform",
+    "client": {
+        "admin": "client/admin.js"
+    }
+}

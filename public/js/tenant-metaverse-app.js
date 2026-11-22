@@ -42,6 +42,7 @@ import {
 } from './tenant-admin-metaverse-auth.js';
 import IdleControlHint from '../../../metaverse-simple/public/js/idle-control-hint.js';
 import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js';
+import { tryResolveClientSpawn, applyClientSpawnPlan } from './client-spawn-registry.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
@@ -321,6 +322,8 @@ class TenantMetaverseApp {
         ensureGuestUsername();
         await this._resolveUserRole();
         await loadTenantPluginClientModules();
+        /** @type {import('./client-spawn-registry.js').ClientSpawnPlan|null} */
+        this._pendingClientSpawnPlan = await tryResolveClientSpawn();
         if (isTenantE2EHarnessEnabled()) {
             window.__tenantInitPhase = 'after-plugins';
         }
@@ -420,9 +423,10 @@ class TenantMetaverseApp {
             });
         });
 
-        const defaultWorldId = this.worldManager.getWorld(DEFAULT_ROOM)
-            ? DEFAULT_ROOM
-            : (this.worldManager.getAllWorlds()[0]?.id || DEFAULT_ROOM);
+        const defaultWorldId = this._pendingClientSpawnPlan?.worldId
+            ?? (this.worldManager.getWorld(DEFAULT_ROOM)
+                ? DEFAULT_ROOM
+                : (this.worldManager.getAllWorlds()[0]?.id || DEFAULT_ROOM));
 
         this.playerManager = new PlayerManager(this.sceneManager.getScene());
         this.fdsSmokeExposureMonitor = new TenantFdsSmokeExposureMonitor(
@@ -461,9 +465,15 @@ class TenantMetaverseApp {
         );
         this.characterController.setMobileMode(this.isMobileMode);
         this.teleportManager.setInputActiveCheck(() => this.characterController.isInputActive());
-        this.characterController.setPosition(spawnPoint.x, spawnPoint.y, spawnPoint.z);
-
-        await this.playerManager.createLocalPlayer(spawnPoint);
+        if (this._pendingClientSpawnPlan) {
+            await applyClientSpawnPlan(this, this._pendingClientSpawnPlan);
+            this._pendingClientSpawnPlan = null;
+            const pos = this.characterController.getPosition?.() ?? spawnPoint;
+            await this.playerManager.createLocalPlayer(pos);
+        } else {
+            this.characterController.setPosition(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+            await this.playerManager.createLocalPlayer(spawnPoint);
+        }
         this.networkManager.startSendingUpdates(this.characterController);
 
         this.voiceChatManager = new VoiceChatManager(this.networkManager.socket);
