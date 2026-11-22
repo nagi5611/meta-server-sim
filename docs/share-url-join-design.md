@@ -125,7 +125,7 @@ Body: `{ "displayName": "..." }`
 | SJ-05 | メンテ中テナント → 参加不可 |
 | SJ-06 | P-01〜P-03・通常ロビー導線の回帰 |
 
-本番 smoke: `https://m.mmh-virtual.jp/join/meta-server`（`meta-server` 未反映時は `P-01` で代替し報告）。
+本番 smoke: 原則 `https://m.mmh-virtual.jp/join/meta-server`。ただし **解決は sim 上の `lobby-catalog.json` エントリ必須**（`resolveShareJoinTarget`）。Worker 一覧は KV `registry` のため、sim にテナントがあっても **`POST /admin/lobby-catalog/sync` が 403 で KV に載っていない**状態と切り離される。一覧に無い `meta-server` は、本番カタログ JSON にも無ければ `/join/meta-server` は **見つかりません** になる（想定どおり）。その場合は `P-01` 等で検証し、sync 403 を勝手に回避したりロビー設定を書き換えないこと。
 
 ## ロールバック
 
