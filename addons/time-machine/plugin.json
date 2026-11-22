@@ -6,7 +6,7 @@
         "meta-server-sim": "^1.0.0"
     },
     "scope": "platform",
-    "tenantIds": ["P-01"],
+    "tenantIds": ["P-01", "meta-server"],
     "client": {
         "admin": "client/admin.js"
     },
