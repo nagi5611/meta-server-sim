@@ -77,12 +77,12 @@ describe('tenant-charts', () => {
         fs.rmSync(tenant.rootPath, { recursive: true, force: true });
     });
 
-    it('score submission and ranking (top 10)', () => {
+    it('score submission and ranking (top 10)', async () => {
         const tenant = makeTempTenant();
-        recordChartScore(tenant, 'song_a', 'Alice', 9000);
-        recordChartScore(tenant, 'song_a', 'Bob', 9500);
-        recordChartScore(tenant, 'song_a', 'Carol', 8500);
-        const top = getChartRanking(tenant, 'song_a');
+        await recordChartScore(tenant, 'song_a', 'Alice', 9000);
+        await recordChartScore(tenant, 'song_a', 'Bob', 9500);
+        await recordChartScore(tenant, 'song_a', 'Carol', 8500);
+        const top = await getChartRanking(tenant, 'song_a');
         assert.equal(top.length, 3);
         assert.equal(top[0].username, 'Bob');
         assert.equal(top[0].score, 9500);
