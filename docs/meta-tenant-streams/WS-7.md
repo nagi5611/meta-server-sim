@@ -6,12 +6,12 @@
 |------|-----------|-----|
 | **nfc-spawn** | `addon_enabled=1` | `addons/nfc-spawn` テナントプラグイン |
 | **admin-reboot** | `addon_enabled=1` | `addons/admin-reboot`（テナントプラグイン再読込のみ） |
-| **qr-ar** | コードあり | 既存 `addons/arxr`（WS-4/本 WS で追加実装なし） |
 
 ## 対象外（根拠）
 
 | 機能 | 根拠 |
 |------|------|
+| **qr-ar** | 対象外（ユーザー指示） |
 | **host-monitor** | meta に `public/host-monitor.html` + ルートあり。**運用専用**（テナント機能ではない）。sim は `admin-api-fetch` のパスのみ。**Fleet ops / プラットフォーム監視は WS-8 外の運用範囲**。 |
 | **pre_xr** | meta `public/pre_xr/` は WebXR 開発ハーネス。本番ワールド・registry から参照なし。sim は `addons/xr` で本番相当をカバー。 |
 | **avator-scalable-animations** | meta のみの addon。テナント `avatars-registry` + 既存 clip 名で代替（WS-1）。専用 addon 移植はデータ上必須ではない。 |
