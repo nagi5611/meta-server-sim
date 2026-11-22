@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/tenant-taiko.css">
     <style>
         .tenant-login-gate {
             position: fixed;
@@ -647,7 +648,115 @@
         <button id="mobile-jump-btn" class="mobile-jump-btn" type="button" data-i18n-aria-label="mobile.jumpAria" aria-label="ジャンプ" data-i18n="mobile.jumpLabel">ジャンプ</button>
     </div>
 
-    
+    <div id="taiko-game-overlay" class="taiko-game-overlay" style="display:none;">
+        <div id="taiko-song-select" class="taiko-song-select">
+            <h2 class="taiko-song-select-title" data-i18n="taiko.selectTitle">選曲</h2>
+            <ul id="taiko-chart-list" class="taiko-chart-list"></ul>
+            <p id="taiko-chart-empty" class="taiko-chart-empty" style="display:none;" data-i18n="taiko.chartEmpty">譜面がありません</p>
+            <button type="button" id="taiko-song-select-close" class="taiko-song-select-close" data-i18n="taiko.close">閉じる</button>
+        </div>
+        <div id="taiko-mp-lobby" class="taiko-song-select taiko-mp-lobby" style="display:none;">
+            <h2 class="taiko-song-select-title" data-i18n="taiko.mpLobbyTitle">マルチプレイ待機中</h2>
+            <div class="taiko-mp-wait-ring" aria-hidden="true">
+                <div class="taiko-mp-wait-ring-dot"></div>
+            </div>
+            <p id="taiko-mp-lobby-hint" class="taiko-mp-lobby-hint"></p>
+            <div id="taiko-mp-part-buttons" class="taiko-mp-part-buttons"></div>
+            <p id="taiko-mp-status" class="taiko-mp-status"></p>
+            <button type="button" id="taiko-mp-lobby-close" class="taiko-song-select-close" data-i18n="taiko.close">閉じる</button>
+        </div>
+        <div class="taiko-game-container" id="taiko-game-container" style="display:none;">
+            <div class="taiko-game-top-buttons">
+                <button type="button" id="taiko-game-hint" class="taiko-game-hint" data-i18n-title="taiko.gameHintTitle" title="ヒント">?</button>
+                <button type="button" id="taiko-game-close" class="taiko-game-close" data-i18n-title="pdf.closeTitle" title="閉じる">×</button>
+            </div>
+            <div class="taiko-game-header">
+                <div class="taiko-game-title" id="taiko-game-title" data-i18n="taiko.gameTitle">轟太鼓</div>
+            </div>
+            <div class="taiko-game-bar">
+                <div class="taiko-game-score-box">
+                    <div class="taiko-score-label" data-i18n="taiko.scoreLabel">スコア</div>
+                    <div class="taiko-score-value" id="taiko-score">0</div>
+                    <div class="taiko-score-max">MAX <span id="taiko-score-max">0</span></div>
+                    <div class="taiko-score-rate" id="taiko-score-rate">0%</div>
+                </div>
+                <div class="taiko-game-lane">
+                    <div class="taiko-judge-wrap">
+                        <img src="images/judge.png" alt="" class="taiko-game-judge-line" width="64" height="64">
+                        <div class="taiko-judge-burst" id="taiko-judge-burst" aria-hidden="true"></div>
+                    </div>
+                    <div class="taiko-game-notes" id="taiko-notes"></div>
+                </div>
+            </div>
+            <div class="taiko-game-input">
+                <div class="taiko-ka-zone" id="taiko-ka-zone" data-i18n-title="taiko.kaTitle" title="カッ"></div>
+                <div class="taiko-input-drum" id="taiko-drum" data-i18n-title="taiko.donTitle" title="ドン">
+                    <img src="images/taiko.png" alt="" class="taiko-drum-img">
+                </div>
+            </div>
+        </div>
+        <div id="taiko-results" class="taiko-results" style="display:none;">
+            <div class="taiko-results-header">
+                <div class="taiko-results-banner taiko-results-banner-left" data-i18n="taiko.resultsLeftBanner">成績発表</div>
+                <div class="taiko-results-banner taiko-results-banner-right" id="taiko-results-song-name">曲名</div>
+            </div>
+            <div class="taiko-results-main">
+                <div class="taiko-results-left">
+                    <div class="taiko-results-player">
+                        <span class="taiko-results-player-label">1P</span>
+                        <span class="taiko-results-player-name" id="taiko-results-username">プレイヤー</span>
+                    </div>
+                    <div class="taiko-results-difficulty-wrap">
+                        <span class="taiko-results-difficulty" id="taiko-results-difficulty">ふつう</span>
+                    </div>
+                </div>
+                <div class="taiko-results-center">
+                    <div class="taiko-results-clear-row">
+                        <span class="taiko-results-clear-label" data-i18n="taiko.clearLabel">クリア</span>
+                        <div class="taiko-results-clear-bar">
+                            <div class="taiko-results-clear-bar-fill" id="taiko-results-clear-fill"></div>
+                        </div>
+                        <span class="taiko-results-soul" data-i18n="taiko.soul">魂</span>
+                    </div>
+                    <div class="taiko-results-stats-row">
+                        <div class="taiko-results-score-box">
+                            <span class="taiko-results-score-value" id="taiko-results-score-value">0</span>
+                            <span class="taiko-results-score-unit" data-i18n="taiko.scoreUnit">点</span>
+                        </div>
+                        <div class="taiko-results-judgments-group">
+                            <div class="taiko-results-judgments">
+                                <span><span data-i18n="taiko.judge.good">良</span> <strong id="taiko-results-good">0</strong></span>
+                                <span><span data-i18n="taiko.judge.ok">可</span> <strong id="taiko-results-ok">0</strong></span>
+                                <span><span data-i18n="taiko.judge.miss">不可</span> <strong id="taiko-results-miss">0</strong></span>
+                            </div>
+                            <div class="taiko-results-combo-stats">
+                                <span><span data-i18n="taiko.maxCombo">最大コンボ数</span> <strong id="taiko-results-max-combo">0</strong></span>
+                                <span><span data-i18n="taiko.rollCount">連打数</span> <strong id="taiko-results-roll">0</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="taiko-results-ranking-area">
+                    <h3 class="taiko-results-ranking-title" data-i18n="taiko.rankingTitle">ランキング</h3>
+                    <ol class="taiko-results-ranking-list" id="taiko-results-ranking-list"></ol>
+                </div>
+            </div>
+            <div class="taiko-results-band"></div>
+            <div class="taiko-results-footer">
+                <button type="button" id="taiko-results-close" class="taiko-results-close" data-i18n="taiko.close">閉じる</button>
+            </div>
+        </div>
+        <div id="taiko-hint-popup" class="taiko-hint-popup" style="display:none;" aria-hidden="true">
+            <div class="taiko-hint-popup-backdrop"></div>
+            <div class="taiko-hint-popup-content">
+                <h3 class="taiko-hint-title" data-i18n="taiko.hintTitle">操作方法</h3>
+                <div id="taiko-hint-body-pc" class="taiko-hint-body" style="display:none;" data-i18n-html="taiko.hintPcHtml"></div>
+                <div id="taiko-hint-body-mobile" class="taiko-hint-body" style="display:none;" data-i18n-html="taiko.hintMobileHtml"></div>
+                <button type="button" class="taiko-hint-popup-close" data-i18n="taiko.close">閉じる</button>
+            </div>
+        </div>
+    </div>
+
     <canvas id="canvas"></canvas>
 
     <script type="module" src="/js/tenant-lobby-entry.js"></script>

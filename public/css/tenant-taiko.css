@@ -1,0 +1,494 @@
+.taiko-game-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 選曲・プレイ・成績発表の幅を統一（プレイメニュー基準）。大画面で拡大 */
+.taiko-game-overlay .taiko-song-select,
+.taiko-game-overlay .taiko-game-container,
+.taiko-game-overlay .taiko-results {
+    width: min(840px, 95vw);
+}
+@media (min-width: 1024px) {
+    .taiko-game-overlay .taiko-song-select,
+    .taiko-game-overlay .taiko-game-container,
+    .taiko-game-overlay .taiko-results {
+        width: min(960px, 90vw);
+        min-height: 470px;
+        box-sizing: border-box;
+    }
+}
+@media (min-width: 1280px) {
+    .taiko-game-overlay .taiko-song-select,
+    .taiko-game-overlay .taiko-game-container,
+    .taiko-game-overlay .taiko-results {
+        width: min(1040px, 85vw);
+    }
+}
+@media (min-width: 1600px) {
+    .taiko-game-overlay .taiko-song-select,
+    .taiko-game-overlay .taiko-game-container,
+    .taiko-game-overlay .taiko-results {
+        width: min(1200px, 75vw);
+    }
+}
+
+/* PC版: 太鼓UIの文字を全体的に大きく（769px以上 & 高さ601px以上 = モバイルでない） */
+@media (min-width: 769px) and (min-height: 601px) {
+    .taiko-song-select-title { font-size: 1.5rem; }
+    .taiko-chart-list li { font-size: 1.0625rem; padding: 14px 18px; }
+    .taiko-chart-empty { font-size: 1rem; }
+    .taiko-song-select-close { font-size: 1.125rem; padding: 12px 24px; }
+
+    .taiko-game-close, .taiko-game-hint { width: 40px; height: 40px; font-size: 20px; }
+    .taiko-game-header { font-size: 1.5rem; padding: 14px 20px 10px; }
+    .taiko-score-label { font-size: 13px; }
+    .taiko-score-value { font-size: 26px; }
+    .taiko-score-max { font-size: 12px; }
+    .taiko-score-rate { font-size: 13px; }
+
+    .taiko-hint-popup-content { max-width: 400px; padding: 24px 28px; }
+    .taiko-hint-title { font-size: 1.375rem; margin-bottom: 16px; }
+    .taiko-hint-body p { font-size: 1rem; }
+    .taiko-hint-popup-close { font-size: 1rem; padding: 12px; }
+
+    .taiko-note { font-size: 13px; }
+}
+
+.taiko-song-select {
+    position: relative;
+    background: #fff;
+    color: #333;
+    border-radius: 12px;
+    border: 3px solid #333;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.taiko-song-select-title {
+    margin: 0;
+    font-size: 1.25rem;
+    text-align: center;
+    border-bottom: 2px solid #333;
+    padding-bottom: 12px;
+    color: #333;
+}
+
+.taiko-chart-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    color: #333;
+}
+
+.taiko-chart-list li {
+    padding: 12px 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: #fafafa;
+    color: #333;
+    transition: background 0.2s;
+}
+
+.taiko-chart-list li:hover {
+    background: #e3f2fd;
+    border-color: #1565c0;
+}
+
+.taiko-chart-empty {
+    margin: 0;
+    color: #666;
+    text-align: center;
+}
+
+.taiko-song-select-close {
+    padding: 10px 20px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #f5f5f5;
+    color: #333;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.taiko-song-select-close:hover {
+    background: #e0e0e0;
+}
+
+.taiko-mp-lobby {
+    position: relative;
+    background: radial-gradient(circle at top, #f5fbff 0%, #ffffff 55%, #f3f4ff 100%);
+    border-radius: 16px;
+    border: 2px solid #1e88e5;
+    box-shadow: 0 10px 28px rgba(15, 76, 129, 0.25);
+    padding: 28px 24px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    overflow: hidden;
+}
+
+.taiko-mp-lobby::before {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background: radial-gradient(circle at 0 0, rgba(33, 150, 243, 0.18), transparent 55%),
+                radial-gradient(circle at 100% 100%, rgba(156, 39, 176, 0.16), transparent 55%);
+    opacity: 0.65;
+    z-index: -1;
+}
+
+.taiko-mp-lobby-hint {
+    font-weight: 700;
+    font-size: 0.98rem;
+    text-align: center;
+    color: #123047;
+    letter-spacing: 0.03em;
+}
+
+.taiko-mp-status {
+    font-size: 0.86rem;
+    color: #556677;
+    text-align: center;
+}
+
+.taiko-mp-wait-ring {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(227,242,253,0.85) 65%, rgba(255,255,255,0.9) 100%);
+    animation: taiko-mp-pulse 2.4s ease-in-out infinite;
+}
+
+.taiko-mp-wait-ring.countdown {
+    animation: taiko-mp-countdown 1s ease-in-out infinite;
+}
+
+.taiko-mp-wait-ring.countdown .taiko-mp-wait-ring-dot {
+    animation: taiko-mp-dot 0.6s ease-in-out infinite alternate;
+}
+
+.taiko-mp-wait-ring-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: #1e88e5;
+    box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.35);
+}
+
+.taiko-mp-part-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin: 16px 0;
+}
+
+.taiko-mp-part-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.taiko-mp-part-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(18, 48, 71, 0.22);
+    background: rgba(255, 255, 255, 0.75);
+    color: #123047;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.taiko-mp-part-pill.ready {
+    border-color: rgba(30, 136, 229, 0.55);
+    background: rgba(227, 242, 253, 0.85);
+}
+
+.taiko-mp-part-pill.loading {
+    border-color: rgba(255, 152, 0, 0.55);
+    background: rgba(255, 248, 225, 0.85);
+}
+
+.taiko-mp-part-buttons button {
+    min-width: 72px;
+    padding: 12px 16px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.taiko-mp-part-buttons button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.taiko-mp-part-buttons button.taiko-mp-part-mine {
+    border-color: #0288d1;
+    background: #e3f2fd;
+    box-shadow: 0 0 0 1px rgba(2, 136, 209, 0.6), 0 0 18px rgba(2, 136, 209, 0.45);
+    animation: taiko-mp-part-mine 1.8s ease-in-out infinite;
+}
+
+.taiko-mp-part-buttons button.taiko-mp-part-taken {
+    background: #eee;
+}
+
+.taiko-mp-lobby-hint,
+.taiko-mp-status {
+    text-align: center;
+    margin: 6px 0;
+}
+
+@keyframes taiko-mp-pulse {
+    0% {
+        transform: scale(0.96);
+        box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.35);
+    }
+    100% {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 14px rgba(25, 118, 210, 0);
+    }
+}
+
+@keyframes taiko-mp-countdown {
+    0% { transform: scale(0.98); }
+    50% { transform: scale(1.06); }
+    100% { transform: scale(0.98); }
+}
+
+@keyframes taiko-mp-dot {
+    0% { transform: scale(0.9); filter: brightness(1); }
+    100% { transform: scale(1.2); filter: brightness(1.25); }
+}
+
+@keyframes taiko-mp-part-mine {
+    0% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+/* 成績発表・メタバース統一（白ベース・青アウトライン） */
+.taiko-results {
+    position: relative;
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Meiryo", sans-serif;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.98);
+    color: #333;
+    border-radius: 12px;
+    border: 2px solid #0288d1;
+    box-shadow: 0 4px 16px rgba(2, 136, 209, 0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.taiko-results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 16px;
+    gap: 12px;
+    border-bottom: 1px solid rgba(2, 136, 209, 0.2);
+}
+
+.taiko-results-banner {
+    padding: 8px 20px;
+    font-size: 1.25rem;
+    font-weight: 900;
+    border: 2px solid #0288d1;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.taiko-results-banner-left {
+    background: rgba(2, 136, 209, 0.1);
+    color: #0288d1;
+}
+
+.taiko-results-banner-right {
+    background: rgba(2, 136, 209, 0.08);
+    color: #333;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.taiko-results-main {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    align-items: flex-start;
+}
+
+.taiko-results-left {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.taiko-results-player {
+    background: rgba(2, 136, 209, 0.08);
+    border: 2px solid #0288d1;
+    border-radius: 12px;
+    padding: 8px 16px;
+    min-width: 140px;
+}
+
+.taiko-results-player-label {
+    color: #0288d1;
+    font-weight: 900;
+    margin-right: 6px;
+}
+
+.taiko-results-player-name {
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.taiko-results-difficulty-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.taiko-results-difficulty {
+    background: #fff;
+    color: #333;
+    padding: 4px 14px;
+    border-radius: 20px;
+    border: 1px solid #0288d1;
+    font-size: 0.9rem;
+    font-weight: 900;
+}
+
+.taiko-results-center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.taiko-results-clear-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.taiko-results-clear-label {
+    font-size: 0.9rem;
+    color: #333;
+    font-weight: 900;
+    flex-shrink: 0;
+}
+
+.taiko-results-clear-bar {
+    flex: 1;
+    height: 20px;
+    background: rgba(2, 136, 209, 0.1);
+    border: 2px solid #0288d1;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.taiko-results-clear-bar-fill {
+    height: 100%;
+    background: #0288d1;
+    transition: width 0.3s ease;
+}
+
+.taiko-results-soul {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #0288d1;
+}
+
+.taiko-results-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 150px;
+}
+
+.taiko-results-score-box {
+    background: rgba(2, 136, 209, 0.08);
+    border: 3px solid #0288d1;
+    border-radius: 8px;
+    padding: 18px 36px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.taiko-results-score-value {
+    font-size: 3.5rem;
+    font-weight: 900;
+    color: #333;
+}
+
+.taiko-results-score-unit {
+    font-size: 1.8rem;
+    color: #333;
+    font-weight: 900;
+}
+
+.taiko-results-judgments-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    margin-left: 50px;
+    margin-top: -80px;
+}
+
+.taiko-results-judgments {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 1.5rem;
+    color: #333;
+    padding: 12px 16px;
+}
+
+.taiko-results-judgments strong {
+    margin-left: 8px;
+    color: #0288d1;
+}
+
+.taiko-results-combo-stats {
