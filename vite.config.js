@@ -61,6 +61,14 @@ export default defineConfig({
                 replacement: `${path.join(projectRoot, 'node_modules/three/examples/jsm')}/$1`,
             },
             {
+                find: /^pdfjs-dist$/,
+                replacement: path.join(simpleRoot, 'node_modules/pdfjs-dist/build/pdf.mjs'),
+            },
+            {
+                find: /^pdfjs-dist\/(.*)$/,
+                replacement: `${path.join(simpleRoot, 'node_modules/pdfjs-dist')}/$1`,
+            },
+            {
                 find: 'socket.io-client-original',
                 replacement: socketIoOriginal,
             },
