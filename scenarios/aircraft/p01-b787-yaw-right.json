@@ -4,7 +4,7 @@
   "name": "P-01 右旋回 Hard B787",
   "controlMode": "hard",
   "slotId": "p01-scenario-b787",
-  "teleportPosition": { "x": 219, "y": 1.2, "z": 7 },
+  "teleportPosition": { "x": 213, "y": 1.2, "z": 7 },
   "sampleIntervalMs": 100,
   "steps": [
     {
