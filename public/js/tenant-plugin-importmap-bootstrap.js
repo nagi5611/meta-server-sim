@@ -1,4 +1,4 @@
-// public/js/tenant-plugin-importmap-bootstrap.js — プラグイン ESM 用 import map（最初の module より前に同期実行）
+// public/js/tenant-plugin-importmap-bootstrap.js — SIM 本体 import map（lib/tenant-esm-deps と同一 URL 形）
 (function tenantPluginImportmapBootstrap() {
     const RESERVED = new Set(['api', 'admin', 'css', 'js', 'dist', 'node_modules']);
     const parts = window.location.pathname.split('/').filter(Boolean);
@@ -6,12 +6,12 @@
     if (!tenantId || RESERVED.has(tenantId.toLowerCase())) return;
     if (document.getElementById('tenant-plugin-importmap-bootstrap')) return;
 
-    const xrDepsBase = `/${encodeURIComponent(tenantId)}/api/tenant-plugins/xr/deps`;
+    const esmBase = `/${encodeURIComponent(tenantId)}/api/tenant-esm-deps`;
     const imports = {
-        three: `${xrDepsBase}/three/build/three.module.js`,
-        'three/addons/': `${xrDepsBase}/three/examples/jsm/`,
-        'three/examples/jsm/': `${xrDepsBase}/three/examples/jsm/`,
-        'three-mesh-ui': `${xrDepsBase}/three-mesh-ui/build/three-mesh-ui.module.js`,
+        three: `${esmBase}/three/build/three.module.js`,
+        'three/addons/': `${esmBase}/three/examples/jsm/`,
+        'three/examples/jsm/': `${esmBase}/three/examples/jsm/`,
+        'three-mesh-ui': `${esmBase}/three-mesh-ui/build/three-mesh-ui.module.js`,
     };
 
     const script = document.createElement('script');

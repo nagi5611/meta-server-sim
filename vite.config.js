@@ -41,6 +41,11 @@ const tenantProxy = {
 /** tenant ID 1 セグメント */
 const TENANT_SEGMENT = '[A-Za-z0-9][A-Za-z0-9-]*';
 
+/** 本番は tenant import map の bare `three` に委譲し vendor-three との二重読込を防ぐ */
+function isThreeBareModuleId(id) {
+    return id === 'three' || id.startsWith('three/');
+}
+
 export default defineConfig({
     root: 'public',
     envDir: projectRoot,
@@ -157,9 +162,10 @@ export default defineConfig({
                 adminTenant: path.join(projectRoot, 'public/admin-tenant.html'),
                 adminTenantWorldEdit: path.join(projectRoot, 'public/admin-tenant-world-edit.html'),
             },
+            external: (id) => isThreeBareModuleId(id),
             output: {
                 manualChunks(id) {
-                    if (id.includes('node_modules/three')) return 'vendor-three';
+                    if (isThreeBareModuleId(id) || id.includes('node_modules/three/')) return undefined;
                     if (id.includes('node_modules/three-mesh-bvh')) return 'vendor-mesh-bvh';
                     if (id.includes('node_modules/socket.io-client')) return 'vendor-socketio';
                     if (id.includes('node_modules')) return 'vendor';
