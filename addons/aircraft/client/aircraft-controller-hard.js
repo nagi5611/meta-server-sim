@@ -190,12 +190,36 @@ export default class AircraftControllerHard {
             if (slot.parkedQuaternion) slot.root.quaternion.copy(slot.parkedQuaternion);
             if (slot.parkedScale) slot.root.scale.copy(slot.parkedScale);
             slot.root.updateMatrixWorld(true);
+            if (this.physicsManager?.raycastStaticWorld) {
+                slot.root.getWorldPosition(this._worldPos);
+                const origin = this._worldPos.clone().add(new THREE.Vector3(0, 80, 0));
+                const hit = this.physicsManager.raycastStaticWorld(
+                    origin,
+                    new THREE.Vector3(0, -1, 0),
+                    LANDING_RAY_MAX
+                );
+                if (hit) {
+                    this._worldPos.set(
+                        slot.parkedPosition.x,
+                        hit.point.y + CLEARANCE_ABOVE_GROUND,
+                        slot.parkedPosition.z
+                    );
+                    if (slot.root.parent) {
+                        slot.root.parent.updateMatrixWorld(true);
+                        slot.root.parent.worldToLocal(this._worldPos);
+                        slot.root.position.copy(this._worldPos);
+                    } else {
+                        slot.root.position.copy(this._worldPos);
+                    }
+                    slot.root.updateMatrixWorld(true);
+                }
+            }
         }
         this.velocity.set(0, 0, 0);
         this._omegaYaw = 0;
         this._omegaPitch = 0;
         this._omegaRoll = 0;
-        this._aircraftGrounded = false;
+        this._aircraftGrounded = true;
         this._throttle = 0;
         this._prevThrottle = 0;
         this._engineRpm = 0;
