@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_join_events_user_ref ON join_events(user_ref, joined_at DESC);
