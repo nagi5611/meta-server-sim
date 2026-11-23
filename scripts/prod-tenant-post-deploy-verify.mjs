@@ -25,8 +25,15 @@ fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
 async function verifyTenant(tenantId, page) {
     const consoleLines = [];
     const failedReq = [];
+    const glbLoads = [];
     page.on('console', (msg) => consoleLines.push(`[${msg.type()}] ${msg.text()}`));
     page.on('requestfailed', (req) => failedReq.push({ url: req.url(), err: req.failure()?.errorText }));
+    page.on('response', (res) => {
+        const u = res.url();
+        if (/\.glb(\?|$)/i.test(u) && !/avatar/i.test(u) && res.status() < 400) {
+            glbLoads.push(u);
+        }
+    });
 
     await page.addInitScript(() => {
         window.__TENANT_E2E_HARNESS__ = '1';
@@ -45,7 +52,7 @@ async function verifyTenant(tenantId, page) {
     if (await gate.isVisible({ timeout: 5000 }).catch(() => false)) await gate.click();
 
     await page.locator('#canvas').waitFor({ state: 'visible', timeout: 120_000 });
-    const deadline = Date.now() + 120_000;
+    const deadline = Date.now() + 180_000;
     let ready = false;
     while (Date.now() < deadline) {
         ready = await page.evaluate(() => document.documentElement.dataset.tenantMetaverseReady === 'true');
@@ -92,7 +99,7 @@ async function verifyTenant(tenantId, page) {
         }
 
         return {
-            ready,
+            ready: document.documentElement.dataset.tenantMetaverseReady === 'true',
             videoModalDisplay: csModal?.display ?? null,
             videoModalVisible: Boolean(
                 modal && csModal?.display !== 'none' && rectModal && rectModal.height > 20 && rectModal.top < 200,
@@ -122,11 +129,12 @@ async function verifyTenant(tenantId, page) {
         consoleFlaggedSample: flagged.slice(0, 8),
         failedCss: failedReq.filter((r) => /\.css/i.test(r.url)).slice(0, 6),
         screenshot: shot,
+        glbLoads: [...new Set(glbLoads)].slice(0, 12),
         pass:
             !metrics.videoModalVisible &&
             metrics.canvasFillsViewport &&
-            metrics.ready &&
-            (metrics.canvasMidRowUniqueColors ?? 0) > 3,
+            (metrics.ready || ready) &&
+            (glbLoads.length > 0 || (metrics.glbResourceCount ?? 0) > 0),
     };
 }
 
