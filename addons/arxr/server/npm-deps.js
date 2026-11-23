@@ -13,6 +13,7 @@ const projectRoot = path.resolve(
 /** @type {Record<string, string>} */
 const DEP_ROOTS = {
     three: path.join(projectRoot, 'node_modules', 'three'),
+    'three-mesh-ui': path.join(projectRoot, 'node_modules', 'three-mesh-ui'),
     webar: path.join(projectRoot, 'node_modules', '@web-ar-studio', 'webar-engine-sdk'),
 };
 
