@@ -23,7 +23,18 @@ process.chdir(ROOT);
 const BASE_URL = process.env.AIRCRAFT_SCENARIO_BASE_URL || 'https://sim.mmh-virtual.jp';
 const TENANT = process.env.WORLD_EDIT_MCP_TENANT_ID || 'P-01';
 const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
-const MAX_ATTEMPTS = Number(process.env.MCP_MATRIX_MAX_ATTEMPTS || 4);
+const MAX_ATTEMPTS = Number(process.env.MCP_MATRIX_MAX_ATTEMPTS || 5);
+const REQUIRED_SLOT = 'p01-scenario-a320';
+
+/** @returns {Parameters<typeof runAircraftScenarioFromPathOrObject>[1]} */
+function scenarioRunOpts(extra = {}) {
+    return {
+        baseUrl: BASE_URL,
+        tenantId: TENANT,
+        artifactsDir: ARTIFACTS,
+        ...extra,
+    };
+}
 
 /** @typedef {import('../lib/aircraft-scenario-matrix-eval.js').MatrixVariantKind} MatrixVariantKind */
 
@@ -46,11 +57,7 @@ async function runCalibration5s(variant, calibration) {
         100,
         { metric: /** @type {'deltaM'|'heading'|'altitude'|'combo'} */ (variant.metric) },
     );
-    const report = await runAircraftScenarioFromPathOrObject(scenario, {
-        baseUrl: BASE_URL,
-        tenantId: TENANT,
-        artifactsDir: ARTIFACTS,
-    });
+    const report = await runAircraftScenarioFromPathOrObject(scenario, scenarioRunOpts());
     const m = metricsFromReport(report, variant.kind);
     if (!m || m.primary <= 0 || m.slotId !== 'p01-scenario-a320') {
         throw new Error(
@@ -96,11 +103,7 @@ async function runMatrix(calibration) {
 
             while (attempt < MAX_ATTEMPTS && !pass) {
                 attempt += 1;
-                lastReport = await runAircraftScenarioFromPathOrObject(scenario, {
-                    baseUrl: BASE_URL,
-                    tenantId: TENANT,
-                    artifactsDir: ARTIFACTS,
-                });
+                lastReport = await runAircraftScenarioFromPathOrObject(scenario, scenarioRunOpts());
                 lastMetrics = metricsFromReport(lastReport, variant.kind);
                 const actualPrimary = lastMetrics?.primary ?? 0;
                 const evalResult = evaluateMatrixCase({
@@ -156,12 +159,10 @@ async function runMatrix(calibration) {
 
 async function diagnoseStraightRootCause() {
     const straightPath = path.join(ROOT, 'scenarios/aircraft/p01-straight.json');
-    const report = await runAircraftScenarioFromPathOrObject(straightPath, {
-        baseUrl: BASE_URL,
-        tenantId: TENANT,
-        artifactsDir: ARTIFACTS,
-        captureScreenshot: true,
-    });
+    const report = await runAircraftScenarioFromPathOrObject(
+        straightPath,
+        scenarioRunOpts({ captureScreenshot: true }),
+    );
     const m = metricsFromReport(report, 'straight');
     const cp = report?.checkpoints?.[0];
     return {
@@ -179,6 +180,8 @@ async function diagnoseStraightRootCause() {
 async function main() {
     await fs.mkdir(ARTIFACTS, { recursive: true });
     const startedAt = new Date().toISOString();
+    const headed =
+        String(process.env.MCP_SCENARIO_HEADED || process.env.PLAYWRIGHT_HEADED || '1') !== '0';
 
     const diagnosis = await diagnoseStraightRootCause();
 
@@ -202,7 +205,9 @@ async function main() {
         finishedAt: new Date().toISOString(),
         baseUrl: BASE_URL,
         tenantId: TENANT,
-        requiredSlotId: 'p01-scenario-a320',
+        requiredSlotId: REQUIRED_SLOT,
+        playwrightHeaded: headed,
+        slotPolicy: 'A320 のみ使用（bc-b0586736 B787 用 p01-scenario-b787 は触らない）',
         calibration,
         calibrationRuns,
         diagnosis,

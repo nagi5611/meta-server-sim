@@ -4,11 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
-import {
-    PLAYWRIGHT_SCENARIO_BROWSER_ARGS,
-    PLAYWRIGHT_SCENARIO_THROTTLE_ARGS,
-    aircraftScenarioHarnessInitScript,
-} from '../lib/playwright-aircraft-harness.js';
+import { aircraftScenarioHarnessInitScript } from '../lib/playwright-aircraft-harness.js';
+import { chromiumScenarioLaunchOptions } from '../lib/playwright-scenario-launch.js';
 import { prepareTenantPlaywrightEntry } from '../lib/playwright-tenant-entry.js';
 
 const ARTIFACTS = process.env.AIRCRAFT_SCENARIO_ARTIFACTS || '/opt/cursor/artifacts';
@@ -47,10 +44,7 @@ const reportOut =
 
 await fs.mkdir(ARTIFACTS, { recursive: true });
 
-const browser = await chromium.launch({
-    headless: true,
-    args: [...PLAYWRIGHT_SCENARIO_BROWSER_ARGS, ...PLAYWRIGHT_SCENARIO_THROTTLE_ARGS],
-});
+const browser = await chromium.launch(chromiumScenarioLaunchOptions({}));
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 await page.addInitScript(aircraftScenarioHarnessInitScript);
 
