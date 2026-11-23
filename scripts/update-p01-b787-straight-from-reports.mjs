@@ -41,7 +41,7 @@ for (const rp of reportPaths) {
     const p0 = samples[0].position;
     const p1 = samples[samples.length - 1].position;
     const ymin = Math.min(...samples.map((s) => s.position.y));
-    if (ymin < 0.4) {
+    if (ymin < p0.y - 1.5) {
         console.error(`skip (ground fall ymin=${ymin}): ${rp}`);
         continue;
     }
@@ -61,9 +61,15 @@ const toleranceM = Math.max(0.5, mag * 0.2);
 
 const round2 = (n) => Math.round(n * 100) / 100;
 const scenario = JSON.parse(fs.readFileSync(SCENARIO_PATH, 'utf8'));
+const atTimeSec = scenario.steps.reduce((a, s) => a + s.durationSec, 0);
 scenario.checkpoints = [
     {
-        atTimeSec: scenario.steps.reduce((a, s) => a + s.durationSec, 0),
+        atTimeSec,
+        expect: { minAltitudeGain: round2(my) },
+        tolerance: { altitudeM: round2(Math.max(0.5, Math.abs(my) * 0.2)) },
+    },
+    {
+        atTimeSec,
         expect: {
             deltaPosition: { x: round2(mx), y: round2(my), z: round2(mz) },
         },

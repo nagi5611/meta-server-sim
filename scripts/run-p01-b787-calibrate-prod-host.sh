@@ -16,7 +16,9 @@ exec flock -w 7200 "$LOCK" bash -c "
     xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight-calibrate.json --out \"\${out}\" || true
     sleep 10
   done
-  node scripts/update-p01-b787-straight-from-reports.mjs \
-    \"${ART}/calib-run1.json\" \"${ART}/calib-run2.json\" \"${ART}/calib-run3.json\" \
-    \"${ART}/calib-run4.json\" \"${ART}/calib-run5.json\" || true
+  shopt -s nullglob
+  reports=(\"${ART}\"/calib-run*.json)
+  if [ \"${#reports[@]}\" -ge 3 ]; then
+    node scripts/update-p01-b787-straight-from-reports.mjs \"\${reports[@]}\" && git add scenarios/aircraft/p01-b787-straight.json
+  fi
 "

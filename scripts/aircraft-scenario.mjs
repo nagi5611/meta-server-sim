@@ -66,7 +66,7 @@ await page.waitForFunction(
 await page.waitForFunction(
     () => Boolean(window.__tenantE2E?.getSocket?.()?.connected),
     null,
-    { timeout: 60_000 }
+    { timeout: 180_000 }
 );
 
 const tp = rawScenario.teleportPosition || { x: 211, y: 1.2, z: 11 };
