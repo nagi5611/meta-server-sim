@@ -215,7 +215,6 @@ export default class AircraftScenarioRunner {
             };
 
             const t0 = performance.now();
-            let physicsLastMs = t0;
             for (const step of scenario.steps) {
                 const keys = controlsToKeyState(step.controls, mode);
                 ctrl.setScenarioControls(keys);
@@ -223,12 +222,6 @@ export default class AircraftScenarioRunner {
 
                 while (performance.now() < stepEndMs) {
                     await this._waitFrame();
-                    const nowMs = performance.now();
-                    const dt = Math.min(0.1, (nowMs - physicsLastMs) / 1000);
-                    physicsLastMs = nowMs;
-                    if (mgr.isPiloting && dt > 0) {
-                        ctrl.update(dt);
-                    }
                     ctrl.setScenarioControls(keys);
                     elapsed = (performance.now() - t0) / 1000;
                     if (elapsed + 1e-6 >= nextSampleT) {
