@@ -175,8 +175,7 @@ export default class AircraftScenarioRunner {
                     impl._engineRpm = 0;
                     impl._throttle = 0;
                 }
-                await new Promise((r) => setTimeout(r, 500));
-                for (let i = 0; i < 25; i++) await this._waitFrame();
+                for (let i = 0; i < 3; i++) await this._waitFrame();
             }
 
             if (!ctrl.setScenarioControls) {
