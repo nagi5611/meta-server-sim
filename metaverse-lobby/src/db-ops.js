@@ -235,6 +235,61 @@ export async function insertJoinEvent(db, row) {
         .run();
 }
 
+/** @param {Record<string, unknown>} row */
+export function mapJoinEventToUserHistory(row) {
+    const joinedAt = String(row.joined_at || '');
+    const leftAt = row.left_at ? String(row.left_at) : null;
+    let dur = 0;
+    if (leftAt && joinedAt) {
+        const ms = Date.parse(leftAt) - Date.parse(joinedAt);
+        if (Number.isFinite(ms) && ms > 0) dur = Math.round(ms / 60_000);
+    }
+    return {
+        world: String(row.world_id || ''),
+        at: joinedAt,
+        dur,
+        ok: row.ok === undefined || row.ok === null ? true : Boolean(Number(row.ok)),
+    };
+}
+
+const JOIN_HISTORY_PER_USER = 50;
+
+/**
+ * @param {D1Database} db
+ * @param {string[]} userRefs
+ * @param {number} [perUserLimit]
+ * @returns {Promise<Map<string, Array<{ world: string, at: string, dur: number, ok: boolean }>>>}
+ */
+export async function fetchJoinHistoriesByUserRefs(db, userRefs, perUserLimit = JOIN_HISTORY_PER_USER) {
+    /** @type {Map<string, Array<{ world: string, at: string, dur: number, ok: boolean }>>} */
+    const byRef = new Map();
+    if (!db || !userRefs.length) return byRef;
+    const unique = [...new Set(userRefs.map((r) => String(r || '').trim()).filter(Boolean))];
+    const chunkSize = 50;
+    for (let i = 0; i < unique.length; i += chunkSize) {
+        const chunk = unique.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => '?').join(', ');
+        const { results } = await db
+            .prepare(
+                `SELECT user_ref, world_id, joined_at, left_at, ok
+                 FROM join_events
+                 WHERE user_ref IN (${placeholders})
+                 ORDER BY joined_at DESC`,
+            )
+            .bind(...chunk)
+            .all();
+        for (const row of results || []) {
+            const ref = String(/** @type {Record<string, unknown>} */ (row).user_ref || '');
+            if (!ref) continue;
+            if (!byRef.has(ref)) byRef.set(ref, []);
+            const list = byRef.get(ref);
+            if (list.length >= perUserLimit) continue;
+            list.push(mapJoinEventToUserHistory(/** @type {Record<string, unknown>} */ (row)));
+        }
+    }
+    return byRef;
+}
+
 /**
  * @param {D1Database} db
  * @param {Record<string, unknown>} row

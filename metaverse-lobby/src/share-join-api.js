@@ -1,5 +1,18 @@
+import { getPublicSession } from './auth-api.js';
+import { insertJoinEvent } from './db-ops.js';
 import { moderateLobbyDisplayName } from './display-name-moderator.js';
 import { fetchSim } from './sim-client.js';
+
+/**
+ * @param {unknown[]} metaverses
+ * @param {string} tenantId
+ */
+function findWorldIdForTenant(metaverses, tenantId) {
+    const tid = String(tenantId || '').trim();
+    if (!tid) return '';
+    const hit = metaverses.find((m) => String(/** @type {Record<string, unknown>} */ (m).tenantId || '') === tid);
+    return hit ? String(/** @type {Record<string, unknown>} */ (hit).id || tid) : tid;
+}
 
 function json(data, status = 200) {
     return new Response(JSON.stringify(data), {
@@ -85,6 +98,25 @@ export async function handleShareJoinRequest(request, env) {
         if (!simRes.ok) {
             const status = simRes.status || 502;
             return json(simRes.data || { error: 'join_failed' }, status);
+        }
+        const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+        const session = await getPublicSession(request, env);
+        const userRef = session?.sub ? String(session.sub) : null;
+        if (db && userRef) {
+            const kv = /** @type {KVNamespace | undefined} */ (env.LOBBY_KV);
+            const registry = kv ? (await kv.get('registry', 'json')) || { metaverses: [] } : { metaverses: [] };
+            const worldId = findWorldIdForTenant(registry.metaverses || [], parsed.tenantId);
+            await insertJoinEvent(db, {
+                id: `je-${crypto.randomUUID()}`,
+                user_ref: userRef,
+                display_name: displayName,
+                world_id: worldId,
+                tenant_id: parsed.tenantId,
+                joined_at: new Date().toISOString(),
+                left_at: null,
+                ok: true,
+                meta: { via: 'share-join' },
+            });
         }
         return json(simRes.data, 200);
     }

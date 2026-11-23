@@ -14,6 +14,7 @@ import {
 } from './announcement-translator.js';
 import {
     deleteAnnouncement,
+    fetchJoinHistoriesByUserRefs,
     insertAnnouncement,
     insertAuditLog,
     listAnnouncements,
@@ -296,8 +297,20 @@ export async function handleAdminApi(request, env, kv) {
                 banExpiresAt: u.banExpiresAt || null,
                 kind: u.kind,
                 rawId: u.id,
-                history: [],
+                history: /** @type {Array<{ world: string, at: string, dur: number, ok: boolean }>} */ ([]),
             });
+        }
+        const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+        if (db && rows.length) {
+            const historyByRef = await fetchJoinHistoriesByUserRefs(
+                db,
+                rows.map((r) => r.id),
+            );
+            for (const row of rows) {
+                const history = historyByRef.get(row.id) || [];
+                row.history = history;
+                if (history.length) row.last = history[0].at;
+            }
         }
         return json({ users: rows });
     }
