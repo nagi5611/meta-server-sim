@@ -27,10 +27,8 @@ const {
     aircraftSetAirframeForMcp,
     aircraftPatchWorldPhysicsForMcp,
     aircraftPlaceSlotForMcp,
-    aircraftRunScenarioForMcp,
     worldEditGetWorldForMcp,
 } = await import('../lib/world-edit-mcp-ops.js');
-const { validateAircraftScenario } = await import('../addons/aircraft/lib/aircraft-scenario-schema.js');
 
 fs.mkdirSync(ARTIFACTS, { recursive: true });
 
@@ -41,24 +39,6 @@ function step(name, ok, detail) {
 }
 
 resetWorldEditAdminClientForTests();
-
-/** @param {unknown} last @param {string} kind @param {number} d */
-function movedEnough(last, kind, d) {
-    const samples = /** @type {{ samples?: { position: { x: number, y: number, z: number }, headingDeg?: number }[] }} */ (last).samples || [];
-    if (samples.length < 2) return false;
-    const start = samples[0];
-    const end = samples[samples.length - 1];
-    const deltaM = Math.hypot(
-        end.position.x - start.position.x,
-        end.position.y - start.position.y,
-        end.position.z - start.position.z,
-    );
-    if (kind === 'straight') return deltaM > d * 2;
-    if (kind === 'yaw-right') return Math.abs((end.headingDeg ?? 0) - (start.headingDeg ?? 0)) > d * 2;
-    if (kind === 'climb') return end.position.y - start.position.y > d * 0.3;
-    if (kind === 'roll') return deltaM > d * 0.5;
-    return deltaM > d;
-}
 
 /** @type {{ airframe?: unknown, physics?: unknown, slotIndex?: number, uploadFilename?: string, placeIndex?: number }} */
 const saved = {};
@@ -128,88 +108,8 @@ try {
     saved.slotIndex = slotPlaced.objectIndex;
     step('aircraft_place_slot', true, slotPlaced);
 
-    const durations = [1, 2, 3, 4, 5];
-    const variants = [
-        { kind: 'straight', axis: 'thrust', control: { thrust: 1, yaw: 0, pitch: 0, roll: 0 } },
-        { kind: 'yaw-right', axis: 'yaw', control: { thrust: 0.55, yaw: 1, pitch: 0, roll: 0 } },
-        { kind: 'climb', axis: 'pitch', control: { thrust: 1, yaw: 0, pitch: 0.75, roll: 0 } },
-        { kind: 'roll', axis: 'roll', control: { thrust: 0.5, yaw: 0, pitch: 0, roll: 1 } },
-        {
-            kind: 'combo',
-            axis: 'combo',
-            stepsBuilder: (d) => [
-                { durationSec: d * 0.4, controls: { thrust: 1, yaw: 0, pitch: 0, roll: 0 } },
-                { durationSec: d * 0.35, controls: { thrust: 0.5, yaw: 1, pitch: 0, roll: 0 } },
-                { durationSec: d * 0.25, controls: { thrust: 1, yaw: 0, pitch: 0.65, roll: 0 } },
-            ],
-        },
-    ];
-
-    /** @param {unknown} r */
-    function samplesLength(r) {
-        return Array.isArray(/** @type {{ samples?: unknown[] }} */ (r).samples)
-            ? /** @type {{ samples: unknown[] }} */ (r).samples.length
-            : 0;
-    }
-
-    for (const v of variants) {
-        for (const d of durations) {
-            const scenario = {
-                id: `mcp-${v.kind}-${d}s-${ts}`,
-                version: 1,
-                name: `${v.kind} ${d}s`,
-                controlMode: 'easy',
-                slotId: 'p01-scenario-a320',
-                sampleIntervalMs: 100,
-                steps:
-                    v.stepsBuilder?.(d) || [{ durationSec: d, controls: v.control }],
-                checkpoints: [],
-            };
-            const validated = validateAircraftScenario(scenario);
-            if (!validated.ok) {
-                report.scenarioMatrix.push({ variant: v.kind, durationSec: d, pass: false, errors: validated.errors });
-                continue;
-            }
-            let attempt = 0;
-            let passed = false;
-            /** @type {unknown} */
-            let last = null;
-            while (attempt < 2 && !passed) {
-                attempt += 1;
-                last = await aircraftRunScenarioForMcp(validated.scenario);
-                passed = !!last.pass;
-            }
-            const scenarioPass = passed || (samplesLength(last) >= 2 && movedEnough(last, v.kind, d));
-            const samples = last?.samples || [];
-            const start = samples[0];
-            const end = samples[samples.length - 1];
-            const moved =
-                start && end
-                    ? {
-                          deltaM: Math.hypot(
-                              end.position.x - start.position.x,
-                              end.position.y - start.position.y,
-                              end.position.z - start.position.z,
-                          ),
-                          headingDelta:
-                              end.headingDeg != null && start.headingDeg != null
-                                  ? Math.abs(end.headingDeg - start.headingDeg)
-                                  : null,
-                          altitudeGain: end.position.y - start.position.y,
-                      }
-                    : null;
-            report.scenarioMatrix.push({
-                scenario: v.kind,
-                durationSec: d,
-                expected: `duration ${d}s produces measurable motion`,
-                actual: moved,
-                pass: scenarioPass,
-                attemptsToPass: attempt,
-                reportPath: last?.reportPath,
-                checkpointPass: passed,
-            });
-        }
-    }
+    report.scenarioMatrixNote =
+        '25 ケースの厳格マトリクスは scripts/mcp-aircraft-scenario-matrix.mjs で実行（チェックポイント必須・±20%・単調増加）';
 } finally {
     if (saved.slotIndex != null) {
         await worldEditDeleteObjectForMcp('school', saved.slotIndex).catch(() => {});
