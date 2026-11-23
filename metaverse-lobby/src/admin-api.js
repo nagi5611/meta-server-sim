@@ -91,6 +91,8 @@ export async function handleAdminLogin(request, env, kv) {
 export async function handleAdminApi(request, env, kv) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/admin/')) return null;
+    // Bearer 同期は index.js 側（LOBBY_WORKER_SYNC_SECRET）で処理する
+    if (url.pathname === '/api/admin/sync') return null;
 
     if (url.pathname === '/api/admin/logout' && request.method === 'POST') {
         return json({ ok: true }, 200, {
