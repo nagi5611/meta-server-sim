@@ -2,13 +2,11 @@
 
 import * as THREE from 'three';
 import ThreeMeshUI from 'three-mesh-ui';
-import { t } from '../../../public/js/metaverse-i18n.js';
-import fontJsonUrl from './assets/font-msdf/Roboto-msdf.json?url';
-import fontTextureUrl from './assets/font-msdf/Roboto-msdf.png?url';
+import { t } from '/js/metaverse-i18n.js';
 
-/** Vite ビルド時はハッシュ付き URL、開発時も確実に解決 */
-export const FONT_JSON = fontJsonUrl;
-export const FONT_TEXTURE = fontTextureUrl;
+/** addons-client 直配信向け（import.meta.url 基準） */
+export const FONT_JSON = new URL('./assets/font-msdf/Roboto-msdf.json', import.meta.url).href;
+export const FONT_TEXTURE = new URL('./assets/font-msdf/Roboto-msdf.png', import.meta.url).href;
 
 /** @type {'unknown'|'ok'|'fail'} */
 let fontProbeStatus = 'unknown';

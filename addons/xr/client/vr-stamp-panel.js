@@ -9,7 +9,7 @@ import {
     createRow,
     getFontOpts,
 } from './vr-ui-helpers.js';
-import { t } from '../../../public/js/metaverse-i18n.js';
+import { t } from '/js/metaverse-i18n.js';
 
 /**
  * VR スタンプパネル（チャットとは独立）

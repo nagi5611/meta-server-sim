@@ -11,8 +11,8 @@ import {
     getFontOpts,
     VR_UI_COLORS,
 } from './vr-ui-helpers.js';
-import { t } from '../../../public/js/metaverse-i18n.js';
-import { VIEW_DISTANCE_SLIDER_STEPS } from '../../../public/js/ibl-setup.js';
+import { t } from '/js/metaverse-i18n.js';
+import { VIEW_DISTANCE_SLIDER_STEPS } from '/metaverse-simple-static/js/ibl-setup.js';
 
 /** @typedef {'general'|'audio'|'draw'} SettingsSection */
 
