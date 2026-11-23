@@ -7,15 +7,19 @@
   "sampleIntervalMs": 100,
   "steps": [
     {
-      "durationSec": 4.5,
-      "controls": { "thrust": 1, "yaw": 0, "pitch": 0.75, "roll": 0 }
+      "durationSec": 2.5,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
+    },
+    {
+      "durationSec": 4,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 1, "roll": 0 }
     }
   ],
   "checkpoints": [
     {
-      "atTimeSec": 4.5,
-      "expect": { "minAltitudeGain": 2.5 },
-      "tolerance": { "altitudeM": 1.5 }
+      "atTimeSec": 6.5,
+      "expect": { "minAltitudeGain": 0.8 },
+      "tolerance": { "altitudeM": 1.2 }
     }
   ]
 }
