@@ -431,7 +431,7 @@ tr.row:hover td.ops .txt-btn,td.ops .txt-btn:focus-visible{opacity:1}
 .hrow.fail .d{color:var(--danger)}
 
 /* ---------- settings ---------- */
-.set{max-width:min(640px,100%);width:100%;box-sizing:border-box}
+.set{max-width:min(960px,100%);width:100%;box-sizing:border-box}
 .set-row{display:grid;grid-template-columns:min(180px,34%) minmax(0,1fr);gap:20px;padding:18px 20px;align-items:start}
 .set-row > :nth-child(2){min-width:0;max-width:100%}
 .set-row + .set-row{border-top:1px solid var(--line)}
