@@ -18,6 +18,9 @@ test('xr client modules avoid tenant /public/js runtime imports', () => {
         if (/\?url['"]/.test(text)) {
             offenders.push(`${file} (?url import)`);
         }
+        if (/from\s+['"]\/js\/metaverse-i18n\.js['"]/.test(text) && file !== 'sim-platform-esm.js') {
+            offenders.push(`${file} (direct i18n; use sim-platform-esm.js)`);
+        }
     }
     assert.deepEqual(
         offenders,
