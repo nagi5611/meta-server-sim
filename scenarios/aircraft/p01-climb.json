@@ -1,9 +1,10 @@
 {
   "id": "p01-climb",
   "version": 1,
-  "name": "P-01 上昇",
+  "name": "P-01 上昇 Easy A320",
   "controlMode": "easy",
   "slotId": "p01-scenario-a320",
+  "teleportPosition": { "x": 211, "y": 1.2, "z": 11 },
   "sampleIntervalMs": 100,
   "steps": [
     {
@@ -18,8 +19,8 @@
   "checkpoints": [
     {
       "atTimeSec": 6.5,
-      "expect": { "minAltitudeGain": 0.8 },
-      "tolerance": { "altitudeM": 1.2 }
+      "expect": { "minAltitudeGain": 36 },
+      "tolerance": { "altitudeM": 7.2 }
     }
   ]
 }

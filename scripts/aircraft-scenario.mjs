@@ -75,9 +75,10 @@ await page.waitForFunction(
     { timeout: 60_000 }
 );
 
-await page.evaluate(() => {
-    window.__tenantE2E.setLocalPosition(211, 1.2, 11);
-});
+const tp = rawScenario.teleportPosition || { x: 211, y: 1.2, z: 11 };
+await page.evaluate(({ x, y, z }) => {
+    window.__tenantE2E.setLocalPosition(x, y, z);
+}, tp);
 
 const slotId = String(rawScenario.slotId || 'p01-scenario-a320');
 await page.waitForFunction(

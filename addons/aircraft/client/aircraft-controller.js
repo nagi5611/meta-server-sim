@@ -155,6 +155,18 @@ export default class AircraftController {
         return this._impl().getHudSnapshot();
     }
 
+    /**
+     * @param {Record<string, boolean>|null} keyState easy / hard それぞれの keys 形
+     */
+    setScenarioControls(keyState) {
+        this._impl().setScenarioControls?.(keyState);
+    }
+
+    clearScenarioControls() {
+        this._hard.clearScenarioControls?.();
+        this._easy.clearScenarioControls?.();
+    }
+
     getPoseForNetwork() {
         return this._impl().getPoseForNetwork();
     }

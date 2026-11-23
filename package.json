@@ -29,6 +29,7 @@
         "test:e2e:aircraft-scenario": "playwright test e2e/aircraft-scenario-p01.spec.js",
         "aircraft:scenario": "node scripts/aircraft-scenario.mjs",
         "aircraft:scenario:p01": "node scripts/run-aircraft-p01-scenarios.mjs",
+        "aircraft:scenario:repro": "node scripts/run-aircraft-scenario-repro.mjs",
         "test:unit": "node --test test/*.test.js addons/xr/test/*.test.js addons/matsuyama-flights/test/*.test.js addons/aircraft/test/*.test.js addons/vdb-volume/test/*.test.js addons/nfc-spawn/test/*.test.js metaverse-lobby/test/*.test.mjs",
         "enable:meta-server-plugins": "node scripts/enable-tenant-plugins.mjs meta-server",
         "migrate:r2": "node scripts/migrate-tenant-assets-to-r2.mjs",

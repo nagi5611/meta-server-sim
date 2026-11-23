@@ -1,0 +1,26 @@
+{
+  "id": "p01-b787-climb",
+  "version": 1,
+  "name": "P-01 上昇 Hard B787",
+  "controlMode": "hard",
+  "slotId": "p01-scenario-b787",
+  "teleportPosition": { "x": 219, "y": 1.2, "z": 7 },
+  "sampleIntervalMs": 100,
+  "steps": [
+    {
+      "durationSec": 6,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
+    },
+    {
+      "durationSec": 6,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 0.8, "roll": 0 }
+    }
+  ],
+  "checkpoints": [
+    {
+      "atTimeSec": 12,
+      "expect": { "minAltitudeGain": 8 },
+      "tolerance": { "altitudeM": 2.5 }
+    }
+  ]
+}
