@@ -392,3 +392,18 @@ export async function disableAdminEd25519Key(db, id) {
     const now = new Date().toISOString();
     await db.prepare(`UPDATE admin_ed25519_keys SET disabled_at = ? WHERE id = ? AND disabled_at IS NULL`).bind(now, id).run();
 }
+
+/**
+ * 失効済み鍵行を D1 から物理削除する。
+ * @param {D1Database | undefined} db
+ * @param {string} id
+ * @returns {Promise<boolean>} deleted
+ */
+export async function deleteRevokedAdminEd25519Key(db, id) {
+    if (!db) throw new Error('db_required');
+    const res = await db
+        .prepare(`DELETE FROM admin_ed25519_keys WHERE id = ? AND disabled_at IS NOT NULL`)
+        .bind(id)
+        .run();
+    return Number(res?.meta?.changes) > 0;
+}

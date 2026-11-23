@@ -1055,10 +1055,19 @@
     const keys = state.adminKeys || [];
     const keyRows = keys.map((k) => {
       const st = k.disabledAt ? tr("admin.adminKeyDisabled") : tr("admin.adminKeyActive");
-      const rev = k.revocable
-        ? `<button type="button" class="txt-btn admin-key-revoke" data-id="${esc(k.id)}">${esc(tr("admin.adminKeyRevoke"))}</button>`
-        : "—";
-      return `<tr><td>${esc(k.name)}</td><td class="num dim"><code>${esc(k.fingerprintShort || "")}…</code></td><td class="num dim">${esc(k.createdAt || "—")}</td><td class="num dim">${esc(k.lastUsedAt || "—")}</td><td>${esc(st)}</td><td>${rev}</td></tr>`;
+      const actions = [];
+      if (k.revocable) {
+        actions.push(
+          `<button type="button" class="txt-btn admin-key-revoke" data-id="${esc(k.id)}" data-name="${esc(k.name)}">${esc(tr("admin.adminKeyRevoke"))}</button>`,
+        );
+      }
+      if (k.disabledAt && k.source === "d1" && k.id !== "env-bootstrap") {
+        actions.push(
+          `<button type="button" class="txt-btn admin-key-delete" data-id="${esc(k.id)}" data-name="${esc(k.name)}">${esc(tr("admin.adminKeyDelete"))}</button>`,
+        );
+      }
+      const act = actions.length ? actions.join(" ") : "—";
+      return `<tr><td>${esc(k.name)}</td><td class="num dim"><code>${esc(k.fingerprintShort || "")}…</code></td><td class="num dim">${esc(k.createdAt || "—")}</td><td class="num dim">${esc(k.lastUsedAt || "—")}</td><td>${esc(st)}</td><td>${act}</td></tr>`;
     }).join("");
     const keyBlock =
       store.superAdmin && store.adminUsername === "admin"
@@ -1071,7 +1080,7 @@
         <button type="button" class="btn btn-primary" id="adminKeyIssueBtn">${esc(tr("admin.adminKeyIssue"))}</button>
         <p class="dim" id="adminKeyIssueMsg" style="margin-top:8px"></p>
         ${state._adminKeysLoading ? `<p>${esc(tr("common.syncing"))}</p>` : ""}
-        ${keyRows ? `<table class="mini-log" style="margin-top:16px"><thead><tr><th>${esc(tr("admin.adminKeyColName"))}</th><th>FP</th><th>${esc(tr("admin.adminKeyColCreated"))}</th><th>${esc(tr("admin.adminKeyColLastUsed"))}</th><th>${esc(tr("admin.adminKeyColStatus"))}</th><th></th></tr></thead><tbody>${keyRows}</tbody></table>` : `<p class="dim">${esc(tr("admin.adminKeysEmpty"))}</p>`}
+        ${keyRows ? `<div class="admin-keys-table-wrap"><table class="mini-log admin-keys-table"><thead><tr><th>${esc(tr("admin.adminKeyColName"))}</th><th>FP</th><th>${esc(tr("admin.adminKeyColCreated"))}</th><th>${esc(tr("admin.adminKeyColLastUsed"))}</th><th>${esc(tr("admin.adminKeyColStatus"))}</th><th></th></tr></thead><tbody>${keyRows}</tbody></table></div>` : `<p class="dim">${esc(tr("admin.adminKeysEmpty"))}</p>`}
       </div></div>`
         : "";
     return head("設定") + `<div class="sheet set">
@@ -1105,20 +1114,42 @@
     panel.dataset.bound = "1";
     $("#adminKeyIssueBtn")?.addEventListener("click", () => { issueAdminKey(); });
     panel.addEventListener("click", async (e) => {
-      const btn = e.target?.closest?.(".admin-key-revoke");
-      if (!btn) return;
-      const id = btn.getAttribute("data-id");
-      if (!id || !confirm(tr("admin.adminKeyRevokeConfirm"))) return;
+      const revokeBtn = e.target?.closest?.(".admin-key-revoke");
+      if (revokeBtn) {
+        const id = revokeBtn.getAttribute("data-id");
+        const name = revokeBtn.getAttribute("data-name") || id;
+        if (!id || !confirm(`${tr("admin.adminKeyRevokeConfirm")}\n\n${name}\n${id}`)) return;
+        try {
+          await window.LobbyAdminApi.revokeAdminKey(id);
+          await loadAdminKeys();
+          toast(tr("admin.adminKeyRevoked"));
+        } catch (err) {
+          const code = err?.data?.error;
+          toast(
+            code === "last_active_key"
+              ? tr("admin.adminKeyLastActive")
+              : tr("admin.adminKeyRevokeFail"),
+          );
+        }
+        return;
+      }
+      const delBtn = e.target?.closest?.(".admin-key-delete");
+      if (!delBtn) return;
+      const id = delBtn.getAttribute("data-id");
+      const name = delBtn.getAttribute("data-name") || id;
+      if (!id || !confirm(`${tr("admin.adminKeyDeleteConfirm")}\n\n${name}\n${id}`)) return;
       try {
-        await window.LobbyAdminApi.revokeAdminKey(id);
+        await window.LobbyAdminApi.deleteRevokedAdminKey(id);
         await loadAdminKeys();
-        toast(tr("admin.adminKeyRevoked"));
+        toast(tr("admin.adminKeyDeleted"));
       } catch (err) {
         const code = err?.data?.error;
         toast(
-          code === "last_active_key"
-            ? tr("admin.adminKeyLastActive")
-            : tr("admin.adminKeyRevokeFail"),
+          code === "key_still_active"
+            ? tr("admin.adminKeyDeleteStillActive")
+            : code === "key_not_deletable"
+              ? tr("admin.adminKeyDeleteNotAllowed")
+              : tr("admin.adminKeyDeleteFail"),
         );
       }
     });

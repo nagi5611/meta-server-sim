@@ -431,11 +431,22 @@ tr.row:hover td.ops .txt-btn,td.ops .txt-btn:focus-visible{opacity:1}
 .hrow.fail .d{color:var(--danger)}
 
 /* ---------- settings ---------- */
-.set{max-width:640px}
-.set-row{display:grid;grid-template-columns:180px 1fr;gap:20px;padding:18px 20px}
+.set{max-width:min(640px,100%);width:100%;box-sizing:border-box}
+.set-row{display:grid;grid-template-columns:min(180px,34%) minmax(0,1fr);gap:20px;padding:18px 20px;align-items:start}
+.set-row > :nth-child(2){min-width:0;max-width:100%}
 .set-row + .set-row{border-top:1px solid var(--line)}
 .set-row h3{font-size:13.5px;font-weight:600;color:var(--ink)}
 .set-row p{font-size:13px;color:var(--muted);line-height:1.7}
+.set-row .field,.set-row .inp{width:100%;max-width:100%;box-sizing:border-box}
+.set-row input[type="file"].inp{padding:6px 10px}
+.admin-keys-table-wrap{max-width:100%;overflow-x:auto;margin-top:16px;-webkit-overflow-scrolling:touch}
+.admin-keys-table-wrap table.admin-keys-table{width:100%;min-width:520px;margin-top:0;table-layout:auto}
+.admin-keys-table-wrap .admin-keys-table th,
+.admin-keys-table-wrap .admin-keys-table td{vertical-align:middle}
+.admin-keys-table-wrap .admin-keys-table th:nth-child(5),
+.admin-keys-table-wrap .admin-keys-table td:nth-child(5){white-space:nowrap}
+.admin-keys-table-wrap .admin-keys-table td:first-child{word-break:break-word;min-width:6rem;max-width:12rem}
+.admin-keys-table-wrap .admin-keys-table .num{white-space:nowrap}
 .set-row dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0 0 8px;font-size:13px}
 .set-row dt{color:var(--faint)}
 .set-row dd{margin:0;color:var(--ink);font-weight:600}

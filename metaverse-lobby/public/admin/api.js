@@ -86,6 +86,8 @@
     registerAdminKey: (body) => request("/admin-keys", { method: "POST", body }),
     revokeAdminKey: (id) =>
       request(`/admin-keys/${encodeURIComponent(id)}/revoke`, { method: "POST", body: {} }),
+    deleteRevokedAdminKey: (id) =>
+      request(`/admin-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),
     superLoginAudit: (limit) =>
       request(`/super-login-audit${limit ? `?limit=${limit}` : ""}`),
     bootstrapFromLobby: () => request("/bootstrap-from-lobby", { method: "POST", body: {} }),
