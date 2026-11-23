@@ -491,4 +491,287 @@
     color: #0288d1;
 }
 
-.taiko-results-combo-stats {
+.taiko-results-combo-stats{display:flex;flex-direction:column;gap:8px;font-size:1.5rem;color:#333;padding:12px 16px}
+
+
+.taiko-results-combo-stats 
+.taiko-results-combo-stats strong{margin-left:8px;color:#0288d1}
+
+
+.taiko-results-combo-stats 
+.taiko-results-ranking-area{width:200px;flex-shrink:0;background:#0288d10d;border:1px solid rgba(2,136,209,.3);border-radius:8px;padding:12px}
+
+
+.taiko-results-combo-stats 
+.taiko-results-ranking-title{margin:0 0 8px;font-size:1rem;font-weight:900;color:#0288d1;text-align:center}
+
+
+.taiko-results-combo-stats 
+.taiko-results-ranking-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+
+
+.taiko-results-combo-stats 
+.taiko-results-ranking-list li{padding:4px 8px;background:#fff;border:1px solid rgba(2,136,209,.3);border-radius:4px;font-size:.75rem;color:#333}
+
+
+.taiko-results-combo-stats 
+.taiko-results-ranking-list li
+.taiko-results-ranking-empty{color:#94a3b8}
+
+
+.taiko-results-combo-stats 
+.taiko-results-band{height:8px;background:#0288d126}
+
+
+.taiko-results-combo-stats 
+.taiko-results-footer{padding:16px;display:flex;justify-content:center}
+
+
+.taiko-results-combo-stats 
+.taiko-results-close{padding:12px 40px;border:2px solid #0288d1;border-radius:8px;background:#fff;color:#0288d1;cursor:pointer;font-size:1rem;font-weight:900}
+
+
+.taiko-results-combo-stats 
+.taiko-results-close:hover{background:#0288d11a}
+
+
+.taiko-results-combo-stats 
+.taiko-game-container{position:relative;background:#fff;border-radius:12px;border:3px solid #333;overflow:hidden;box-shadow:0 8px 32px #00000080;display:flex;flex-direction:column}
+
+
+.taiko-results-combo-stats 
+.taiko-game-top-buttons{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:6px;z-index:10}
+
+
+.taiko-results-combo-stats 
+.taiko-game-close,
+.taiko-results-combo-stats 
+.taiko-game-hint{width:36px;height:36px;border:2px solid #333;border-radius:50%;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;background:#f5f5f5;color:#333}
+
+
+.taiko-results-combo-stats 
+.taiko-game-close{font-size:20px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-close:hover,
+.taiko-results-combo-stats 
+.taiko-game-hint:hover{background:#e0e0e0}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-popup{position:fixed;inset:0;z-index:2100;display:flex;align-items:center;justify-content:center;padding:16px}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-popup-backdrop{position:absolute;inset:0;background:#00000080}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-popup-content{position:relative;background:#fff;color:#222;border-radius:12px;border:2px solid #333;padding:20px 24px;max-width:320px;box-shadow:0 8px 24px #0000004d}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-title{margin:0 0 14px;font-size:18px;color:#222;border-bottom:1px solid #ccc;padding-bottom:8px}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-body{margin-bottom:16px;color:#333}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-body p{margin:0 0 8px;font-size:14px;line-height:1.5;color:#333}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-body p:last-child{margin-bottom:0}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-popup-close{display:block;width:100%;padding:10px;font-size:14px;font-weight:700;color:#222;border:2px solid #333;border-radius:8px;background:#f0f0f0;cursor:pointer}
+
+
+.taiko-results-combo-stats 
+.taiko-hint-popup-close:hover{background:#e0e0e0}
+
+
+.taiko-results-combo-stats 
+.taiko-game-header{padding:12px 18px 8px;font-size:22px;font-weight:700;border-bottom:2px solid #333;background:#f9f9f9}
+
+
+.taiko-results-combo-stats 
+.taiko-game-bar{display:flex;align-items:stretch;border-bottom:2px solid #333;height:90px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-score-box{min-width:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-right:2px solid #333;padding:8px 10px;background:#f5f5f5;flex-shrink:0}
+
+
+.taiko-results-combo-stats 
+.taiko-score-label{font-size:11px;color:#555;font-weight:700}
+
+
+.taiko-results-combo-stats 
+.taiko-score-value{font-size:22px;font-weight:700;color:#333;line-height:1.2}
+
+
+.taiko-results-combo-stats 
+.taiko-score-max{font-size:10px;color:#666}
+
+
+.taiko-results-combo-stats 
+.taiko-score-rate{font-size:11px;font-weight:700;color:#333;margin-top:2px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-lane{position:relative;flex:1;overflow:hidden;background:#fafafa}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-wrap{position:absolute;left:34px;top:50%;transform:translateY(-50%);width:64px;height:64px;pointer-events:none;z-index:10}
+
+
+.taiko-results-combo-stats 
+.taiko-game-judge-line{position:relative;width:64px;height:64px;object-fit:contain;display:block}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-burst{position:absolute;left:0;top:0;width:64px;height:64px;pointer-events:none;z-index:1}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-burst 
+.taiko-burst-particle{position:absolute;left:50%;top:50%;width:10px;height:10px;margin-left:-5px;margin-top:-5px;background:#f9a825;border-radius:50%;box-shadow:0 0 8px #ffc107,0 0 16px #f9a82580;animation:taiko-burst-particle .35s ease-out forwards;opacity:1}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-burst 
+.taiko-burst-ring{position:absolute;left:50%;top:50%;width:64px;height:64px;margin-left:-32px;margin-top:-32px;border-radius:50%;border:3px solid rgba(249,168,37,.9);box-shadow:0 0 12px #f9a825,inset 0 0 12px #f9a8254d;animation:taiko-burst-ring .35s ease-out forwards}
+
+
+.taiko-results-combo-stats 
+.taiko-game-notes{position:absolute;inset:0}
+
+
+.taiko-results-combo-stats 
+.taiko-note{position:absolute;top:50%;transform:translateY(-50%);width:64px;height:64px;border-radius:50%;border:3px solid;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;pointer-events:none}
+
+
+.taiko-results-combo-stats 
+.taiko-note.don{background:#fcc;border-color:#c20;color:#c20}
+
+
+.taiko-results-combo-stats 
+.taiko-note.ka{background:#cce8ff;border-color:#05c;color:#05c}
+
+
+.taiko-results-combo-stats 
+.taiko-note
+.taiko-note-roll{width:auto;min-width:40px;height:48px;border-radius:6px;background:#fff9c4;border-color:#f9a825;color:#f57f17}
+
+
+.taiko-results-combo-stats 
+.taiko-note
+.taiko-note-roll
+.taiko-roll-hit{animation:taiko-roll-hit-effect .15s ease-out}
+
+
+.taiko-results-combo-stats 
+.taiko-note
+.taiko-note-hit{animation:taiko-note-hit-effect .32s ease-out forwards;pointer-events:none}
+
+
+.taiko-results-combo-stats 
+.taiko-note
+.taiko-note-miss{animation:taiko-note-miss-effect .2s ease-out forwards;pointer-events:none}
+
+
+.taiko-results-combo-stats 
+.taiko-flash{animation:taiko-flash .15s ease-out}
+
+
+.taiko-results-combo-stats 
+.taiko-game-input{position:relative;min-height:190px;padding:20px 12px 0;background:#b8d4e8;border-radius:0 0 12px 12px}
+
+
+.taiko-results-combo-stats 
+.taiko-ka-zone{position:absolute;inset:0;z-index:0;cursor:pointer;-webkit-user-select:none;user-select:none;transition:filter .1s;border-radius:0 0 12px 12px}
+
+
+.taiko-results-combo-stats 
+.taiko-ka-zone:hover{filter:brightness(1.05)}
+
+
+.taiko-results-combo-stats 
+.taiko-ka-zone.active{animation:taiko-flash .15s ease-out}
+
+
+.taiko-results-combo-stats 
+.taiko-input-drum{position:absolute;left:50%;bottom:0;transform:translate(-50%);z-index:1;width:400px;height:200px;border-radius:200px 200px 0 0;overflow:hidden;cursor:pointer;-webkit-user-select:none;user-select:none}
+
+
+.taiko-results-combo-stats 
+.taiko-input-drum:hover{filter:brightness(1.08)}
+
+
+.taiko-results-combo-stats 
+.taiko-input-drum.active{animation:taiko-flash .15s ease-out}
+
+
+.taiko-results-combo-stats 
+.taiko-drum-img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;pointer-events:none}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text{position:absolute;left:60px;top:0%;transform:translate(-50%);font-size:20px;font-weight:700;pointer-events:none;opacity:0;transition:opacity .05s;z-index:20}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text.visible{opacity:1;transition:opacity 0s}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text.good{color:#c60}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text.ok{color:#05c}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text.miss{color:#888}
+
+
+.taiko-results-combo-stats 
+.taiko-judge-text.roll{color:#f9a825;font-weight:900}
+
+@media(min-width:1024px){
+.taiko-results-combo-stats 
+.taiko-game-input{position:relative;min-height:400px}
+
+
+.taiko-results-combo-stats 
+.taiko-input-drum{position:absolute;left:50%;bottom:0;transform:translate(-50%);z-index:1;width:500px;height:250px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-bar{display:flex;align-items:stretch;border-bottom:2px solid #333;height:160px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-header{padding:20px 18px;font-size:22px;font-weight:700;border-bottom:2px solid #333;background:#f9f9f9}
+
+
+.taiko-results-combo-stats 
+.taiko-game-top-buttons{position:absolute;top:15px}
+
+
+.taiko-results-combo-stats 
+.taiko-game-close,
+.taiko-results-combo-stats 
+.taiko-game-hint{width:45px;height:45px}
+
+}
+
+
+.taiko-results-combo-stats

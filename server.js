@@ -282,7 +282,19 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 app.use('/css', express.static(path.join(PUBLIC_DIR, 'css'), { index: false }));
 app.use('/js', express.static(path.join(PUBLIC_DIR, 'js'), { index: false }));
 
-
+app.get('/favicon.ico', (_req, res) => {
+    const icoPath = path.join(PUBLIC_DIR, 'favicon.ico');
+    const fallbackPng = path.join(PUBLIC_DIR, 'images', 'judge.png');
+    if (fs.existsSync(icoPath)) {
+        res.type('image/x-icon');
+        return res.sendFile(icoPath);
+    }
+    if (fs.existsSync(fallbackPng)) {
+        res.type('image/png');
+        return res.sendFile(fallbackPng);
+    }
+    return res.status(204).end();
+});
 
 app.get('/', (_req, res) => {
 

@@ -61,8 +61,12 @@ export default defineConfig({
                 replacement: `${path.join(projectRoot, 'node_modules/three/examples/jsm')}/$1`,
             },
             {
-                find: /^pdfjs-dist$/,
+                find: 'pdfjs-dist-original',
                 replacement: path.join(simpleRoot, 'node_modules/pdfjs-dist/build/pdf.mjs'),
+            },
+            {
+                find: /^pdfjs-dist$/,
+                replacement: path.join(projectRoot, 'public/js/tenant-pdfjs-dist-entry.js'),
             },
             {
                 find: /^pdfjs-dist\/(.*)$/,
