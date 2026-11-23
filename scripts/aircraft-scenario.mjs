@@ -49,9 +49,6 @@ await fs.mkdir(ARTIFACTS, { recursive: true });
 const browser = await chromium.launch({ headless: true, args: PLAYWRIGHT_SCENARIO_BROWSER_ARGS });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 await page.addInitScript(aircraftScenarioHarnessInitScript);
-await page.addInitScript(() => {
-    localStorage.setItem('username', `ScenarioCLI-${Date.now()}`);
-});
 
 const url = `${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(tenantId)}/`;
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
