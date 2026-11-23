@@ -45,7 +45,7 @@ const diag = await page.evaluate(async () => {
 });
 
 const screenshotPath = path.join(ARTIFACTS, 'p01-guest-lobby-headed.png');
-await fs.writeFile(screenshotPath, await page.screenshot({ fullPage: false }));
+await fs.writeFile(screenshotPath, await page.screenshot({ fullPage: false, timeout: 90_000 }));
 
 const spawnOk =
     diag.spawnPoint &&
