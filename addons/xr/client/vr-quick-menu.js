@@ -19,7 +19,7 @@ import {
     VR_UI_COLORS,
     probeFontAssets,
 } from './vr-ui-helpers.js';
-import { t } from '/js/metaverse-i18n.js';
+import { t } from './sim-platform-esm.js';
 
 /** @typedef {'chat'|'stamp'|'settings'|'help'|'admin'|'restart'|'logout'|null} ActivePanelId */
 

@@ -9,7 +9,7 @@ import {
     createRow,
     getFontOpts,
 } from './vr-ui-helpers.js';
-import { t } from '/js/metaverse-i18n.js';
+import { t } from './sim-platform-esm.js';
 
 /**
  * VR スタンプパネル（チャットとは独立）
