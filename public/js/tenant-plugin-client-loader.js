@@ -8,47 +8,6 @@ function ensureTenantPluginClientBridge() {
 }
 
 /**
- * Dynamic import された addon クライアントが bare `three` を解決できるようにする
- * @param {string} tenantId
- * @param {string} pluginId
- */
-function ensurePluginClientImportMap(tenantId, pluginId) {
-    if (document.getElementById('tenant-plugin-importmap-bootstrap')) return;
-    if (pluginId !== 'xr' && pluginId !== 'vdb-volume' && pluginId !== 'aircraft') return;
-    const mapId =
-        pluginId === 'xr'
-            ? 'tenant-xr-three-importmap'
-            : pluginId === 'vdb-volume'
-              ? 'tenant-vdb-volume-three-importmap'
-              : 'tenant-aircraft-three-importmap';
-    if (document.getElementById(mapId)) return;
-    const imports =
-        pluginId === 'xr'
-            ? (() => {
-                  const base = `/${encodeURIComponent(tenantId)}/api/tenant-plugins/xr/deps`;
-                  return {
-                      three: `${base}/three/build/three.module.js`,
-                      'three/addons/': `${base}/three/examples/jsm/`,
-                      'three/examples/jsm/': `${base}/three/examples/jsm/`,
-                      'three-mesh-ui': `${base}/three-mesh-ui/build/three-mesh-ui.module.js`,
-                  };
-              })()
-            : (() => {
-                  const base = `/${encodeURIComponent(tenantId)}/addons-client/${encodeURIComponent(pluginId)}/deps`;
-                  return {
-                      three: `${base}/three/build/three.module.js`,
-                      'three/addons/': `${base}/three/examples/jsm/`,
-                      'three/examples/jsm/': `${base}/three/examples/jsm/`,
-                  };
-              })();
-    const script = document.createElement('script');
-    script.type = 'importmap';
-    script.id = mapId;
-    script.textContent = JSON.stringify({ imports });
-    document.head.prepend(script);
-}
-
-/**
  * @param {string} tenantId
  */
 async function fetchEnabledPlugins(tenantId) {
@@ -80,7 +39,6 @@ export async function loadTenantPluginClientModules() {
         if (!rel || typeof rel !== 'string') continue;
         const url = `/${encodeURIComponent(tenantId)}/addons-client/${encodeURIComponent(plugin.id)}/${rel}`;
         try {
-            ensurePluginClientImportMap(tenantId, plugin.id);
             const mod = await import(/* @vite-ignore */ url);
             if (typeof mod.initTenantPlugin === 'function') {
                 await mod.initTenantPlugin();
