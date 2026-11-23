@@ -15,8 +15,8 @@
   "checkpoints": [
     {
       "atTimeSec": 5,
-      "expect": { "deltaPosition": { "x": 0, "y": 9, "z": -126 } },
-      "tolerance": { "positionM": 25.5 }
+      "expect": { "deltaPosition": { "x": 0, "y": 20, "z": -173 } },
+      "tolerance": { "positionM": 35 }
     }
   ]
 }

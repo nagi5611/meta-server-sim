@@ -165,7 +165,20 @@ export default class AircraftScenarioRunner {
                 });
             }
 
-            ctrl._implForSlot?.(slot);
+            const mode = scenario.controlMode || slot.controlMode || 'easy';
+            if (mode === 'hard' && mgr.activeSlot) {
+                mgr.resetSlotToParked(slot.id);
+                ctrl.bindSlot(mgr.activeSlot);
+                const impl = ctrl._active;
+                if (impl?.velocity) impl.velocity.set(0, 0, 0);
+                if (impl && 'engineRpm' in impl) {
+                    impl._engineRpm = 0;
+                    impl._throttle = 0;
+                }
+                await new Promise((r) => setTimeout(r, 500));
+                for (let i = 0; i < 25; i++) await this._waitFrame();
+            }
+
             if (!ctrl.setScenarioControls) {
                 return buildAircraftScenarioReport(scenario, [], {
                     startedAtIso,
@@ -201,7 +214,6 @@ export default class AircraftScenarioRunner {
             };
 
             const t0 = performance.now();
-            const mode = scenario.controlMode || slot.controlMode || 'easy';
             for (const step of scenario.steps) {
                 const keys = controlsToKeyState(step.controls, mode);
                 ctrl.setScenarioControls(keys);

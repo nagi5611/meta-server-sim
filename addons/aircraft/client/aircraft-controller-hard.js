@@ -185,6 +185,12 @@ export default class AircraftControllerHard {
     bindSlot(slot) {
         this.unbind();
         this.slot = slot;
+        if (slot?.root && slot.parkedPosition) {
+            slot.root.position.copy(slot.parkedPosition);
+            if (slot.parkedQuaternion) slot.root.quaternion.copy(slot.parkedQuaternion);
+            if (slot.parkedScale) slot.root.scale.copy(slot.parkedScale);
+            slot.root.updateMatrixWorld(true);
+        }
         this.velocity.set(0, 0, 0);
         this._omegaYaw = 0;
         this._omegaPitch = 0;
