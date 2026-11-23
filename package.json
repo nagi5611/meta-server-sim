@@ -16,6 +16,8 @@
         "mcp:fleet": "node mcp/fleet-ops-mcp-server.js",
         "mcp:browser-metamask": "node mcp/browser-metamask-mcp-server.js",
         "mcp:browser-metamask:smoke": "node scripts/mcp-browser-metamask-smoke.mjs",
+        "mcp:world-edit": "node mcp/world-edit-mcp-server.js",
+        "mcp:world-edit:invoke": "node scripts/mcp-world-edit-invoke-tool.mjs",
         "metamask:install-unpacked": "node scripts/install-metamask-extension-unpacked.mjs",
         "preview": "vite preview",
         "test:e2e": "playwright test",
