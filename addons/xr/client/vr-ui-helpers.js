@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import ThreeMeshUI from 'three-mesh-ui';
-import { t } from '/js/metaverse-i18n.js';
+import { t } from './sim-platform-esm.js';
 
 /** addons-client 直配信向け（import.meta.url 基準） */
 export const FONT_JSON = new URL('./assets/font-msdf/Roboto-msdf.json', import.meta.url).href;
