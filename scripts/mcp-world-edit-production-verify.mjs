@@ -21,14 +21,14 @@ if (!process.env.AIRCRAFT_SCENARIO_BASE_URL) {
     process.env.AIRCRAFT_SCENARIO_BASE_URL = 'https://sim.mmh-virtual.jp';
 }
 
-import {
+const {
     resetWorldEditAdminClientForTests,
     worldEditListWorldsForMcp,
     worldEditPlaceModelForMcp,
     worldEditDeleteObjectForMcp,
     aircraftRunScenarioForMcp,
     aircraftListAirframesForMcp,
-} from '../lib/world-edit-mcp-ops.js';
+} = await import('../lib/world-edit-mcp-ops.js');
 
 const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || process.env.ARTIFACTS || '/opt/cursor/artifacts';
 const report = {
