@@ -1,6 +1,7 @@
 import { isLobbySuperAdmin } from './lobby-super-admin.js';
 import {
     countActiveAdminEd25519Keys,
+    deleteRevokedAdminEd25519Key,
     disableAdminEd25519Key,
     insertAdminEd25519Key,
     listAdminEd25519Keys,
@@ -279,6 +280,30 @@ export async function handleAdminKeysApi(request, env, kv, session) {
         }
         await disableAdminEd25519Key(db, keyId);
         return jsonResult({ status: 200, body: { ok: true, id: keyId, activeCount: remainingAfter } });
+    }
+
+    const deleteMatch = /^\/api\/admin\/admin-keys\/([^/]+)$/.exec(url.pathname);
+    if (deleteMatch && request.method === 'DELETE') {
+        const keyId = decodeURIComponent(deleteMatch[1]);
+        if (keyId === 'env-bootstrap') {
+            return jsonResult({ status: 400, body: { error: 'key_not_deletable' } });
+        }
+        if (!db) {
+            return jsonResult({ status: 503, body: { error: 'db_required' } });
+        }
+        const rows = await listAdminEd25519Keys(db, false);
+        const row = rows.find((r) => r.id === keyId);
+        if (!row) {
+            return jsonResult({ status: 404, body: { error: 'key_not_found' } });
+        }
+        if (!row.disabledAt) {
+            return jsonResult({ status: 409, body: { error: 'key_still_active' } });
+        }
+        const deleted = await deleteRevokedAdminEd25519Key(db, keyId);
+        if (!deleted) {
+            return jsonResult({ status: 404, body: { error: 'key_not_found' } });
+        }
+        return jsonResult({ status: 200, body: { ok: true, id: keyId } });
     }
 
     return null;
