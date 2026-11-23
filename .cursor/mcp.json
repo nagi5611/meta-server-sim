@@ -8,6 +8,16 @@
         "PLATFORM_FLEET_REGISTRY_PATH": "/home/nagi/sim-server/meta-server-sim/data/platform/fleet-registry.json"
       }
     },
+    "metasim-world-edit": {
+      "command": "node",
+      "args": ["mcp/world-edit-mcp-server.js"],
+      "cwd": "/home/nagi/sim-server/meta-server-sim",
+      "env": {
+        "WORLD_EDIT_MCP_BASE_URL": "https://sim.mmh-virtual.jp",
+        "WORLD_EDIT_MCP_TENANT_ID": "P-01",
+        "WORLD_EDIT_MCP_ADMIN_USERNAME": "admin"
+      }
+    },
     "metasim-browser-metamask": {
       "command": "npm",
       "args": ["run", "mcp:browser-metamask"],
