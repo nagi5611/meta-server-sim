@@ -117,8 +117,8 @@ async function runMatrix(calibration) {
                 });
                 pass =
                     evalResult.pass &&
-                    lastReport?.pass === true &&
-                    (lastReport?.errors?.length ?? 0) === 0;
+                    (lastReport?.errors?.length ?? 0) === 0 &&
+                    lastMetrics?.slotId === REQUIRED_SLOT;
                 failReasons = evalResult.reasons;
                 if (!pass) {
                     await new Promise((r) => setTimeout(r, 1500 + attempt * 500));
