@@ -9,7 +9,7 @@ import { buildAircraftScenarioReport } from '../lib/aircraft-scenario-report.js'
  * @param {import('../lib/aircraft-scenario-types.js').AircraftScenarioControls} controls
  * @param {'easy'|'hard'} controlMode
  */
-function controlsToKeyState(controls, controlMode = 'easy') {
+export function controlsToKeyState(controls, controlMode = 'easy') {
     const thr = Number(controls.thrust) || 0;
     const yaw = Number(controls.yaw) || 0;
     const pitch = Number(controls.pitch) || 0;
@@ -168,7 +168,7 @@ export default class AircraftScenarioRunner {
             const mode = scenario.controlMode || slot.controlMode || 'easy';
             if (mode === 'hard' && mgr.activeSlot) {
                 mgr.resetSlotToParked(slot.id);
-                ctrl.bindSlot(mgr.activeSlot);
+                ctrl.bindSlot({ ...mgr.activeSlot, controlMode: mode });
                 const impl = ctrl._active;
                 if (impl?.velocity) impl.velocity.set(0, 0, 0);
                 if (impl && 'engineRpm' in impl) {
@@ -176,6 +176,8 @@ export default class AircraftScenarioRunner {
                     impl._throttle = 0;
                 }
                 for (let i = 0; i < 3; i++) await this._waitFrame();
+            } else if (mgr.activeSlot) {
+                ctrl.bindSlot({ ...mgr.activeSlot, controlMode: mode });
             }
 
             if (!ctrl.setScenarioControls) {
@@ -213,6 +215,7 @@ export default class AircraftScenarioRunner {
             };
 
             const t0 = performance.now();
+            let physicsLastMs = t0;
             for (const step of scenario.steps) {
                 const keys = controlsToKeyState(step.controls, mode);
                 ctrl.setScenarioControls(keys);
@@ -220,6 +223,12 @@ export default class AircraftScenarioRunner {
 
                 while (performance.now() < stepEndMs) {
                     await this._waitFrame();
+                    const nowMs = performance.now();
+                    const dt = Math.min(0.1, (nowMs - physicsLastMs) / 1000);
+                    physicsLastMs = nowMs;
+                    if (mgr.isPiloting && dt > 0) {
+                        ctrl.update(dt);
+                    }
                     ctrl.setScenarioControls(keys);
                     elapsed = (performance.now() - t0) / 1000;
                     if (elapsed + 1e-6 >= nextSampleT) {
