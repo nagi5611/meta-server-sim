@@ -11,7 +11,7 @@ import {
     getFontOpts,
     VR_UI_COLORS,
 } from './vr-ui-helpers.js';
-import { t } from '../../../public/js/metaverse-i18n.js';
+import { t } from '/js/metaverse-i18n.js';
 
 const MAX_VISIBLE_MESSAGES = 12;
 
