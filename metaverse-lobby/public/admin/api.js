@@ -76,6 +76,16 @@
       request("/login", { method: "POST", body: { login, password, username: login, email: login } }),
     verifyOtp: (challengeId, code) =>
       request("/login/verify-otp", { method: "POST", body: { challengeId, code } }),
+    resendOtp: (challengeId) =>
+      request("/login/resend-otp", { method: "POST", body: { challengeId } }),
+    verifyKey: (challengeId, signature) =>
+      request("/login/verify-key", { method: "POST", body: { challengeId, signature } }),
+    listAdminKeys: () => request("/admin-keys"),
+    adminKeyReauthChallenge: () =>
+      request("/admin-keys/reauth-challenge", { method: "POST", body: {} }),
+    registerAdminKey: (body) => request("/admin-keys", { method: "POST", body }),
+    revokeAdminKey: (id) =>
+      request(`/admin-keys/${encodeURIComponent(id)}/revoke`, { method: "POST", body: {} }),
     superLoginAudit: (limit) =>
       request(`/super-login-audit${limit ? `?limit=${limit}` : ""}`),
     bootstrapFromLobby: () => request("/bootstrap-from-lobby", { method: "POST", body: {} }),

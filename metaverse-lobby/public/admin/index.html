@@ -30,9 +30,16 @@
       </div>
     </div>
     <div class="field" id="gateOtpField" hidden>
-      <label for="gOtp" data-i18n="admin.gateOtpLabel">確認コード（SMS）</label>
+      <label for="gOtp" data-i18n="admin.gateOtpLabel">確認コード（メール）</label>
       <input class="inp" id="gOtp" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" spellcheck="false">
       <p class="meta-line" id="gateOtpHint" style="margin-top:8px"></p>
+      <button type="button" class="txt-btn" id="gateOtpResend" disabled data-i18n="admin.gateOtpResend">確認コードを再送信</button>
+      <p class="meta-line" id="gateOtpResendHint" hidden></p>
+    </div>
+    <div class="field" id="gateKeyField" hidden>
+      <label for="gKeyFile" data-i18n="admin.gateKeyFileLabel">管理者秘密鍵（Ed25519 PEM）</label>
+      <input class="inp" id="gKeyFile" type="file" accept=".pem,.key,text/plain" autocomplete="off">
+      <p class="meta-line" id="gateKeyHint" style="margin-top:8px" data-i18n="admin.gateKeyHint">パスワード承認後、登録済み公開鍵と対になる秘密鍵ファイルを選び「鍵で確認」を押してください。</p>
     </div>
     <p class="gate-audit" id="gateAudit" hidden></p>
     <p class="gate-err" id="gateErr" role="alert"></p>
@@ -82,6 +89,7 @@
   import { isLobbyEntryUrlAllowed, lobbyEntryUrlPolicyHintJa } from '/lobby-entry-url-policy.js';
   window.LobbyEntryUrlPolicy = { isLobbyEntryUrlAllowed, lobbyEntryUrlPolicyHintJa };
 </script>
+<script src="/admin/admin-gate-key.js"></script>
 <script src="/admin/api.js"></script>
 <script src="/admin/store.js"></script>
 <script src="/admin/ui.js"></script>

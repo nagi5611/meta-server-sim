@@ -29,6 +29,9 @@ export async function ensureLobbyOpsSchema(db) {
     await db.exec(`CREATE TABLE IF NOT EXISTS super_admin_login_events (
       id TEXT PRIMARY KEY, client_ip TEXT, event_at_jst TEXT NOT NULL, event_at_utc TEXT NOT NULL,
       outcome TEXT NOT NULL, detail TEXT)`);
+    await db.exec(`CREATE TABLE IF NOT EXISTS admin_ed25519_keys (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, public_key_b64 TEXT NOT NULL, fingerprint TEXT NOT NULL,
+      created_at TEXT NOT NULL, last_used_at TEXT, disabled_at TEXT, created_ip TEXT, created_ua TEXT)`);
     await db.exec(`CREATE TABLE IF NOT EXISTS announcements (
       id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
       published INTEGER NOT NULL DEFAULT 1, sort_order INTEGER NOT NULL DEFAULT 0,
@@ -299,4 +302,93 @@ export async function listSuperAdminLoginEvents(db, limit = 20) {
         outcome: String(r.outcome || ''),
         detail: r.detail ? JSON.parse(String(r.detail)) : null,
     }));
+}
+
+/**
+ * @param {Record<string, unknown>} row
+ */
+function mapAdminEd25519KeyRow(row) {
+    return {
+        id: String(row.id),
+        name: String(row.name || ''),
+        publicKeyB64: String(row.public_key_b64 || ''),
+        fingerprint: String(row.fingerprint || ''),
+        createdAt: String(row.created_at || ''),
+        lastUsedAt: row.last_used_at ? String(row.last_used_at) : null,
+        disabledAt: row.disabled_at ? String(row.disabled_at) : null,
+        createdIp: row.created_ip ? String(row.created_ip) : null,
+        createdUa: row.created_ua ? String(row.created_ua) : null,
+        source: 'd1',
+    };
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {boolean} [activeOnly]
+ */
+export async function listAdminEd25519Keys(db, activeOnly = false) {
+    if (!db) return [];
+    const sql = activeOnly
+        ? `SELECT * FROM admin_ed25519_keys WHERE disabled_at IS NULL ORDER BY created_at ASC`
+        : `SELECT * FROM admin_ed25519_keys ORDER BY created_at ASC`;
+    const rows = await db.prepare(sql).all();
+    return (rows.results || []).map(mapAdminEd25519KeyRow);
+}
+
+/**
+ * @param {D1Database | undefined} db
+ */
+export async function countActiveAdminEd25519Keys(db) {
+    if (!db) return 0;
+    const row = await db
+        .prepare(`SELECT COUNT(*) AS c FROM admin_ed25519_keys WHERE disabled_at IS NULL`)
+        .first();
+    return Number(row?.c) || 0;
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {Record<string, unknown>} row
+ */
+export async function insertAdminEd25519Key(db, row) {
+    if (!db) throw new Error('db_required');
+    await db
+        .prepare(
+            `INSERT INTO admin_ed25519_keys
+             (id, name, public_key_b64, fingerprint, created_at, last_used_at, disabled_at, created_ip, created_ua)
+             VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
+        )
+        .bind(
+            row.id,
+            row.name,
+            row.public_key_b64,
+            row.fingerprint,
+            row.created_at,
+            row.created_ip || null,
+            row.created_ua || null,
+        )
+        .run();
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {string} id
+ * @param {string} atIso
+ */
+export async function touchAdminEd25519KeyLastUsed(db, id, atIso) {
+    if (!db || !id) return;
+    await db
+        .prepare(`UPDATE admin_ed25519_keys SET last_used_at = ? WHERE id = ? AND disabled_at IS NULL`)
+        .bind(atIso, id)
+        .run();
+}
+
+/**
+ * @param {D1Database | undefined} db
+ * @param {string} id
+ */
+export async function disableAdminEd25519Key(db, id) {
+    if (!db) throw new Error('db_required');
+    const now = new Date().toISOString();
+    await db.prepare(`UPDATE admin_ed25519_keys SET disabled_at = ? WHERE id = ? AND disabled_at IS NULL`).bind(now, id).run();
 }
