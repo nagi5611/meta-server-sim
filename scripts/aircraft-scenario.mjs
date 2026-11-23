@@ -79,6 +79,16 @@ await page.evaluate(() => {
     window.__tenantE2E.setLocalPosition(211, 1.2, 11);
 });
 
+const slotId = String(rawScenario.slotId || 'p01-scenario-a320');
+await page.waitForFunction(
+    (id) => {
+        const slots = window.__tenantE2E?.getMetaverseApp?.()?.sceneManager?.getAircraftSlots?.() || [];
+        return slots.some((s) => s.id === id);
+    },
+    slotId,
+    { timeout: 120_000 },
+);
+
 await page.waitForTimeout(1500);
 
 const report = await page.evaluate(async (scenario) => window.__tenantE2E.runAircraftScenario(scenario), rawScenario);
