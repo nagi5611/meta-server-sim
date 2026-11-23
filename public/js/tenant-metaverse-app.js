@@ -47,6 +47,7 @@ import { loadClientConfigOnce } from './tenant-client-config.js';
 import { applyTenantSceneTaikoPatch } from './tenant-scene-taiko-patch.js';
 import { installTenantPdfjsGetDocumentShim } from './tenant-pdfjs-get-document-shim.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
+import { ensureViewDistanceCoversWorldModels } from './tenant-world-view-distance.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
 import { collectTeleporterDestinationUrls } from '../../lib/tenant-external-teleporter.js';
@@ -528,6 +529,11 @@ class TenantMetaverseApp {
             this._publishTenantE2EHarness();
         }
 
+        ensureViewDistanceCoversWorldModels(
+            this.sceneManager,
+            this.worldManager.getWorld(defaultWorldId),
+        );
+
         await this.worldManager.loadWorld(defaultWorldId, () => {
             this.updateTeleportZones();
             this._worldReadyForNetwork = true;
@@ -629,7 +635,10 @@ class TenantMetaverseApp {
             const world = this.worldManager.getWorld(DEFAULT_ROOM);
             if (world) {
                 this.networkManager.changeWorld(DEFAULT_ROOM, {}, (err) => {
-                    if (!err) this.worldManager.loadWorld(DEFAULT_ROOM, () => {});
+                    if (!err) {
+                        ensureViewDistanceCoversWorldModels(this.sceneManager, world);
+                        this.worldManager.loadWorld(DEFAULT_ROOM, () => {});
+                    }
                 });
             }
         });
@@ -766,6 +775,10 @@ class TenantMetaverseApp {
                                 reject(err);
                                 return;
                             }
+                            ensureViewDistanceCoversWorldModels(
+                                this.sceneManager,
+                                this.worldManager.getWorld(worldId),
+                            );
                             this.worldManager.loadWorld(worldId, () => resolve(worldId));
                         });
                     }),
