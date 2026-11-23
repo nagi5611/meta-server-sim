@@ -215,29 +215,27 @@ export default class AircraftScenarioRunner {
                 });
             };
 
+            const physicsStepSec = Math.min(0.05, Math.max(1 / 120, sampleEvery / 2));
             const t0 = performance.now();
-            let physicsLastMs = t0;
             for (const step of scenario.steps) {
                 const keys = controlsToKeyState(step.controls, mode);
                 ctrl.setScenarioControls(keys);
-                const stepEndMs = t0 + (elapsed + step.durationSec) * 1000;
+                let stepSimSec = 0;
 
-                while (performance.now() < stepEndMs) {
-                    await this._waitFrame();
-                    const nowMs = performance.now();
-                    const dt = Math.min(0.1, Math.max(0, (nowMs - physicsLastMs) / 1000));
-                    physicsLastMs = nowMs;
-                    if (mgr.isPiloting && dt > 0) {
+                while (stepSimSec + 1e-6 < step.durationSec) {
+                    const dt = Math.min(physicsStepSec, step.durationSec - stepSimSec);
+                    if (mgr.isPiloting) {
+                        ctrl.setScenarioControls(keys);
                         ctrl.update(dt);
                     }
-                    ctrl.setScenarioControls(keys);
-                    elapsed = (performance.now() - t0) / 1000;
+                    stepSimSec += dt;
+                    elapsed += dt;
                     if (elapsed + 1e-6 >= nextSampleT) {
                         pushSample();
                         nextSampleT += sampleEvery;
                     }
+                    await this._waitFrame();
                 }
-                elapsed = (performance.now() - t0) / 1000;
             }
 
             ctrl.clearScenarioControls();
