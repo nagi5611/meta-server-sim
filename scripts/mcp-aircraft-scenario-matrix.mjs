@@ -15,6 +15,7 @@ import {
     extractMatrixMetrics,
 } from '../lib/aircraft-scenario-matrix-eval.js';
 import { runAircraftScenarioFromPathOrObject } from '../lib/mcp-aircraft-scenario-run.js';
+import { runP01LobbyHeadedCheck } from './mcp-p01-lobby-headed-check.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -25,6 +26,7 @@ const TENANT = process.env.WORLD_EDIT_MCP_TENANT_ID || 'P-01';
 const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
 const MAX_ATTEMPTS = Number(process.env.MCP_MATRIX_MAX_ATTEMPTS || 5);
 const REQUIRED_SLOT = 'p01-scenario-a320';
+const AIRFRAME = 'A320';
 
 /** @returns {Parameters<typeof runAircraftScenarioFromPathOrObject>[1]} */
 function scenarioRunOpts(extra = {}) {
@@ -128,6 +130,8 @@ async function runMatrix(calibration) {
             }
 
             rows.push({
+                scenario: `${variant.kind}_${durationSec}s`,
+                airframe: AIRFRAME,
                 variant: variant.kind,
                 durationSec,
                 expected: Number(expected.toFixed(4)),
@@ -183,6 +187,15 @@ async function main() {
     const headed =
         String(process.env.MCP_SCENARIO_HEADED || process.env.PLAYWRIGHT_HEADED || '1') !== '0';
 
+    const lobbyBefore = await runP01LobbyHeadedCheck({
+        artifactsDir: ARTIFACTS,
+        screenshotName: 'p01-lobby-before-matrix.png',
+    });
+    if (!lobbyBefore.pass) {
+        console.error(JSON.stringify({ fatal: 'lobby check failed before matrix', lobbyBefore }, null, 2));
+        process.exit(3);
+    }
+
     const diagnosis = await diagnoseStraightRootCause();
 
     /** @type {Record<MatrixVariantKind, number>} */
@@ -200,6 +213,11 @@ async function main() {
 
     const matrixRows = await runMatrix(calibration);
 
+    const lobbyAfter = await runP01LobbyHeadedCheck({
+        artifactsDir: ARTIFACTS,
+        screenshotName: 'p01-lobby-after-matrix.png',
+    });
+
     const summary = {
         startedAt,
         finishedAt: new Date().toISOString(),
@@ -210,6 +228,8 @@ async function main() {
         slotPolicy: 'A320 のみ使用（bc-b0586736 B787 用 p01-scenario-b787 は触らない）',
         calibration,
         calibrationRuns,
+        lobbyChecks: { before: lobbyBefore, after: lobbyAfter },
+        prodHead: process.env.METASIM_PROD_HEAD || null,
         diagnosis,
         rootCauseNotes: [
             '旧マトリクスは checkpoints: [] のため buildAircraftScenarioReport が errors なしで常に pass=true になり、movedEnough フォールバックも緩かった。',
@@ -229,13 +249,13 @@ async function main() {
         '',
         `診断 p01-straight: deltaM=${diagnosis.deltaM ?? 'n/a'}, checkpointΔ=${diagnosis.checkpointDeltaM ?? 'n/a'}, slot=${diagnosis.slotId}`,
         '',
-        '| variant | sec | expected | actual (primary) | deviation % | pass | attempt |',
-        '| --- | ---: | ---: | ---: | ---: | --- | ---: |',
+        '| scenario | airframe | sec | expected | actual | deviation % | pass | attempt |',
+        '| --- | --- | ---: | ---: | ---: | ---: | --- | ---: |',
     ];
     for (const r of matrixRows) {
         const prim = r.actual?.primary ?? '—';
         mdLines.push(
-            `| ${r.variant} | ${r.durationSec} | ${r.expected} | ${prim} | ${r.deviationPct ?? '—'} | ${r.pass ? 'OK' : 'NG'} | ${r.attemptsToPass ?? r.attemptsRun} |`,
+            `| ${r.scenario ?? r.variant} | ${r.airframe ?? AIRFRAME} | ${r.durationSec} | ${r.expected} | ${prim} | ${r.deviationPct ?? '—'} | ${r.pass ? 'OK' : 'NG'} | ${r.attemptsToPass ?? r.attemptsRun} |`,
         );
     }
     const mdOut = path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.md');

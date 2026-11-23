@@ -3,7 +3,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${METASIM_INSTALL_DIR:-/home/nagi/sim-server/meta-server-sim}"
-LOCK="${METASIM_AIRCRAFT_MATRIX_LOCK:-/tmp/p01-aircraft-scenario-matrix.lock}"
+LOCK="${METASIM_AIRCRAFT_MATRIX_LOCK:-/tmp/p01-aircraft-scenario-matrix-a320.lock}"
 ARTIFACTS="${MCP_ARTIFACTS_DIR:-/home/nagi/sim-server/backups/mcp-artifacts}"
 export MCP_SCENARIO_HEADED=1
 export MCP_ARTIFACTS_DIR="$ARTIFACTS"
@@ -16,6 +16,7 @@ exec flock -w 7200 "$LOCK" bash -c "
   cd \"$INSTALL_DIR\"
   command -v xvfb-run >/dev/null
   mkdir -p \"$ARTIFACTS\"
-  exec xvfb-run -a env MCP_SCENARIO_HEADED=1 MCP_ARTIFACTS_DIR=\"$ARTIFACTS\" \
+  HEAD=\$(git rev-parse HEAD)
+  exec xvfb-run -a env MCP_SCENARIO_HEADED=1 MCP_ARTIFACTS_DIR=\"$ARTIFACTS\" METASIM_PROD_HEAD=\"\$HEAD\" \
     node scripts/mcp-aircraft-scenario-matrix.mjs
 "
