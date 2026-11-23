@@ -45,6 +45,7 @@ import { loadTenantPluginClientModules } from './tenant-plugin-client-loader.js'
 import { tryResolveClientSpawn, applyClientSpawnPlan } from './client-spawn-registry.js';
 import { loadClientConfigOnce } from './tenant-client-config.js';
 import { applyTenantSceneTaikoPatch } from './tenant-scene-taiko-patch.js';
+import { installTenantPdfjsGetDocumentShim } from './tenant-pdfjs-get-document-shim.js';
 import { runTenantLoginGate } from './tenant-login-gate.js';
 import { registerTenantAssetCacheServiceWorker } from './tenant-service-worker-register-shim.js';
 import { navigateToLobbyAfterLogout } from './tenant-lobby-exit.js';
@@ -384,6 +385,7 @@ class TenantMetaverseApp {
         void registerTenantAssetCacheServiceWorker();
         await ensureFdsSmokeBulkConfig();
         applyTenantSceneTaikoPatch();
+        await installTenantPdfjsGetDocumentShim();
         try {
             const cfg = await loadClientConfigOnce();
             this.chartFeaturesEnabled =

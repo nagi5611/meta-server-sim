@@ -7,6 +7,7 @@ import { initTenantWorldEditFdsSmokePanel } from './tenant-world-edit-fds-smoke-
 import { initTenantWorldEditVdbPreview } from './tenant-world-edit-vdb-preview.js';
 import { installTenantWorldEditVdbShim } from './tenant-world-edit-vdb-shim.js';
 import { initTenantWorldEditAircraft } from './tenant-world-edit-aircraft.js';
+import { installTenantPdfjsGetDocumentShim } from './tenant-pdfjs-get-document-shim.js';
 
 /**
  * アセットタブ表示時にアバター／HDR 情報を更新する
@@ -48,6 +49,7 @@ function wireAssetsTabRefresh(tenantId) {
  * @returns {Promise<void>}
  */
 export async function initTenantSettingEditor(tenantId) {
+    await installTenantPdfjsGetDocumentShim();
     const { initSettingEditor } = await import('@metaverse-simple/setting.js');
     await initSettingEditor();
     wireAssetsTabRefresh(tenantId);
