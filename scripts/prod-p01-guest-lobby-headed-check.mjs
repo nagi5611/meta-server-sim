@@ -53,13 +53,18 @@ const spawnOk =
     Math.abs(Number(diag.spawnPoint.y) - 1) < 0.01 &&
     Math.abs(Number(diag.spawnPoint.z) - 5) < 0.01;
 
+const modelCount =
+    diag.loadedModelCount != null && diag.loadedModelCount > 0
+        ? diag.loadedModelCount
+        : (diag.lobbyModelCount ?? 0);
+
 const report = {
     checkedAt: new Date().toISOString(),
     pass:
         diag.tenantMetaverseReady &&
         diag.worldId === 'lobby' &&
         spawnOk &&
-        ((diag.loadedModelCount ?? diag.lobbyModelCount ?? 0) > 3),
+        modelCount > 3,
     diag,
     screenshotPath,
 };
