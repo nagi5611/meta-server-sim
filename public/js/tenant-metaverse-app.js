@@ -1193,7 +1193,8 @@ class TenantMetaverseApp {
         this.fdsSmokePanelManager?.update();
         this.fdsSmokeExposureMonitor?.update(deltaTime);
 
-        if (this.isPageVisible) {
+        const simGameplayActive = this.isPageVisible || isTenantE2EHarnessEnabled();
+        if (simGameplayActive) {
             if (this.aircraftManager?.isPiloting && this.aircraftController) {
                 this.aircraftController.update(deltaTime);
             }

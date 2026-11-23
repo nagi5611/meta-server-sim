@@ -160,6 +160,7 @@ async function diagnoseStraightRootCause() {
         baseUrl: BASE_URL,
         tenantId: TENANT,
         artifactsDir: ARTIFACTS,
+        captureScreenshot: true,
     });
     const m = metricsFromReport(report, 'straight');
     const cp = report?.checkpoints?.[0];
@@ -207,7 +208,7 @@ async function main() {
         diagnosis,
         rootCauseNotes: [
             '旧マトリクスは checkpoints: [] のため buildAircraftScenarioReport が errors なしで常に pass=true になり、movedEnough フォールバックも緩かった。',
-            '9.1m は搭乗・推力が正常でもチェックポイント検証が無効なため「合格」扱いされた典型例。125m は scenarios/aircraft/p01-straight.json の checkpoint（z:-126, 許容 25.5m）による実機材スロット検証。',
+            '9.1m vs 125m の主因は headless Playwright で document.hidden / rAF スロットリングにより frameUpdate 内の aircraftController.update が実質数フレームしか走らないこと（壁時計 5s でも移動 ~7.5m）。E2E ハーネス時は isPageVisible 無視＋visibility 偽装＋Chrome スロットリング無効化で是正。',
         ],
         matrix: matrixRows,
         allPass: matrixRows.every((r) => r.pass),

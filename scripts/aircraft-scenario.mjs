@@ -4,6 +4,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
+import {
+    PLAYWRIGHT_SCENARIO_BROWSER_ARGS,
+    aircraftScenarioHarnessInitScript,
+} from '../lib/playwright-aircraft-harness.js';
 
 const ARTIFACTS = process.env.AIRCRAFT_SCENARIO_ARTIFACTS || '/opt/cursor/artifacts';
 
@@ -41,12 +45,10 @@ const reportOut =
 
 await fs.mkdir(ARTIFACTS, { recursive: true });
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: PLAYWRIGHT_SCENARIO_BROWSER_ARGS });
 const page = await browser.newPage();
+await page.addInitScript(aircraftScenarioHarnessInitScript);
 await page.addInitScript(() => {
-    window.__TENANT_E2E_HARNESS__ = '1';
-    document.documentElement.dataset.e2eHarness = '1';
-    localStorage.setItem('metaverse-control-scheme', 'keyboard');
     localStorage.setItem('username', `ScenarioCLI-${Date.now()}`);
 });
 
