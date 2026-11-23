@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 本番デプロイ: バックアップ作成に失敗したら pull/build/restart しない（root 実行想定）
+# tenants/*/data/worlds.json 等のデータは git stash しない（未コミット差分はバックアップ JSON に退避してから pull）
 set -euo pipefail
 
 INSTALL_DIR="${METASIM_INSTALL_DIR:-/home/nagi/sim-server/meta-server-sim}"

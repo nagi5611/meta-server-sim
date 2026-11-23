@@ -24,21 +24,14 @@ function loadJsonFile(p) {
 }
 
 let stashWorlds = null;
+const stashRef = `stash@{0}:tenants/${tenantId}/data/worlds.json`;
 try {
-    const patch = execSync('git stash show -p stash@{0} -- tenants/' + tenantId + '/data/worlds.json', {
+    const raw = execSync(`git show ${stashRef}`, {
         cwd: ROOT,
         encoding: 'utf8',
         maxBuffer: 20 * 1024 * 1024,
     });
-    if (patch.trim()) {
-        const plus = patch
-            .split('\n')
-            .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
-            .map((l) => l.slice(1))
-            .join('\n');
-        const body = plus.startsWith('{') ? plus : null;
-        if (body) stashWorlds = JSON.parse(body);
-    }
+    if (raw.trim()) stashWorlds = JSON.parse(raw);
 } catch {
     stashWorlds = null;
 }
