@@ -30,7 +30,7 @@ import {
     aircraftListAirframesForMcp,
 } from '../lib/world-edit-mcp-ops.js';
 
-const ARTIFACTS = '/opt/cursor/artifacts';
+const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || process.env.ARTIFACTS || '/opt/cursor/artifacts';
 const report = {
     startedAt: new Date().toISOString(),
     steps: [],
