@@ -106,8 +106,11 @@ export default class AircraftScenarioRunner {
         const errors = [];
 
         try {
+            const waitSlotMs = 90_000;
+            let slot = scenario.slotId
+                ? await this._waitForSlotId(mgr, scenario.slotId, waitSlotMs)
+                : null;
             mgr.refreshSlotsFromScene();
-            let slot = scenario.slotId ? mgr.slotsById.get(scenario.slotId) : null;
             if (!slot) {
                 const lib = scenario.aircraftLibraryId;
                 if (lib) {
@@ -243,5 +246,22 @@ export default class AircraftScenarioRunner {
         return new Promise((resolve) => {
             requestAnimationFrame(() => resolve());
         });
+    }
+
+    /**
+     * @param {import('./aircraft-manager.js').default} mgr
+     * @param {string} slotId
+     * @param {number} timeoutMs
+     */
+    async _waitForSlotId(mgr, slotId, timeoutMs) {
+        const sid = String(slotId || '').trim();
+        const t0 = performance.now();
+        while (performance.now() - t0 < timeoutMs) {
+            mgr.refreshSlotsFromScene();
+            const hit = mgr.slotsById.get(sid);
+            if (hit?.root) return hit;
+            await this._waitFrame();
+        }
+        return null;
     }
 }
