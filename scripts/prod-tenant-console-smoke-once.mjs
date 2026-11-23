@@ -17,6 +17,8 @@ const CONSOLE_PATTERNS = [
     /Multiple instances of Three\.js/i,
     /\[tenant-plugins\] client load failed/i,
     /Maximum call stack/i,
+    /tenant-pdfjs-shim/i,
+    /read only property 'getDocument'/i,
 ];
 
 fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
