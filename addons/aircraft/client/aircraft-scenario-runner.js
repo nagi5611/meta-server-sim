@@ -143,13 +143,15 @@ export default class AircraftScenarioRunner {
             if (!mgr.isPiloting) {
                 const feet = this.app.characterController?.getPosition?.();
                 if (feet) mgr.updateProximity(feet);
-                const boarded = await mgr.tryBoardSlot(slot.id);
-                if (!boarded) {
-                    return buildAircraftScenarioReport(scenario, [], {
-                        startedAtIso,
-                        errors: [`board failed for slot ${slot.id}`],
-                    });
-                }
+                await mgr.tryBoardSlot(slot.id);
+                await this._waitFrame();
+                await this._waitFrame();
+            }
+            if (!mgr.isPiloting || mgr.activeSlot?.id !== slot.id) {
+                return buildAircraftScenarioReport(scenario, [], {
+                    startedAtIso,
+                    errors: [`board failed for slot ${slot.id}`],
+                });
             }
 
             const activeCtrl = ctrl._active;

@@ -606,11 +606,14 @@ export default class AircraftManager {
     async tryBoardSlot(slotId) {
         const sid = String(slotId || '').trim();
         if (!sid) return false;
+        if (this.isPiloting && this.activeSlot?.id === sid) return true;
         this.refreshSlotsFromScene();
         const slot = this.slotsById.get(sid);
         if (!slot) return false;
         this.nearestSlot = slot;
-        return this.tryBoardNearest();
+        const ok = await this.tryBoardNearest();
+        if (!ok && this.isPiloting && this.activeSlot?.id === sid) return true;
+        return ok;
     }
 
     /**
