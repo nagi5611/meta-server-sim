@@ -12,6 +12,7 @@ import { handleShareJoinRequest } from './share-join-api.js';
 import { normalizeRegistryMetaverseList } from './lobby-registry-urls.js';
 import { isLobbyEntryUrlAllowed } from './lobby-entry-url-policy.js';
 import { pollStatus } from './lobby-poll-status.js';
+import { maybeNotifyZeroAdminKeys } from './admin-key-zero-warning.js';
 
 export { LobbyPoller };
 
@@ -170,6 +171,10 @@ export default {
         ctx.waitUntil(env.LOBBY_POLLER.get(id).fetch('http://lobby-poller/wake'));
         if (env.LOBBY_DB) {
             ctx.waitUntil(rollupDailyMetrics(env.LOBBY_DB));
+        }
+        const kv = /** @type {KVNamespace | undefined} */ (env.LOBBY_KV);
+        if (kv) {
+            ctx.waitUntil(maybeNotifyZeroAdminKeys(env, kv, { reason: 'startup' }));
         }
     },
 };

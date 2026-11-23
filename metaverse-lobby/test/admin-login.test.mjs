@@ -19,7 +19,7 @@ async function startSimStub(handler) {
     };
 }
 
-test('handleAdminLogin: static LOBBY_ADMIN_PASSWORD still works', async () => {
+test('handleAdminLogin: static admin requires configured public key', async () => {
     const env = {
         LOBBY_ADMIN_USER: 'admin',
         LOBBY_ADMIN_PASSWORD: 'static-secret',
@@ -33,16 +33,9 @@ test('handleAdminLogin: static LOBBY_ADMIN_PASSWORD still works', async () => {
         body: JSON.stringify({ username: 'admin', password: 'static-secret' }),
     });
     const res = await handleAdminLogin(req, env);
-    assert.equal(res?.status, 200);
-    const setCookie = res.headers.get('set-cookie') || '';
-    assert.match(setCookie, /lobby_admin_session=/);
-    const token = setCookie.match(/lobby_admin_session=([^;]+)/)?.[1];
-    assert.ok(token);
-    const session = await verifyJwt(token, SECRET);
-    assert.equal(session?.sub, 'admin');
-    assert.equal(session?.superAdmin, true);
+    assert.equal(res?.status, 503);
     const body = await res.json();
-    assert.equal(body.user.superAdmin, true);
+    assert.equal(body.error, 'admin_key_not_configured');
 });
 
 test('handleAdminLogin: sim teacher via email issues admin session', async () => {

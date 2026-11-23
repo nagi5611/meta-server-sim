@@ -4,18 +4,25 @@ import {
     insertSuperAdminLoginEvent,
     listSuperAdminLoginEvents,
 } from './db-ops.js';
-import {
-    buildOtpSmsMessage,
-    maskAdminPhone,
-    normalizeJapanPhoneE164,
-    sendAdminOtpSms,
-} from './aws-sns-sms.js';
 import { resolveAdminOtpSecret, resolveAdminSessionSecret } from './admin-secrets.js';
+import {
+    ADMIN_KEY_CHALLENGE_PREFIX,
+    ADMIN_KEY_MAX_ATTEMPTS,
+    ADMIN_KEY_TTL_SEC,
+    generateKeyChallengeNonce,
+    isAdminKeyAuthEnabled,
+    verifyAdminKeyAgainstAnyActive,
+} from './admin-ed25519-auth.js';
+import { countBootstrapActiveAdminKeys, maybeNotifyZeroAdminKeys } from './admin-key-zero-warning.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const OTP_KV_PREFIX = 'super_admin_otp:';
+const OTP_RESEND_KV_PREFIX = 'admin_otp_resend:';
 const OTP_TTL_SEC = 600;
 const OTP_MAX_ATTEMPTS = 5;
+const OTP_RESEND_COOLDOWN_SEC = 45;
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 /**
  * @param {Request} request
@@ -48,23 +55,30 @@ export function formatJstTimestamp(now = new Date()) {
 }
 
 /**
+ * メール OTP（admin 以外）。Resend 設定またはテスト用 sink。
  * @param {Record<string, unknown>} env
  * @returns {boolean}
  */
+export function isAdminOtpEnabled(env) {
+    if (Array.isArray(env.__test_mail_sink)) return true;
+    return Boolean(String(env.RESEND_API_KEY || '').trim());
+}
+
+/** @deprecated 互換用 — メール OTP 有効と同義 */
 export function isSuperAdminOtpEnabled(env) {
-    return Boolean(
-        String(env.ADMIN_PHONE || '').trim() || String(env.ADMIN_EMAIL || '').trim(),
-    );
+    return isAdminOtpEnabled(env);
 }
 
 /**
- * @param {Record<string, unknown>} env
- * @returns {'sms' | 'email' | null}
+ * @param {{ email?: string } | null | undefined} simUser
+ * @returns {{ ok: true, email: string } | { ok: false, error: 'otp_mail_no_recipient' }}
  */
-export function resolveSuperAdminOtpChannel(env) {
-    if (String(env.ADMIN_PHONE || '').trim()) return 'sms';
-    if (String(env.ADMIN_EMAIL || '').trim()) return 'email';
-    return null;
+export function resolveAdminOtpRecipient(simUser) {
+    const email = String(simUser?.email || '').trim();
+    if (!email || email.endsWith('@mmh.local') || !EMAIL_RE.test(email)) {
+        return { ok: false, error: 'otp_mail_no_recipient' };
+    }
+    return { ok: true, email };
 }
 
 /**
@@ -108,11 +122,37 @@ function generateOtpCode() {
     return String(n).padStart(6, '0');
 }
 
-function maskAdminEmail(email) {
+export function maskAdminEmail(email) {
     const e = String(email || '').trim();
     const at = e.indexOf('@');
     if (at <= 1) return '***';
     return `${e.slice(0, 2)}***${e.slice(at)}`;
+}
+
+/**
+ * @param {KVNamespace} kv
+ * @param {string} adminSub
+ * @returns {Promise<number>}
+ */
+export async function getOtpResendCooldownRemaining(kv, adminSub) {
+    const raw = await kv.get(`${OTP_RESEND_KV_PREFIX}${adminSub}`);
+    if (!raw) return 0;
+    const lastSent = Number(raw);
+    if (!Number.isFinite(lastSent)) return 0;
+    const elapsed = Math.floor(Date.now() / 1000) - lastSent;
+    const remaining = OTP_RESEND_COOLDOWN_SEC - elapsed;
+    return remaining > 0 ? remaining : 0;
+}
+
+/**
+ * @param {KVNamespace} kv
+ * @param {string} adminSub
+ */
+async function recordOtpResendSent(kv, adminSub) {
+    const now = Math.floor(Date.now() / 1000);
+    await kv.put(`${OTP_RESEND_KV_PREFIX}${adminSub}`, String(now), {
+        expirationTtl: OTP_RESEND_COOLDOWN_SEC + 120,
+    });
 }
 
 /**
@@ -196,6 +236,100 @@ async function issueAdminSession(env, sessionUser, superAdmin) {
 }
 
 /**
+ * @param {Record<string, unknown>} env
+ * @param {KVNamespace} kv
+ * @param {D1Database | undefined} db
+ * @param {{ sessionUser: string, superAdmin: boolean, clientIp: string, simUser?: Record<string, unknown> }} ctx
+ */
+async function beginEmailOtpChallenge(env, kv, db, ctx) {
+    const recipient = resolveAdminOtpRecipient(ctx.simUser);
+    if (!recipient.ok) {
+        return { status: 503, body: { error: recipient.error } };
+    }
+    const code = generateOtpCode();
+    const challengeId = crypto.randomUUID();
+    const hash = await hashOtpCode(env, code);
+    await kv.put(
+        `${OTP_KV_PREFIX}${challengeId}`,
+        JSON.stringify({
+            hash,
+            sub: ctx.sessionUser,
+            superAdmin: ctx.superAdmin,
+            attempts: 0,
+            ip: ctx.clientIp,
+            otpEmail: recipient.email,
+        }),
+        { expirationTtl: OTP_TTL_SEC },
+    );
+    await recordOtpResendSent(kv, ctx.sessionUser);
+    const atJst = formatJstTimestamp();
+    try {
+        await sendAdminOtpEmail(env, {
+            to: recipient.email,
+            subject: 'みんなでメタ 管理ログイン確認コード',
+            text: `管理者ログインの確認コード: ${code}\n有効期限: 10分\nIP: ${ctx.clientIp}\n時刻(JST): ${atJst}`,
+            html: `<p>管理者ログインの確認コード:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>有効期限: 10分</p><p>IP: ${ctx.clientIp}<br>時刻 (JST): ${atJst}</p>`,
+        });
+    } catch (err) {
+        await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
+        const codeName = /** @type {{ code?: string }} */ (err).code;
+        if (codeName === 'RESEND_NOT_CONFIGURED') {
+            return { status: 503, body: { error: 'otp_mail_not_configured' } };
+        }
+        return { status: 502, body: { error: 'otp_email_send_failed' } };
+    }
+    if (db && ctx.superAdmin) {
+        await logSuperAdminAttempt(db, { clientIp: ctx.clientIp, outcome: 'password_ok' });
+    }
+    return {
+        status: 200,
+        body: {
+            ok: true,
+            otpRequired: true,
+            challengeId,
+            otpChannel: 'email',
+            otpSentTo: maskAdminEmail(recipient.email),
+            clientIp: ctx.clientIp,
+            attemptedAtJst: atJst,
+            resendCooldownSec: OTP_RESEND_COOLDOWN_SEC,
+        },
+    };
+}
+
+/**
+ * @param {Record<string, unknown>} env
+ * @param {KVNamespace} kv
+ * @param {D1Database | undefined} db
+ * @param {{ sessionUser: string, clientIp: string }} ctx
+ */
+async function beginAdminKeyChallenge(env, kv, db, ctx) {
+    if (!(await isAdminKeyAuthEnabled(env, db))) {
+        return { status: 503, body: { error: 'admin_key_not_configured' } };
+    }
+    const challengeId = crypto.randomUUID();
+    const nonce = generateKeyChallengeNonce();
+    await kv.put(
+        `${ADMIN_KEY_CHALLENGE_PREFIX}${challengeId}`,
+        JSON.stringify({ nonce, sub: ctx.sessionUser, attempts: 0, ip: ctx.clientIp }),
+        { expirationTtl: ADMIN_KEY_TTL_SEC },
+    );
+    await logSuperAdminAttempt(db, { clientIp: ctx.clientIp, outcome: 'password_ok' });
+    const atJst = formatJstTimestamp();
+    return {
+        status: 200,
+        body: {
+            ok: true,
+            keyChallengeRequired: true,
+            challengeId,
+            nonce,
+            clientIp: ctx.clientIp,
+            attemptedAtJst: atJst,
+            keyChallengeExpiresSec: ADMIN_KEY_TTL_SEC,
+        },
+    };
+}
+
+/**
  * @param {Request} request
  * @param {Record<string, unknown>} env
  * @param {KVNamespace} kv
@@ -205,18 +339,81 @@ export async function handleAdminLoginSuper(request, env, kv) {
     if (request.method !== 'POST') return null;
 
     const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
+    const clientIp = getRequestClientIp(request);
+
+    if (url.pathname === '/api/admin/login/verify-key') {
+        const body = await request.json();
+        const challengeId = String(body.challengeId || '').trim();
+        const signature = String(body.signature || '').trim();
+        if (!challengeId || !signature) {
+            return { status: 400, body: { error: 'key_invalid' } };
+        }
+        const raw = await kv.get(`${ADMIN_KEY_CHALLENGE_PREFIX}${challengeId}`, 'json');
+        if (!raw || typeof raw !== 'object') {
+            await logSuperAdminAttempt(db, { clientIp, outcome: 'key_failed', detail: { reason: 'expired' } });
+            return { status: 401, body: { error: 'key_challenge_expired' } };
+        }
+        const attempts = Number(raw.attempts) || 0;
+        if (attempts >= ADMIN_KEY_MAX_ATTEMPTS) {
+            await kv.delete(`${ADMIN_KEY_CHALLENGE_PREFIX}${challengeId}`);
+            return { status: 401, body: { error: 'key_locked' } };
+        }
+        const nonce = String(raw.nonce || '');
+        const verified = await verifyAdminKeyAgainstAnyActive(env, db, {
+            challengeId,
+            nonce,
+            signatureB64: signature,
+            register: false,
+        });
+        if (!verified.ok) {
+            await kv.put(
+                `${ADMIN_KEY_CHALLENGE_PREFIX}${challengeId}`,
+                JSON.stringify({ ...raw, attempts: attempts + 1 }),
+                { expirationTtl: ADMIN_KEY_TTL_SEC },
+            );
+            await logSuperAdminAttempt(db, { clientIp, outcome: 'key_failed' });
+            return { status: 401, body: { error: 'key_invalid' } };
+        }
+        await kv.delete(`${ADMIN_KEY_CHALLENGE_PREFIX}${challengeId}`);
+        const sessionUser = String(raw.sub || 'admin');
+        await logSuperAdminAttempt(db, { clientIp, outcome: 'session_ok' });
+        return issueAdminSession(env, sessionUser, true);
+    }
+
+    if (url.pathname === '/api/admin/login/resend-otp') {
+        const body = await request.json();
+        const challengeId = String(body.challengeId || '').trim();
+        if (!challengeId) {
+            return { status: 400, body: { error: 'otp_invalid' } };
+        }
+        const raw = await kv.get(`${OTP_KV_PREFIX}${challengeId}`, 'json');
+        if (!raw || typeof raw !== 'object') {
+            return { status: 401, body: { error: 'otp_expired' } };
+        }
+        const sub = String(raw.sub || '');
+        const retryAfterSec = await getOtpResendCooldownRemaining(kv, sub);
+        if (retryAfterSec > 0) {
+            return { status: 429, body: { error: 'otp_resend_cooldown', retryAfterSec } };
+        }
+        await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
+        const email = String(raw.otpEmail || '').trim();
+        return beginEmailOtpChallenge(env, kv, db, {
+            sessionUser: sub,
+            superAdmin: Boolean(raw.superAdmin),
+            clientIp,
+            simUser: { email },
+        });
+    }
 
     if (url.pathname === '/api/admin/login/verify-otp') {
         const body = await request.json();
         const challengeId = String(body.challengeId || '').trim();
         const code = String(body.code || body.otp || '').trim();
-        const clientIp = getRequestClientIp(request);
         if (!challengeId || !/^\d{6}$/.test(code)) {
             return { status: 400, body: { error: 'otp_invalid' } };
         }
         const raw = await kv.get(`${OTP_KV_PREFIX}${challengeId}`, 'json');
         if (!raw || typeof raw !== 'object') {
-            await logSuperAdminAttempt(db, { clientIp, outcome: 'otp_failed', detail: { reason: 'expired' } });
             return { status: 401, body: { error: 'otp_expired' } };
         }
         const attempts = Number(raw.attempts) || 0;
@@ -232,13 +429,18 @@ export async function handleAdminLoginSuper(request, env, kv) {
                 JSON.stringify({ ...raw, attempts: attempts + 1 }),
                 { expirationTtl: OTP_TTL_SEC },
             );
-            await logSuperAdminAttempt(db, { clientIp, outcome: 'otp_failed' });
+            if (Boolean(raw.superAdmin)) {
+                await logSuperAdminAttempt(db, { clientIp, outcome: 'otp_failed' });
+            }
             return { status: 401, body: { error: 'otp_invalid' } };
         }
         await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
         const sessionUser = String(raw.sub || 'admin');
-        await logSuperAdminAttempt(db, { clientIp, outcome: 'session_ok' });
-        return issueAdminSession(env, sessionUser, true);
+        const superAdmin = Boolean(raw.superAdmin);
+        if (superAdmin) {
+            await logSuperAdminAttempt(db, { clientIp, outcome: 'session_ok' });
+        }
+        return issueAdminSession(env, sessionUser, superAdmin);
     }
 
     if (url.pathname !== '/api/admin/login') return null;
@@ -247,7 +449,6 @@ export async function handleAdminLoginSuper(request, env, kv) {
     const login = String(body.login || body.username || body.email || '').trim();
     const pass = String(body.password || '');
     const staticAdminUser = String(env.LOBBY_ADMIN_USER || 'admin').trim();
-    const clientIp = getRequestClientIp(request);
     const staticUserAttempt = login === staticAdminUser;
 
     /** @type {string} */
@@ -255,6 +456,8 @@ export async function handleAdminLoginSuper(request, env, kv) {
     let authenticated = false;
     /** @type {boolean} */
     let superAdmin = false;
+    /** @type {Record<string, unknown> | null} */
+    let simUser = null;
     /** @type {{ ok: boolean, status: number, data: Record<string, unknown> | null }} | null */
     let simResult = null;
 
@@ -269,7 +472,9 @@ export async function handleAdminLoginSuper(request, env, kv) {
         simResult = await fetchSimProxy(env, login, pass);
         if (simResult.ok && simResult.data?.user) {
             authenticated = true;
-            sessionUser = String(simResult.data.user.username || login);
+            simUser = /** @type {Record<string, unknown>} */ (simResult.data.user);
+            sessionUser = String(simUser.username || login);
+            superAdmin = false;
         }
     }
 
@@ -284,76 +489,22 @@ export async function handleAdminLoginSuper(request, env, kv) {
         return { status: status === 403 ? 403 : 401, body: { error: simError || 'invalid_credentials' } };
     }
 
-    if (superAdmin && isSuperAdminOtpEnabled(env)) {
-        await logSuperAdminAttempt(db, { clientIp, outcome: 'password_ok' });
-        const channel = resolveSuperAdminOtpChannel(env);
-        const adminPhone = String(env.ADMIN_PHONE || '').trim();
-        const adminEmail = String(env.ADMIN_EMAIL || '').trim();
-        const code = generateOtpCode();
-        const challengeId = crypto.randomUUID();
-        const hash = await hashOtpCode(env, code);
-        await kv.put(
-            `${OTP_KV_PREFIX}${challengeId}`,
-            JSON.stringify({ hash, sub: sessionUser, attempts: 0, ip: clientIp }),
-            { expirationTtl: OTP_TTL_SEC },
-        );
-        const atJst = formatJstTimestamp();
-        /** @type {string} */
-        let otpSentTo = '';
-        try {
-            if (channel === 'sms') {
-                const smsBody = buildOtpSmsMessage({ code, clientIp, atJst });
-                await sendAdminOtpSms(env, { phone: adminPhone, message: smsBody });
-                const e164 = normalizeJapanPhoneE164(adminPhone) || adminPhone;
-                otpSentTo = maskAdminPhone(e164);
-            } else {
-                await sendAdminOtpEmail(env, {
-                    to: adminEmail,
-                    subject: 'みんなでメタ 管理ログイン確認コード',
-                    text: `スーパー管理者ログインの確認コード: ${code}\n有効期限: 10分\nIP: ${clientIp}\n時刻(JST): ${atJst}`,
-                    html: `<p>スーパー管理者ログインの確認コード:</p><p style="font-size:24px;font-weight:bold;letter-spacing:4px">${code}</p><p>有効期限: 10分</p><p>IP: ${clientIp}<br>時刻 (JST): ${atJst}</p>`,
-                });
-                otpSentTo = maskAdminEmail(adminEmail);
-            }
-        } catch (err) {
-            await kv.delete(`${OTP_KV_PREFIX}${challengeId}`);
-            const codeName = /** @type {{ code?: string }} */ (err).code;
-            if (codeName === 'ADMIN_PHONE_INVALID') {
-                return { status: 503, body: { error: 'admin_phone_invalid' } };
-            }
-            if (codeName === 'SNS_NOT_CONFIGURED') {
-                return { status: 503, body: { error: 'otp_sms_not_configured' } };
-            }
-            if (codeName === 'SNS_SEND_FAILED') {
-                return { status: 502, body: { error: 'otp_sms_send_failed' } };
-            }
-            if (codeName === 'RESEND_NOT_CONFIGURED') {
-                return { status: 503, body: { error: 'otp_mail_not_configured' } };
-            }
-            if (codeName === 'RESEND_SEND_FAILED') {
-                return { status: 502, body: { error: 'otp_email_send_failed' } };
-            }
-            return {
-                status: 502,
-                body: { error: channel === 'sms' ? 'otp_sms_send_failed' : 'otp_email_send_failed' },
-            };
+    if (superAdmin) {
+        const activeKeys = await countBootstrapActiveAdminKeys(env, db);
+        if (activeKeys <= 0) {
+            await maybeNotifyZeroAdminKeys(env, kv, { reason: 'login_attempt', clientIp });
+            return { status: 503, body: { error: 'admin_key_not_configured' } };
         }
-        return {
-            status: 200,
-            body: {
-                ok: true,
-                otpRequired: true,
-                challengeId,
-                otpChannel: channel,
-                otpSentTo,
-                clientIp,
-                attemptedAtJst: atJst,
-            },
-        };
+        return beginAdminKeyChallenge(env, kv, db, { sessionUser, clientIp });
     }
 
-    if (superAdmin) {
-        await logSuperAdminAttempt(db, { clientIp, outcome: 'session_ok', detail: { otpSkipped: true } });
+    if (isAdminOtpEnabled(env)) {
+        return beginEmailOtpChallenge(env, kv, db, {
+            sessionUser,
+            superAdmin: false,
+            clientIp,
+            simUser: simUser || undefined,
+        });
     }
 
     return issueAdminSession(env, sessionUser, superAdmin);
@@ -381,3 +532,5 @@ export async function getSuperAdminLoginAudit(db, limit = 20) {
     const lastSuccess = rows.find((r) => r.outcome === 'session_ok') || null;
     return { events: rows, lastSuccess };
 }
+
+export { OTP_RESEND_COOLDOWN_SEC };

@@ -18,18 +18,72 @@
 
   /* ================= 認証 ================= */
   const gate = $("#gate"), app = $("#app");
-  const otpState = { challengeId: null, pending: false };
+  const otpState = {
+    challengeId: null,
+    pending: false,
+    mode: null,
+    nonce: null,
+    resendTimer: null,
+    resendUntil: 0,
+  };
+
+  function clearOtpResendTimer() {
+    if (otpState.resendTimer) {
+      clearInterval(otpState.resendTimer);
+      otpState.resendTimer = null;
+    }
+  }
+
+  function updateOtpResendUi() {
+    const resendBtn = $("#gateOtpResend");
+    const resendHint = $("#gateOtpResendHint");
+    if (!resendBtn || otpState.mode !== "otp") return;
+    const left = Math.max(0, Math.ceil((otpState.resendUntil - Date.now()) / 1000));
+    if (left > 0) {
+      resendBtn.disabled = true;
+      if (resendHint) {
+        resendHint.hidden = false;
+        resendHint.textContent = tr("admin.gateOtpResendWait", { sec: String(left) });
+      }
+    } else {
+      resendBtn.disabled = false;
+      if (resendHint) {
+        resendHint.hidden = true;
+        resendHint.textContent = "";
+      }
+    }
+  }
+
+  function startOtpResendCooldown(sec) {
+    clearOtpResendTimer();
+    const cooldown = Math.max(1, Number(sec) || 45);
+    otpState.resendUntil = Date.now() + cooldown * 1000;
+    updateOtpResendUi();
+    otpState.resendTimer = setInterval(updateOtpResendUi, 1000);
+  }
 
   function resetOtpGate() {
     otpState.challengeId = null;
     otpState.pending = false;
+    otpState.mode = null;
+    otpState.nonce = null;
+    clearOtpResendTimer();
+    otpState.resendUntil = 0;
     const otpField = $("#gateOtpField");
     const otp = $("#gOtp");
     const hint = $("#gateOtpHint");
+    const keyField = $("#gateKeyField");
+    const keyFile = $("#gKeyFile");
     const audit = $("#gateAudit");
     if (otpField) otpField.hidden = true;
     if (otp) otp.value = "";
     if (hint) hint.textContent = "";
+    if (keyField) keyField.hidden = true;
+    if (keyFile) keyFile.value = "";
+    const resendHint = $("#gateOtpResendHint");
+    const resendBtn = $("#gateOtpResend");
+    if (resendHint) { resendHint.hidden = true; resendHint.textContent = ""; }
+    if (resendBtn) resendBtn.disabled = true;
     if (audit) { audit.hidden = true; audit.textContent = ""; }
     const btn = $("#gateBtn");
     if (btn) btn.textContent = tr("admin.gateLogin");
@@ -71,21 +125,109 @@
       $("#gateBtn").disabled = false;
     }
   }
+  async function handleKeyVerify() {
+    const fileInput = $("#gKeyFile");
+    const file = fileInput?.files?.[0];
+    if (!file || !otpState.challengeId || !otpState.nonce) {
+      $("#gateErr").textContent = tr("admin.gateKeyMissing");
+      return;
+    }
+    if (!window.LobbyAdminGateKey) {
+      $("#gateErr").textContent = tr("admin.gateKeyLoadFail");
+      return;
+    }
+    $("#gateBtn").disabled = true;
+  try {
+      const privateKey = await window.LobbyAdminGateKey.readAdminKeyFile(file);
+      const signature = await window.LobbyAdminGateKey.signAdminKeyChallenge(
+        privateKey,
+        otpState.challengeId,
+        otpState.nonce,
+      );
+      await window.LobbyAdminApi.verifyKey(otpState.challengeId, signature);
+      await enter();
+    } catch (err) {
+      const code = err?.data?.error;
+      const key =
+        code === "key_invalid" || code === "key_challenge_expired" || code === "key_locked"
+          ? "admin.gateKeyInvalid"
+          : code === "admin_key_not_configured" || code === "admin_key_invalid"
+            ? "admin.gateKeyNotConfigured"
+            : "admin.gateErr";
+      $("#gateErr").textContent = tr(key);
+    } finally {
+      $("#gateBtn").disabled = false;
+    }
+  }
+
+  $("#gateOtpResend")?.addEventListener("click", async () => {
+    if (!otpState.challengeId || otpState.mode !== "otp") return;
+    const resendBtn = $("#gateOtpResend");
+    if (resendBtn) resendBtn.disabled = true;
+    $("#gateErr").textContent = "";
+    try {
+      const data = await window.LobbyAdminApi.resendOtp(otpState.challengeId);
+      otpState.challengeId = data.challengeId;
+      const hint = $("#gateOtpHint");
+      if (hint) hint.textContent = tr("admin.gateOtpSent", { mask: data.otpSentTo || "email" });
+      startOtpResendCooldown(data.resendCooldownSec ?? errRetryCooldown(data));
+    } catch (err) {
+      const code = err?.data?.error;
+      if (code === "otp_resend_cooldown" && err?.data?.retryAfterSec) {
+        startOtpResendCooldown(err.data.retryAfterSec);
+        return;
+      }
+      $("#gateErr").textContent =
+        code === "otp_mail_not_configured" || code === "otp_email_send_failed"
+          ? tr("admin.gateOtpMailFail")
+          : tr("admin.gateErr");
+      updateOtpResendUi();
+    }
+  });
+
+  function errRetryCooldown(data) {
+    return data?.resendCooldownSec ?? 45;
+  }
+
   $("#gateForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#gateErr").textContent = "";
     $("#gateBtn").disabled = true;
     try {
-      if (otpState.pending && otpState.challengeId) {
+      if (otpState.pending && otpState.mode === "key" && otpState.challengeId) {
+        await handleKeyVerify();
+        return;
+      }
+      if (otpState.pending && otpState.mode === "otp" && otpState.challengeId) {
         const code = $("#gOtp")?.value?.trim() || "";
         await window.LobbyAdminApi.verifyOtp(otpState.challengeId, code);
         await enter();
         return;
       }
       const data = await window.LobbyAdminApi.login($("#gUser").value.trim(), $("#gPass").value);
+      if (data?.keyChallengeRequired && data.challengeId && data.nonce) {
+        otpState.challengeId = data.challengeId;
+        otpState.nonce = data.nonce;
+        otpState.pending = true;
+        otpState.mode = "key";
+        const keyField = $("#gateKeyField");
+        const audit = $("#gateAudit");
+        if (keyField) keyField.hidden = false;
+        if (audit && data.clientIp && data.attemptedAtJst) {
+          audit.hidden = false;
+          audit.textContent = tr("admin.gateAttemptAudit", {
+            ip: data.clientIp,
+            at: data.attemptedAtJst,
+          });
+        }
+        $("#gateBtn").textContent = tr("admin.gateKeySubmit");
+        setTimeout(() => $("#gKeyFile")?.focus(), 50);
+        return;
+      }
       if (data?.otpRequired && data.challengeId) {
         otpState.challengeId = data.challengeId;
         otpState.pending = true;
+        otpState.mode = "otp";
         const otpField = $("#gateOtpField");
         const hint = $("#gateOtpHint");
         const audit = $("#gateAudit");
@@ -101,6 +243,7 @@
           });
         }
         $("#gateBtn").textContent = tr("admin.gateOtpSubmit");
+        startOtpResendCooldown(data.resendCooldownSec ?? 45);
         setTimeout(() => $("#gOtp")?.focus(), 50);
         return;
       }
@@ -116,18 +259,18 @@
               ? "admin.gateSessionNotConfigured"
               : code === "otp_invalid" || code === "otp_expired" || code === "otp_locked"
                 ? "admin.gateOtpInvalid"
-                : code === "admin_phone_invalid"
-                  ? "admin.gatePhoneInvalid"
-                  : code === "otp_sms_not_configured" ||
-                      code === "otp_sms_send_failed"
-                    ? "admin.gateOtpSmsFail"
-                  : code === "otp_mail_not_configured" ||
+                : code === "otp_mail_not_configured" ||
                       code === "otp_email_send_failed" ||
                       code === "otp_send_failed"
                     ? "admin.gateOtpMailFail"
+                  : code === "key_invalid" || code === "key_challenge_expired" || code === "key_locked"
+                    ? "admin.gateKeyInvalid"
+                  : code === "admin_key_not_configured" || code === "admin_key_invalid"
+                    ? "admin.gateKeyNotConfigured"
                   : "admin.gateErr";
       $("#gateErr").textContent = tr(key);
-      if (otpState.pending) $("#gOtp")?.select();
+      if (otpState.pending && otpState.mode === "otp") $("#gOtp")?.select();
+      else if (otpState.pending && otpState.mode === "key") $("#gKeyFile")?.focus();
       else $("#gPass").select();
     } finally {
       $("#gateBtn").disabled = false;
@@ -909,13 +1052,144 @@
         ${auditRows ? `<table class="mini-log"><thead><tr><th>時刻 (JST)</th><th>IP</th><th>結果</th></tr></thead><tbody>${auditRows}</tbody></table>` : `<p class="dim">${esc(tr("admin.superLoginAuditEmpty"))}</p>`}
       </div></div>`
       : "";
+    const keys = state.adminKeys || [];
+    const keyRows = keys.map((k) => {
+      const st = k.disabledAt ? tr("admin.adminKeyDisabled") : tr("admin.adminKeyActive");
+      const rev = k.revocable
+        ? `<button type="button" class="txt-btn admin-key-revoke" data-id="${esc(k.id)}">${esc(tr("admin.adminKeyRevoke"))}</button>`
+        : "—";
+      return `<tr><td>${esc(k.name)}</td><td class="num dim"><code>${esc(k.fingerprintShort || "")}…</code></td><td class="num dim">${esc(k.createdAt || "—")}</td><td class="num dim">${esc(k.lastUsedAt || "—")}</td><td>${esc(st)}</td><td>${rev}</td></tr>`;
+    }).join("");
+    const keyBlock =
+      store.superAdmin && store.adminUsername === "admin"
+        ? `<div class="set-row" id="adminKeysPanel"><h3 data-i18n="admin.adminKeysTitle">管理者 Ed25519 鍵</h3><div>
+        <p data-i18n="admin.adminKeysDesc">スーパー管理者 <code>admin</code> は複数の公開鍵を登録できます。秘密鍵はブラウザで生成し、この画面では公開鍵のみ登録します。</p>
+        <div class="field"><label for="adminKeyName">${esc(tr("admin.adminKeyNameLabel"))}</label>
+          <input class="inp" id="adminKeyName" type="text" maxlength="120" spellcheck="false"></div>
+        <div class="field"><label for="adminKeyReauthFile">${esc(tr("admin.adminKeyReauthLabel"))}</label>
+          <input class="inp" id="adminKeyReauthFile" type="file" accept=".pem,.key,text/plain"></div>
+        <button type="button" class="btn btn-primary" id="adminKeyIssueBtn">${esc(tr("admin.adminKeyIssue"))}</button>
+        <p class="dim" id="adminKeyIssueMsg" style="margin-top:8px"></p>
+        ${state._adminKeysLoading ? `<p>${esc(tr("common.syncing"))}</p>` : ""}
+        ${keyRows ? `<table class="mini-log" style="margin-top:16px"><thead><tr><th>${esc(tr("admin.adminKeyColName"))}</th><th>FP</th><th>${esc(tr("admin.adminKeyColCreated"))}</th><th>${esc(tr("admin.adminKeyColLastUsed"))}</th><th>${esc(tr("admin.adminKeyColStatus"))}</th><th></th></tr></thead><tbody>${keyRows}</tbody></table>` : `<p class="dim">${esc(tr("admin.adminKeysEmpty"))}</p>`}
+      </div></div>`
+        : "";
     return head("設定") + `<div class="sheet set">
       <div class="set-row"><h3>管理ログイン</h3><div>
-        <p>Cloudflare Worker の <code>LOBBY_ADMIN_USER</code> / <code>LOBBY_ADMIN_PASSWORD</code> で認証します。スーパー管理者は <code>ADMIN_PHONE</code> 宛 SMS OTP（AWS SNS: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_SNS_REGION</code>）または <code>ADMIN_EMAIL</code> + <code>RESEND_API_KEY</code>。カタログは sim 本番 JSON が正本です。</p></div></div>
+        <p><code>admin</code> は Ed25519 秘密鍵（第2要素）。その他の管理者は Resend メール OTP（再送信 45 秒）。初回 bootstrap 公開鍵は <code>ADMIN_ED25519_PUBLIC_KEY</code> または CLI 登録。</p></div></div>
+      ${keyBlock}
       ${auditBlock}
       <div class="set-row"><h3>パスワード再設定メール</h3><div>
         <p>Resend で再設定リンクを送信します。sim の <code>RESEND_API_KEY</code> と <code>RESEND_FROM_EMAIL</code>、任意で <code>LOBBY_PASSWORD_RESET_URL</code> を設定してください。</p></div></div>
     </div>`;
+  }
+
+  async function loadAdminKeys() {
+    if (!store.superAdmin || store.adminUsername !== "admin") return;
+    state._adminKeysLoading = true;
+    if (state.view === "settings") render();
+    try {
+      const data = await window.LobbyAdminApi.listAdminKeys();
+      state.adminKeys = data.keys || [];
+    } catch {
+      state.adminKeys = [];
+    } finally {
+      state._adminKeysLoading = false;
+      if (state.view === "settings") render();
+    }
+  }
+
+  function bindAdminKeysPanel() {
+    const panel = $("#adminKeysPanel");
+    if (!panel || panel.dataset.bound) return;
+    panel.dataset.bound = "1";
+    $("#adminKeyIssueBtn")?.addEventListener("click", () => { issueAdminKey(); });
+    panel.addEventListener("click", async (e) => {
+      const btn = e.target?.closest?.(".admin-key-revoke");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      if (!id || !confirm(tr("admin.adminKeyRevokeConfirm"))) return;
+      try {
+        await window.LobbyAdminApi.revokeAdminKey(id);
+        await loadAdminKeys();
+        toast(tr("admin.adminKeyRevoked"));
+      } catch (err) {
+        const code = err?.data?.error;
+        toast(
+          code === "last_active_key"
+            ? tr("admin.adminKeyLastActive")
+            : tr("admin.adminKeyRevokeFail"),
+        );
+      }
+    });
+  }
+
+  async function issueAdminKey() {
+    const msg = $("#adminKeyIssueMsg");
+    const name = $("#adminKeyName")?.value?.trim() || "";
+    const reauthFile = $("#adminKeyReauthFile")?.files?.[0];
+    if (!name) {
+      if (msg) msg.textContent = tr("admin.adminKeyNameRequired");
+      return;
+    }
+    if (!window.LobbyAdminGateKey) {
+      if (msg) msg.textContent = tr("admin.gateKeyLoadFail");
+      return;
+    }
+    const issueBtn = $("#adminKeyIssueBtn");
+    if (issueBtn) issueBtn.disabled = true;
+    try {
+      let challengeId = null;
+      let nonce = null;
+      let signature = null;
+      const needsReauth = (state.adminKeys || []).some((k) => !k.disabledAt && (k.source === "d1" || k.id === "env-bootstrap"));
+      if (needsReauth) {
+        if (!reauthFile) {
+          if (msg) msg.textContent = tr("admin.adminKeyReauthRequired");
+          return;
+        }
+        const reauth = await window.LobbyAdminApi.adminKeyReauthChallenge();
+        challengeId = reauth.challengeId;
+        nonce = reauth.nonce;
+        const privateKey = await window.LobbyAdminGateKey.readAdminKeyFile(reauthFile);
+        signature = await window.LobbyAdminGateKey.signAdminKeyRegisterReauth(
+          privateKey,
+          challengeId,
+          nonce,
+        );
+      }
+      const keyPair = await window.LobbyAdminGateKey.generateEd25519KeyPair();
+      const publicKeyB64 = await window.LobbyAdminGateKey.exportEd25519PublicKeyB64(keyPair.publicKey);
+      const pem = await window.LobbyAdminGateKey.exportEd25519PrivateKeyPem(keyPair.privateKey);
+      const registerBody = { name, publicKeyB64 };
+      if (challengeId) {
+        registerBody.challengeId = challengeId;
+        registerBody.signature = signature;
+      }
+      const reg = await window.LobbyAdminApi.registerAdminKey(registerBody);
+      window.LobbyAdminGateKey.downloadTextFile(
+        `admin-ed25519-${name.replace(/[^\w.-]+/g, "_")}.pem`,
+        pem,
+      );
+      if (msg) {
+        msg.textContent = tr("admin.adminKeyIssueOk", {
+          fp: reg.key?.fingerprintShort || "",
+        });
+      }
+      await loadAdminKeys();
+    } catch (err) {
+      const code = err?.data?.error;
+      if (msg) {
+        msg.textContent =
+          code === "reauth_invalid" || code === "reauth_expired"
+            ? tr("admin.adminKeyReauthInvalid")
+            : code === "super_admin_operator_required"
+              ? tr("admin.superAdminRequired")
+              : tr("admin.adminKeyIssueFail");
+      }
+    } finally {
+      if (issueBtn) issueBtn.disabled = false;
+    }
   }
 
   /* ================= render ================= */
@@ -951,6 +1225,11 @@
         state._superAuditLoading = false;
       });
     }
+    if (v === "settings" && store.superAdmin && store.adminUsername === "admin" && !state._adminKeysLoaded) {
+      state._adminKeysLoaded = true;
+      loadAdminKeys();
+    }
+    bindAdminKeysPanel();
     if (v === "worlds") {
       drawChart(true);
       pullChartMetrics();

@@ -22,6 +22,7 @@ import {
 import { handleThumbnailUpload } from './lobby-assets.js';
 import { isLobbySuperAdmin } from './lobby-super-admin.js';
 import { getSuperAdminLoginAudit, handleAdminLoginSuper } from './admin-super-login.js';
+import { handleAdminKeysApi } from './admin-keys-api.js';
 import { resolveAdminSessionSecret } from './admin-secrets.js';
 import {
     enforceBootstrapAdminContinuity,
@@ -138,6 +139,9 @@ export async function handleAdminApi(request, env, kv) {
     if (!session && url.pathname !== '/api/admin/login') {
         return json({ error: 'unauthorized' }, 401);
     }
+
+    const adminKeysRes = await handleAdminKeysApi(request, env, kv, session);
+    if (adminKeysRes) return adminKeysRes;
 
     const thumbUpload = await handleThumbnailUpload(request, env);
     if (thumbUpload) return thumbUpload;
