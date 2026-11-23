@@ -24,10 +24,10 @@
     {
       "atTimeSec": 8,
       "expect": {
-        "minHeadingChangeDeg": 174,
-        "minAltitudeGain": 37
+        "minHeadingChangeDeg": 44,
+        "minAltitudeGain": 67
       },
-      "tolerance": { "headingDeg": 35, "altitudeM": 7.5 }
+      "tolerance": { "headingDeg": 9, "altitudeM": 13.4 }
     }
   ]
 }
