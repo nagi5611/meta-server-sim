@@ -21,7 +21,10 @@ export function estimateModelLoadRadius(cfg) {
  * @returns {number|null} 適用後の viewDistanceM
  */
 export function ensureViewDistanceCoversWorldModels(sceneManager, world) {
-    if (!sceneManager?.graphicsOptions || !world) return null;
+    if (!sceneManager || !world) return null;
+    if (!sceneManager.graphicsOptions) {
+        sceneManager.graphicsOptions = { viewDistanceM: VIEW_DISTANCE_M_DEFAULT };
+    }
     const spawn = world.spawnPoint || { x: 0, y: 0, z: 0 };
     const models = Array.isArray(world.models) ? world.models : [];
     let required = Number(sceneManager.graphicsOptions.viewDistanceM);

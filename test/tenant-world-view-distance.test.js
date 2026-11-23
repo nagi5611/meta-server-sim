@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ensureViewDistanceCoversWorldModels } from '../public/js/tenant-world-view-distance.js';
 
+test('creates graphicsOptions when missing', () => {
+    const sceneManager = {};
+    const world = { spawnPoint: { x: 0, y: 0, z: 0 }, models: [{ path: 'a.glb', position: { x: 100, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } }] };
+    ensureViewDistanceCoversWorldModels(sceneManager, world);
+    assert.ok(sceneManager.graphicsOptions);
+    assert.ok(sceneManager.graphicsOptions.viewDistanceM > 50);
+});
+
 test('raises viewDistanceM when spawn is far from scaled lobby model (P-01 shape)', () => {
     const sceneManager = { graphicsOptions: { viewDistanceM: 50 } };
     const world = {
