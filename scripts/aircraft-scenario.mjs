@@ -8,6 +8,7 @@ import {
     PLAYWRIGHT_SCENARIO_BROWSER_ARGS,
     aircraftScenarioHarnessInitScript,
 } from '../lib/playwright-aircraft-harness.js';
+import { prepareTenantPlaywrightEntry } from '../lib/playwright-tenant-entry.js';
 
 const ARTIFACTS = process.env.AIRCRAFT_SCENARIO_ARTIFACTS || '/opt/cursor/artifacts';
 
@@ -54,11 +55,7 @@ await page.addInitScript(() => {
 
 const url = `${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(tenantId)}/`;
 await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
-await page.waitForFunction(
-    () => document.documentElement.dataset.tenantMetaverseReady === 'true',
-    null,
-    { timeout: 120_000 }
-);
+await prepareTenantPlaywrightEntry(page);
 
 const kb = page.locator('#control-scheme-keyboard-btn');
 if (await kb.isVisible({ timeout: 2000 }).catch(() => false)) await kb.click();
