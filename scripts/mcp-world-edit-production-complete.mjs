@@ -64,8 +64,11 @@ function movedEnough(last, kind, d) {
 const saved = {};
 
 const uploadName = `mcp-test-${ts}.glb`;
-const srcGlb = path.join(ROOT, 'tenants/P-01/data/models/monument.glb');
-if (!fs.existsSync(srcGlb)) throw new Error(`missing source glb: ${srcGlb}`);
+const srcGlb = [
+    path.join(ROOT, 'tenants/P-01/models/monument.glb'),
+    path.join(ROOT, 'tenants/P-01/data/models/monument.glb'),
+].find((p) => fs.existsSync(p));
+if (!srcGlb) throw new Error('missing source glb: tenants/P-01/models/monument.glb');
 const uploadPath = path.join(ARTIFACTS, uploadName);
 fs.copyFileSync(srcGlb, uploadPath);
 
