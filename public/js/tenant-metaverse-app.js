@@ -1195,7 +1195,11 @@ class TenantMetaverseApp {
 
         const simGameplayActive = this.isPageVisible || isTenantE2EHarnessEnabled();
         if (simGameplayActive) {
-            if (this.aircraftManager?.isPiloting && this.aircraftController) {
+            if (
+                this.aircraftManager?.isPiloting &&
+                this.aircraftController &&
+                !this._aircraftScenarioRunnerDriving
+            ) {
                 this.aircraftController.update(deltaTime);
             }
             if (this.aircraftManager?.isPassenger && this.aircraftController) {

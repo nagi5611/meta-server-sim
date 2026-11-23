@@ -118,6 +118,7 @@ export default class AircraftScenarioRunner {
         }
 
         this._running = true;
+        this.app._aircraftScenarioRunnerDriving = true;
         const startedAtIso = new Date().toISOString();
         /** @type {string[]} */
         const errors = [];
@@ -215,6 +216,7 @@ export default class AircraftScenarioRunner {
             };
 
             const t0 = performance.now();
+            let physicsLastMs = t0;
             for (const step of scenario.steps) {
                 const keys = controlsToKeyState(step.controls, mode);
                 ctrl.setScenarioControls(keys);
@@ -222,6 +224,12 @@ export default class AircraftScenarioRunner {
 
                 while (performance.now() < stepEndMs) {
                     await this._waitFrame();
+                    const nowMs = performance.now();
+                    const dt = Math.min(0.1, Math.max(0, (nowMs - physicsLastMs) / 1000));
+                    physicsLastMs = nowMs;
+                    if (mgr.isPiloting && dt > 0) {
+                        ctrl.update(dt);
+                    }
                     ctrl.setScenarioControls(keys);
                     elapsed = (performance.now() - t0) / 1000;
                     if (elapsed + 1e-6 >= nextSampleT) {
@@ -262,6 +270,7 @@ export default class AircraftScenarioRunner {
             } catch {
                 /* ignore */
             }
+            this.app._aircraftScenarioRunnerDriving = false;
             this._running = false;
         }
     }
