@@ -96,6 +96,8 @@ export default class AircraftControllerHard {
         this.viewpointIndex = 0;
         this._onKeyDown = (e) => this._handleKey(e, true);
         this._onKeyUp = (e) => this._handleKey(e, false);
+        /** @type {Partial<AircraftControllerHard['keys']>|null} */
+        this._scenarioKeys = null;
         this._bound = false;
         this._omegaYaw = 0;
         this._omegaPitch = 0;
@@ -453,6 +455,29 @@ export default class AircraftControllerHard {
     }
 
     /**
+     * E2E / シナリオ再生用の合成入力（キーボードより優先）
+     * @param {Partial<AircraftControllerHard['keys']>|null} keyState
+     */
+    setScenarioControls(keyState) {
+        this._scenarioKeys = keyState ? { ...keyState } : null;
+    }
+
+    clearScenarioControls() {
+        this._scenarioKeys = null;
+    }
+
+    /**
+     * @param {keyof AircraftControllerHard['keys']} name
+     * @returns {boolean}
+     */
+    _hardKey(name) {
+        if (this._scenarioKeys && name in this._scenarioKeys) {
+            return !!this._scenarioKeys[name];
+        }
+        return !!this.keys[name];
+    }
+
+    /**
      * @param {KeyboardEvent} e
      * @param {boolean} down
      */
@@ -685,10 +710,10 @@ export default class AircraftControllerHard {
         if (this._flapReliefCooldown > 0) this._flapReliefCooldown = Math.max(0, this._flapReliefCooldown - dt);
 
         const throttleSpool = ph.throttleSpoolPerS;
-        if (this.keys.throttleUp) {
+        if (this._hardKey('throttleUp')) {
             this._throttle = Math.min(THROTTLE_MAX, this._throttle + throttleSpool * dt);
         }
-        if (this.keys.throttleDown) {
+        if (this._hardKey('throttleDown')) {
             this._throttle = Math.max(THROTTLE_MIN, this._throttle - throttleSpool * dt);
         }
         this._throttle = THREE.MathUtils.clamp(this._throttle, THROTTLE_MIN, THROTTLE_MAX);
@@ -723,9 +748,9 @@ export default class AircraftControllerHard {
         }
 
         const fa = flapAuthorityMultipliers(this._flapIndex);
-        const yawIn = (this.keys.yawR ? 1 : 0) - (this.keys.yawL ? 1 : 0);
-        const pitchIn = (this.keys.pitchUp ? 1 : 0) - (this.keys.pitchDn ? 1 : 0);
-        const rollIn = (this.keys.rollL ? 1 : 0) - (this.keys.rollR ? 1 : 0);
+        const yawIn = (this._hardKey('yawR') ? 1 : 0) - (this._hardKey('yawL') ? 1 : 0);
+        const pitchIn = (this._hardKey('pitchUp') ? 1 : 0) - (this._hardKey('pitchDn') ? 1 : 0);
+        const rollIn = (this._hardKey('rollL') ? 1 : 0) - (this._hardKey('rollR') ? 1 : 0);
         const rateScale = highSpeedAngularRateScale(this.velocity.length(), maxSpd);
 
         this._omegaYaw = this._integrateOmega(
@@ -843,7 +868,7 @@ export default class AircraftControllerHard {
                                 fwdSpeed -= Math.sign(fwdSpeed) * ds;
                             }
                         }
-                        if (this.keys.brake) {
+                        if (this._hardKey('brake')) {
                             const step = ph.tireBrakeAccel * ls * dt;
                             const mag = Math.abs(fwdSpeed);
                             if (mag > 0) {

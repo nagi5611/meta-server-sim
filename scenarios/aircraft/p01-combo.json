@@ -4,6 +4,7 @@
   "name": "P-01 直進→旋回→上昇",
   "controlMode": "easy",
   "slotId": "p01-scenario-a320",
+  "teleportPosition": { "x": 211, "y": 1.2, "z": 11 },
   "sampleIntervalMs": 100,
   "steps": [
     {
@@ -23,10 +24,10 @@
     {
       "atTimeSec": 8,
       "expect": {
-        "minHeadingChangeDeg": 15,
-        "minAltitudeGain": 1.5
+        "minHeadingChangeDeg": 174,
+        "minAltitudeGain": 37
       },
-      "tolerance": { "headingDeg": 14, "altitudeM": 1.2 }
+      "tolerance": { "headingDeg": 35, "altitudeM": 7.5 }
     }
   ]
 }

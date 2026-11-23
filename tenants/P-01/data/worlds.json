@@ -123,6 +123,32 @@
           "cockpitOffset": { "x": 0, "y": 1.4, "z": 0.3 },
           "chaseOffset": { "x": 0, "y": 5.5, "z": 18 }
         }
+      },
+      {
+        "position": {
+          "x": 220,
+          "y": 1.05,
+          "z": 8
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.02,
+          "y": 0.02,
+          "z": 0.02
+        },
+        "path": "models/monument.glb",
+        "aircraft": {
+          "id": "p01-scenario-b787",
+          "aircraftLibraryId": "B787",
+          "radius": 14,
+          "label": "操縦する",
+          "cockpitOffset": { "x": 0, "y": 1.4, "z": 0.3 },
+          "chaseOffset": { "x": 0, "y": 5.5, "z": 18 }
+        }
       }
     ],
     "spawnPoint": {

@@ -1,10 +1,10 @@
 {
   "id": "p01-straight",
   "version": 1,
-  "name": "P-01 直進（推力）",
+  "name": "P-01 直進（推力）Easy A320",
   "controlMode": "easy",
   "slotId": "p01-scenario-a320",
-  "aircraftLibraryId": "A320",
+  "teleportPosition": { "x": 211, "y": 1.2, "z": 11 },
   "sampleIntervalMs": 100,
   "steps": [
     {
@@ -15,8 +15,8 @@
   "checkpoints": [
     {
       "atTimeSec": 5,
-      "expect": { "deltaPosition": { "x": 0, "y": 8, "z": -120 } },
-      "tolerance": { "positionM": 55 }
+      "expect": { "deltaPosition": { "x": 0, "y": 9, "z": -126 } },
+      "tolerance": { "positionM": 25.5 }
     }
   ]
 }

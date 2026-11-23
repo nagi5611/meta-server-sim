@@ -5,11 +5,28 @@ import { buildAircraftScenarioReport } from '../lib/aircraft-scenario-report.js'
 /**
  * @param {import('../lib/aircraft-scenario-types.js').AircraftScenarioControls} controls
  */
-function controlsToKeyState(controls) {
+/**
+ * @param {import('../lib/aircraft-scenario-types.js').AircraftScenarioControls} controls
+ * @param {'easy'|'hard'} controlMode
+ */
+function controlsToKeyState(controls, controlMode = 'easy') {
     const thr = Number(controls.thrust) || 0;
     const yaw = Number(controls.yaw) || 0;
     const pitch = Number(controls.pitch) || 0;
     const roll = Number(controls.roll) || 0;
+    if (controlMode === 'hard') {
+        return {
+            throttleUp: thr > 0.05,
+            throttleDown: thr < -0.05,
+            yawR: yaw > 0.05,
+            yawL: yaw < -0.05,
+            pitchUp: pitch > 0.05,
+            pitchDn: pitch < -0.05,
+            rollL: roll > 0.05,
+            rollR: roll < -0.05,
+            brake: false,
+        };
+    }
     return {
         forward: thr > 0.05,
         back: thr < -0.05,
@@ -140,25 +157,19 @@ export default class AircraftScenarioRunner {
                 });
             }
 
-            if (!mgr.isPiloting) {
-                const feet = this.app.characterController?.getPosition?.();
-                if (feet) mgr.updateProximity(feet);
-                await mgr.tryBoardSlot(slot.id);
-                await this._waitFrame();
-                await this._waitFrame();
-            }
-            if (!mgr.isPiloting || mgr.activeSlot?.id !== slot.id) {
+            const boarded = await this._ensurePiloting(mgr, slot, 5);
+            if (!boarded) {
                 return buildAircraftScenarioReport(scenario, [], {
                     startedAtIso,
-                    errors: [`board failed for slot ${slot.id}`],
+                    errors: [`board failed for slot ${slot.id} after retries`],
                 });
             }
 
-            const activeCtrl = ctrl._active;
-            if (!activeCtrl?.setScenarioControls) {
+            ctrl._implForSlot?.(slot);
+            if (!ctrl.setScenarioControls) {
                 return buildAircraftScenarioReport(scenario, [], {
                     startedAtIso,
-                    errors: ['active controller lacks scenario API'],
+                    errors: ['aircraftController lacks scenario API'],
                 });
             }
 
@@ -190,14 +201,15 @@ export default class AircraftScenarioRunner {
             };
 
             const t0 = performance.now();
+            const mode = scenario.controlMode || slot.controlMode || 'easy';
             for (const step of scenario.steps) {
-                const keys = controlsToKeyState(step.controls);
-                activeCtrl.setScenarioControls(keys);
+                const keys = controlsToKeyState(step.controls, mode);
+                ctrl.setScenarioControls(keys);
                 const stepEndMs = t0 + (elapsed + step.durationSec) * 1000;
 
                 while (performance.now() < stepEndMs) {
                     await this._waitFrame();
-                    activeCtrl.setScenarioControls(keys);
+                    ctrl.setScenarioControls(keys);
                     elapsed = (performance.now() - t0) / 1000;
                     if (elapsed + 1e-6 >= nextSampleT) {
                         pushSample();
@@ -207,7 +219,7 @@ export default class AircraftScenarioRunner {
                 elapsed = (performance.now() - t0) / 1000;
             }
 
-            activeCtrl.clearScenarioControls?.();
+            ctrl.clearScenarioControls();
             pushSample();
 
             if (elapsed < totalSec - 0.01) {
@@ -233,12 +245,32 @@ export default class AircraftScenarioRunner {
             });
         } finally {
             try {
-                ctrl._active?.clearScenarioControls?.();
+                ctrl.clearScenarioControls?.();
             } catch {
                 /* ignore */
             }
             this._running = false;
         }
+    }
+
+    /**
+     * @param {import('./aircraft-manager.js').default} mgr
+     * @param {{ id: string }} slot
+     * @param {number} maxAttempts
+     */
+    async _ensurePiloting(mgr, slot, maxAttempts = 5) {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (mgr.isPiloting && mgr.activeSlot?.id === slot.id) return true;
+            const feet = this.app.characterController?.getPosition?.();
+            if (feet) mgr.updateProximity(feet);
+            await mgr.tryBoardSlot(slot.id);
+            for (let i = 0; i < 8; i++) {
+                await this._waitFrame();
+                if (mgr.isPiloting && mgr.activeSlot?.id === slot.id) return true;
+            }
+            await new Promise((r) => setTimeout(r, 400 + attempt * 200));
+        }
+        return mgr.isPiloting && mgr.activeSlot?.id === slot.id;
     }
 
     /**
