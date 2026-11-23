@@ -603,10 +603,50 @@ export default class AircraftManager {
      * @param {string} slotId
      * @returns {Promise<boolean>}
      */
+    /**
+     * E2E: スロットが他者操縦でないまで待つ
+     * @param {string} slotId
+     * @param {number} timeoutMs
+     */
+    async waitForSlotBoardable(slotId, timeoutMs = 30_000) {
+        const sid = String(slotId || '').trim();
+        const t0 = performance.now();
+        while (performance.now() - t0 < timeoutMs) {
+            this.refreshSlotsFromScene();
+            if (!this._slotHasOtherPilot(sid)) return true;
+            await new Promise((r) => setTimeout(r, 250));
+        }
+        return !this._slotHasOtherPilot(sid);
+    }
+
+    /**
+     * シナリオ用: 搭乗前にローカル占有と機体姿体姿勢を掃除
+     * @param {string} slotId
+     */
+    async prepareSlotForScenarioBoard(slotId) {
+        const sid = String(slotId || '').trim();
+        if (!sid) return;
+        if (this.isPiloting && this.activeSlot?.id !== sid) {
+            await this.exitPiloting();
+        } else if (this.isPiloting && this.activeSlot?.id === sid) {
+            await this.exitPiloting();
+        }
+        if (this.isPassenger) {
+            this.exitPassenger();
+        }
+        this.refreshSlotsFromScene();
+        this.resetSlotToParked(sid);
+        await this.waitForSlotBoardable(sid, 45_000);
+        this.nearestSlot = this.slotsById.get(sid) || null;
+    }
+
     async tryBoardSlot(slotId) {
         const sid = String(slotId || '').trim();
         if (!sid) return false;
         if (this.isPiloting && this.activeSlot?.id === sid) return true;
+        if (this.isPassenger) {
+            this.exitPassenger();
+        }
         this.refreshSlotsFromScene();
         const slot = this.slotsById.get(sid);
         if (!slot) return false;
@@ -673,6 +713,14 @@ export default class AircraftManager {
                     return;
                 }
                 if (res?.error === 'busy') {
+                    const harness =
+                        typeof document !== 'undefined' &&
+                        (document.documentElement?.dataset?.e2eHarness === '1' ||
+                            globalThis.__TENANT_E2E_HARNESS__ === '1');
+                    if (harness) {
+                        finish(false);
+                        return;
+                    }
                     this._enterPassenger(slot);
                     finish(true);
                     return;

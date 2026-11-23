@@ -122,6 +122,8 @@ export default class AircraftScenarioRunner {
         const startedAtIso = new Date().toISOString();
         /** @type {string[]} */
         const errors = [];
+        /** @type {string|null} */
+        let scenarioSlotId = null;
 
         try {
             const waitSlotMs = 90_000;
@@ -158,7 +160,9 @@ export default class AircraftScenarioRunner {
                 });
             }
 
-            const boarded = await this._ensurePiloting(mgr, slot, 5);
+            scenarioSlotId = slot.id;
+            await mgr.prepareSlotForScenarioBoard(scenarioSlotId);
+            const boarded = await this._ensurePiloting(mgr, slot, 12);
             if (!boarded) {
                 return buildAircraftScenarioReport(scenario, [], {
                     startedAtIso,
@@ -268,6 +272,19 @@ export default class AircraftScenarioRunner {
             } catch {
                 /* ignore */
             }
+            try {
+                const sid =
+                    mgr?.activeSlot?.id ||
+                    (typeof scenarioSlotId === 'string' ? scenarioSlotId : null);
+                if (mgr?.isPiloting) {
+                    await mgr.exitPiloting();
+                } else if (mgr?.isPassenger) {
+                    mgr.exitPassenger();
+                }
+                if (sid) mgr.resetSlotToParked(sid);
+            } catch {
+                /* ignore */
+            }
             this.app._aircraftScenarioRunnerDriving = false;
             this._running = false;
         }
@@ -281,14 +298,20 @@ export default class AircraftScenarioRunner {
     async _ensurePiloting(mgr, slot, maxAttempts = 5) {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             if (mgr.isPiloting && mgr.activeSlot?.id === slot.id) return true;
+            if (mgr.isPassenger) mgr.exitPassenger();
+            mgr.refreshSlotsFromScene();
+            mgr.resetSlotToParked(slot.id);
+            await mgr.waitForSlotBoardable(slot.id, 15_000);
             const feet = this.app.characterController?.getPosition?.();
             if (feet) mgr.updateProximity(feet);
-            await mgr.tryBoardSlot(slot.id);
-            for (let i = 0; i < 8; i++) {
+            mgr.nearestSlot = slot;
+            const ok = await mgr.tryBoardSlot(slot.id);
+            if (ok && mgr.isPiloting && mgr.activeSlot?.id === slot.id) return true;
+            for (let i = 0; i < 24; i++) {
                 await this._waitFrame();
                 if (mgr.isPiloting && mgr.activeSlot?.id === slot.id) return true;
             }
-            await new Promise((r) => setTimeout(r, 400 + attempt * 200));
+            await new Promise((r) => setTimeout(r, 600 + attempt * 300));
         }
         return mgr.isPiloting && mgr.activeSlot?.id === slot.id;
     }

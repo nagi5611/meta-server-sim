@@ -14,14 +14,14 @@ const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
 const BASE = process.env.E2E_BASE_URL || 'https://sim.mmh-virtual.jp';
 
 const scenario = {
-    id: 'p01-straight',
+    id: 'p01-b787-straight',
     version: 1,
-    name: 'screenshot',
-    controlMode: 'easy',
-    slotId: 'p01-scenario-a320',
-    teleportPosition: { x: 211, y: 1.2, z: 11 },
+    name: 'screenshot-b787',
+    controlMode: 'hard',
+    slotId: 'p01-scenario-b787',
+    teleportPosition: { x: 213, y: 1.2, z: 7 },
     sampleIntervalMs: 200,
-    steps: [{ durationSec: 4, controls: { thrust: 1, yaw: 0, pitch: 0, roll: 0 } }],
+    steps: [{ durationSec: 6, controls: { thrust: 1, yaw: 0, pitch: 0, roll: 0 } }],
     checkpoints: [],
 };
 
