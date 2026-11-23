@@ -13,6 +13,7 @@ function ensureTenantPluginClientBridge() {
  * @param {string} pluginId
  */
 function ensurePluginClientImportMap(tenantId, pluginId) {
+    if (document.getElementById('tenant-plugin-importmap-bootstrap')) return;
     if (pluginId !== 'xr' && pluginId !== 'vdb-volume' && pluginId !== 'aircraft') return;
     const mapId =
         pluginId === 'xr'
@@ -29,6 +30,7 @@ function ensurePluginClientImportMap(tenantId, pluginId) {
                       three: `${base}/three/build/three.module.js`,
                       'three/addons/': `${base}/three/examples/jsm/`,
                       'three/examples/jsm/': `${base}/three/examples/jsm/`,
+                      'three-mesh-ui': `${base}/three-mesh-ui/build/three-mesh-ui.module.js`,
                   };
               })()
             : (() => {
