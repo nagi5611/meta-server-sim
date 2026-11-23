@@ -162,6 +162,7 @@ export default class AircraftScenarioRunner {
 
             scenarioSlotId = slot.id;
             await mgr.prepareSlotForScenarioBoard(scenarioSlotId);
+            await this._waitForStaticColliderReady(60_000);
             const boarded = await this._ensurePiloting(mgr, slot, 12);
             if (!boarded) {
                 return buildAircraftScenarioReport(scenario, [], {
@@ -323,6 +324,20 @@ export default class AircraftScenarioRunner {
         return new Promise((resolve) => {
             requestAnimationFrame(() => resolve());
         });
+    }
+
+    /**
+     * 地形 BVH が揃うまで待つ（Hard 接地レイが無いと落下する）
+     * @param {number} timeoutMs
+     */
+    async _waitForStaticColliderReady(timeoutMs = 60_000) {
+        const t0 = performance.now();
+        while (performance.now() - t0 < timeoutMs) {
+            const pm = this.app.sceneManager?.physicsManager;
+            if (pm?.collider?.geometry?.boundsTree) return true;
+            await this._waitFrame();
+        }
+        return false;
     }
 
     /**

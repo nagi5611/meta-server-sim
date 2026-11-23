@@ -8,7 +8,11 @@
   "sampleIntervalMs": 100,
   "steps": [
     {
-      "durationSec": 12,
+      "durationSec": 2.5,
+      "controls": { "thrust": 0.35, "yaw": 0, "pitch": 0, "roll": 0 }
+    },
+    {
+      "durationSec": 9.5,
       "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
     }
   ],
