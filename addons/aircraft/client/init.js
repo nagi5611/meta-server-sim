@@ -120,6 +120,49 @@ export async function initAircraftSubsystem(app) {
         onToggleCamera: () => app.aircraftManager.toggleCameraMode()
     });
 
+    if (!app._aircraftScenarioRunner) {
+        import('./aircraft-scenario-runner.js').then((mod) => {
+            app._aircraftScenarioRunner = new mod.default(app);
+        }).catch((err) => {
+            console.warn('[addon:aircraft] scenario runner load failed', err);
+        });
+    }
+    app.runAircraftScenario = async (rawScenario) => {
+        if (!app._aircraftScenarioRunner) {
+            const mod = await import('./aircraft-scenario-runner.js');
+            app._aircraftScenarioRunner = new mod.default(app);
+        }
+        return app._aircraftScenarioRunner.run(rawScenario);
+    };
+    app.getAircraftDebugState = () => {
+        const mgr = app.aircraftManager;
+        const ctrl = app.aircraftController?._active;
+        const root = mgr?.activeSlot?.root;
+        if (!root) {
+            return { piloting: Boolean(mgr?.isPiloting), slotId: mgr?.activeSlot?.id ?? null };
+        }
+        root.updateMatrixWorld(true);
+        const THREE = globalThis.__metaverseSharedThree;
+        const p = new THREE.Vector3();
+        const q = new THREE.Quaternion();
+        const e = new THREE.Euler(0, 0, 0, 'YXZ');
+        root.getWorldPosition(p);
+        root.getWorldQuaternion(q);
+        e.setFromQuaternion(q);
+        const vel = ctrl?.velocity;
+        return {
+            piloting: Boolean(mgr?.isPiloting),
+            slotId: mgr?.activeSlot?.id ?? null,
+            controlMode: mgr?.activeSlot?.controlMode ?? null,
+            position: { x: p.x, y: p.y, z: p.z },
+            quaternion: { x: q.x, y: q.y, z: q.z, w: q.w },
+            headingDeg: (e.y * 180) / Math.PI,
+            velocity: vel
+                ? { x: vel.x, y: vel.y, z: vel.z }
+                : null,
+        };
+    };
+
     app.networkManager.setAircraftNetworkBridge({
         getPose: () => app.aircraftManager.getAircraftPoseForNetwork(),
         getPilotCameraWorldPose: () =>

@@ -97,12 +97,44 @@
           "z": 0.3
         },
         "path": "models/teleporter_l2.glb"
+      },
+      {
+        "position": {
+          "x": 212,
+          "y": 1.05,
+          "z": 12
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "scale": {
+          "x": 0.02,
+          "y": 0.02,
+          "z": 0.02
+        },
+        "path": "models/monument.glb",
+        "aircraft": {
+          "id": "p01-scenario-a320",
+          "aircraftLibraryId": "A320",
+          "radius": 14,
+          "label": "操縦する",
+          "cockpitOffset": { "x": 0, "y": 1.4, "z": 0.3 },
+          "chaseOffset": { "x": 0, "y": 5.5, "z": 18 }
+        }
       }
     ],
     "spawnPoint": {
       "x": 207,
       "y": 1,
       "z": 5
+    },
+    "aircraftPhysics": {
+      "gravity": 9.81,
+      "maxThrustSpeed": 55,
+      "stallSpeed": 24,
+      "rotationSpeed": 28
     },
     "lights": [
       {

@@ -1,0 +1,22 @@
+{
+  "id": "p01-straight",
+  "version": 1,
+  "name": "P-01 直進（推力）",
+  "controlMode": "easy",
+  "slotId": "p01-scenario-a320",
+  "aircraftLibraryId": "A320",
+  "sampleIntervalMs": 100,
+  "steps": [
+    {
+      "durationSec": 5,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
+    }
+  ],
+  "checkpoints": [
+    {
+      "atTimeSec": 5,
+      "expect": { "deltaPosition": { "x": 0, "y": 0, "z": -18 } },
+      "tolerance": { "positionM": 14 }
+    }
+  ]
+}
