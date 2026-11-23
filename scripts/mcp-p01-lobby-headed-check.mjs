@@ -8,31 +8,13 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { aircraftScenarioHarnessInitScript } from '../lib/playwright-aircraft-harness.js';
 import { chromiumScenarioLaunchOptions } from '../lib/playwright-scenario-launch.js';
+import { prepareTenantPlaywrightEntry } from '../lib/playwright-tenant-entry.js';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 process.chdir(ROOT);
 
 const BASE = process.env.AIRCRAFT_SCENARIO_BASE_URL || 'https://sim.mmh-virtual.jp';
 const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
-
-/**
- * @param {import('playwright').Page} page
- */
-async function waitTenantReady(page, maxMs = 240_000) {
-    const gate = page.locator('#tenant-login-enter-btn');
-    if (await gate.isVisible({ timeout: 8000 }).catch(() => false)) {
-        await gate.click({ timeout: 5000 }).catch(() => undefined);
-    }
-    const deadline = Date.now() + maxMs;
-    while (Date.now() < deadline) {
-        const ready = await page.evaluate(
-            () => document.documentElement.dataset.tenantMetaverseReady === 'true',
-        );
-        if (ready) return true;
-        await page.waitForTimeout(1000);
-    }
-    return false;
-}
 
 export async function runP01LobbyHeadedCheck(opts = {}) {
     const artifactsDir = opts.artifactsDir || ARTIFACTS;
@@ -44,10 +26,13 @@ export async function runP01LobbyHeadedCheck(opts = {}) {
     await page.addInitScript(aircraftScenarioHarnessInitScript);
 
     await page.goto(`${BASE}/P-01/`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
-    const ready = await waitTenantReady(page);
-    const kb = page.locator('#control-scheme-keyboard-btn');
-    if (await kb.isVisible({ timeout: 3000 }).catch(() => false)) await kb.click();
-    await page.keyboard.press('KeyW');
+    let ready = false;
+    try {
+        await prepareTenantPlaywrightEntry(page);
+        ready = true;
+    } catch {
+        ready = false;
+    }
     await page.waitForTimeout(3000);
 
     const metrics = await page.evaluate(() => {
