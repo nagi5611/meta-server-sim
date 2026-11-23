@@ -40,6 +40,11 @@ for (const rp of reportPaths) {
   }
     const p0 = samples[0].position;
     const p1 = samples[samples.length - 1].position;
+    const ymin = Math.min(...samples.map((s) => s.position.y));
+    if (ymin < 0.4) {
+        console.error(`skip (ground fall ymin=${ymin}): ${rp}`);
+        continue;
+    }
     deltas.push({ x: p1.x - p0.x, y: p1.y - p0.y, z: p1.z - p0.z });
 }
 

@@ -13,7 +13,7 @@
     },
     {
       "durationSec": 9.5,
-      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
+      "controls": { "thrust": 0.82, "yaw": 0, "pitch": 0, "roll": 0 }
     }
   ],
   "checkpoints": []

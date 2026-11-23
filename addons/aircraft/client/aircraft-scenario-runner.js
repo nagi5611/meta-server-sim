@@ -227,6 +227,7 @@ export default class AircraftScenarioRunner {
                 ctrl.setScenarioControls(keys);
                 let stepSimSec = 0;
 
+                let tick = 0;
                 while (stepSimSec + 1e-6 < step.durationSec) {
                     const dt = Math.min(physicsStepSec, step.durationSec - stepSimSec);
                     if (mgr.isPiloting) {
@@ -239,7 +240,8 @@ export default class AircraftScenarioRunner {
                         pushSample();
                         nextSampleT += sampleEvery;
                     }
-                    await this._waitFrame();
+                    tick += 1;
+                    if (tick % 4 === 0) await this._waitFrame();
                 }
             }
 

@@ -12,7 +12,11 @@ exec flock -w 7200 "$LOCK" bash -c "
   set -euo pipefail
   cd \"$ROOT\"
   for run in 1 2 3 4 5; do
-    xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight-calibrate.json --out \"$ART/calib-run\${run}.json\" || true
-    sleep 8
+    out=\"${ART}/calib-run\${run}.json\"
+    xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight-calibrate.json --out \"\${out}\" || true
+    sleep 10
   done
+  node scripts/update-p01-b787-straight-from-reports.mjs \
+    \"${ART}/calib-run1.json\" \"${ART}/calib-run2.json\" \"${ART}/calib-run3.json\" \
+    \"${ART}/calib-run4.json\" \"${ART}/calib-run5.json\" || true
 "

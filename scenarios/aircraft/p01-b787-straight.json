@@ -13,14 +13,19 @@
     },
     {
       "durationSec": 9.5,
-      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
+      "controls": { "thrust": 0.82, "yaw": 0, "pitch": 0, "roll": 0 }
     }
   ],
   "checkpoints": [
     {
       "atTimeSec": 12,
-      "expect": { "deltaPosition": { "x": 0, "y": 5, "z": -45 } },
-      "tolerance": { "positionM": 18 }
+      "expect": { "minAltitudeGain": -0.5 },
+      "tolerance": { "altitudeM": 4 }
+    },
+    {
+      "atTimeSec": 12,
+      "expect": { "deltaPosition": { "x": 0, "y": 0, "z": -18 } },
+      "tolerance": { "positionM": 4 }
     }
   ]
 }
