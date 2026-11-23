@@ -59,7 +59,7 @@ const report = {
         diag.tenantMetaverseReady &&
         diag.worldId === 'lobby' &&
         spawnOk &&
-        (diag.loadedModelCount ?? 0) > 3,
+        ((diag.loadedModelCount ?? diag.lobbyModelCount ?? 0) > 3),
     diag,
     screenshotPath,
 };
