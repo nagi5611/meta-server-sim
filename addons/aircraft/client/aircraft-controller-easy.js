@@ -393,7 +393,27 @@ export default class AircraftControllerEasy {
      * @param {keyof AircraftControllerEasy['keys']} name
      * @returns {boolean}
      */
+    /**
+     * @type {Partial<AircraftControllerEasy['keys']>|null}
+     */
+    _scenarioKeys = null;
+
+    /**
+     * E2E / シナリオ再生用の合成入力（キーボードより優先）
+     * @param {Partial<AircraftControllerEasy['keys']>|null} keyState
+     */
+    setScenarioControls(keyState) {
+        this._scenarioKeys = keyState ? { ...keyState } : null;
+    }
+
+    clearScenarioControls() {
+        this._scenarioKeys = null;
+    }
+
     _keyActive(name) {
+        if (this._scenarioKeys && name in this._scenarioKeys) {
+            return !!this._scenarioKeys[/** @type {keyof AircraftControllerEasy['keys']} */ (name)];
+        }
         return !!this.keys[name] || !!this._touchKeys[name];
     }
 

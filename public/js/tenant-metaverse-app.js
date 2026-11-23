@@ -1037,6 +1037,21 @@ class TenantMetaverseApp {
                         altitude: typeof y === 'number' && Number.isFinite(y) ? y : null,
                     };
                 },
+                getAircraftDebugState: () =>
+                    typeof this.getAircraftDebugState === 'function'
+                        ? this.getAircraftDebugState()
+                        : null,
+                runAircraftScenario: async (scenario) => {
+                    if (typeof this.runAircraftScenario !== 'function') {
+                        throw new Error('runAircraftScenario missing — is aircraft addon loaded?');
+                    }
+                    return this.runAircraftScenario(scenario);
+                },
+                tryBoardAircraftSlot: async (slotId) => {
+                    const mgr = this.aircraftManager;
+                    if (!mgr) throw new Error('aircraftManager missing');
+                    return mgr.tryBoardSlot(slotId);
+                },
         };
     }
 

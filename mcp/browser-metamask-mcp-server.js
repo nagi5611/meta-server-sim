@@ -12,6 +12,8 @@ import {
     CallToolRequestSchema,
     ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import {
     classifyPageUrl,
     clickVisibleButton,
@@ -137,6 +139,20 @@ const TOOLS = [
             type: 'object',
             properties: { buttonLabel: { type: 'string' } },
             required: ['buttonLabel'],
+        },
+    },
+    {
+        name: 'aircraft_run_scenario',
+        description:
+            'Run flight scenario JSON on the app tab (__tenantE2E.runAircraftScenario). MetaMask not required.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                scenario: { type: 'object' },
+                scenarioPath: { type: 'string' },
+                teleportNearSlot: { type: 'boolean' },
+            },
+            additionalProperties: false,
         },
     },
 ];
@@ -291,6 +307,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (!page) throw new Error('No app page');
                 payload = await clickVisibleButton(page, String(args?.buttonLabel ?? ''));
                 payload.after = await snapshotPlaywrightPage(page);
+                break;
+            }
+
+            case 'aircraft_run_scenario': {
+                const ctx = await getOrLaunchBrowserSession();
+                const page = resolveAppPage(ctx);
+                if (!page) throw new Error('No app page');
+                let scenario = args?.scenario;
+                if (!scenario && args?.scenarioPath) {
+                    const full = path.resolve(process.cwd(), String(args.scenarioPath));
+                    scenario = JSON.parse(await fs.readFile(full, 'utf8'));
+                }
+                if (!scenario) throw new Error('scenario or scenarioPath required');
+                await page.evaluate(() => {
+                    if (window.__TENANT_E2E_HARNESS__ !== '1') {
+                        window.__TENANT_E2E_HARNESS__ = '1';
+                        document.documentElement.dataset.e2eHarness = '1';
+                    }
+                });
+                const teleport = args?.teleportNearSlot !== false;
+                if (teleport) {
+                    await page.evaluate(() => {
+                        window.__tenantE2E?.setLocalPosition?.(211, 1.2, 11);
+                    });
+                    await page.waitForTimeout(800);
+                }
+                const report = await page.evaluate(
+                    async (sc) => window.__tenantE2E.runAircraftScenario(sc),
+                    scenario
+                );
+                payload = { report };
                 break;
             }
 

@@ -587,9 +587,30 @@ export default class AircraftManager {
             (code && BOARD_ERROR_JA[code]) ||
             (code ? `搭乗できませんでした（${code}）` : '搭乗できませんでした。');
         console.warn('[AircraftManager] board failed:', code || 'unknown');
+        if (
+            typeof document !== 'undefined' &&
+            document.documentElement?.dataset?.e2eHarness === '1'
+        ) {
+            return;
+        }
         if (typeof window !== 'undefined' && typeof window.alert === 'function') {
             window.alert(msg);
         }
+    }
+
+    /**
+     * 指定スロットへ搭乗（E2E シナリオ用）
+     * @param {string} slotId
+     * @returns {Promise<boolean>}
+     */
+    async tryBoardSlot(slotId) {
+        const sid = String(slotId || '').trim();
+        if (!sid) return false;
+        this.refreshSlotsFromScene();
+        const slot = this.slotsById.get(sid);
+        if (!slot) return false;
+        this.nearestSlot = slot;
+        return this.tryBoardNearest();
     }
 
     /**
