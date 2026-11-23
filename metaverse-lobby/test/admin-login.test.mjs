@@ -19,7 +19,7 @@ async function startSimStub(handler) {
     };
 }
 
-test('handleAdminLogin: static admin requires configured public key', async () => {
+test('handleAdminLogin: static admin without Resend returns otp_mail_not_configured when D1 keys empty', async () => {
     const env = {
         LOBBY_ADMIN_USER: 'admin',
         LOBBY_ADMIN_PASSWORD: 'static-secret',
@@ -35,7 +35,7 @@ test('handleAdminLogin: static admin requires configured public key', async () =
     const res = await handleAdminLogin(req, env);
     assert.equal(res?.status, 503);
     const body = await res.json();
-    assert.equal(body.error, 'admin_key_not_configured');
+    assert.equal(body.error, 'otp_mail_not_configured');
 });
 
 test('handleAdminLogin: sim teacher via email issues admin session', async () => {

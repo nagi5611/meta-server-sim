@@ -1142,7 +1142,7 @@
       let challengeId = null;
       let nonce = null;
       let signature = null;
-      const needsReauth = (state.adminKeys || []).some((k) => !k.disabledAt && (k.source === "d1" || k.id === "env-bootstrap"));
+      const needsReauth = (state.adminKeys || []).some((k) => !k.disabledAt && k.source === "d1");
       if (needsReauth) {
         if (!reauthFile) {
           if (msg) msg.textContent = tr("admin.adminKeyReauthRequired");

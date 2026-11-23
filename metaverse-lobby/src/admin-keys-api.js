@@ -178,8 +178,9 @@ export async function handleAdminKeysApi(request, env, kv, session) {
         if (!parseEd25519PublicKeyBytes(publicKeyB64)) {
             return jsonResult({ status: 400, body: { error: 'invalid_public_key' } });
         }
+        const registeredActive = await countActiveAdminEd25519Keys(db);
         const verifyKeys = await listActiveAdminVerifyKeys(env, db);
-        if (verifyKeys.length > 0) {
+        if (registeredActive > 0 && verifyKeys.length > 0) {
             if (!challengeId || !signature) {
                 return jsonResult({ status: 400, body: { error: 'reauth_required' } });
             }

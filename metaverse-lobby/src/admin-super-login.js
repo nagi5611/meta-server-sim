@@ -8,12 +8,13 @@ import { resolveAdminOtpSecret, resolveAdminSessionSecret } from './admin-secret
 import {
     ADMIN_KEY_CHALLENGE_PREFIX,
     ADMIN_KEY_MAX_ATTEMPTS,
+    ADMIN_KEY_REGISTER_NOTIFY_EMAIL,
     ADMIN_KEY_TTL_SEC,
     generateKeyChallengeNonce,
     isAdminKeyAuthEnabled,
     verifyAdminKeyAgainstAnyActive,
 } from './admin-ed25519-auth.js';
-import { countBootstrapActiveAdminKeys, maybeNotifyZeroAdminKeys } from './admin-key-zero-warning.js';
+import { countRegisteredActiveAdminKeys, maybeNotifyZeroAdminKeys } from './admin-key-zero-warning.js';
 
 const ADMIN_COOKIE = 'lobby_admin_session';
 const OTP_KV_PREFIX = 'super_admin_otp:';
@@ -490,12 +491,23 @@ export async function handleAdminLoginSuper(request, env, kv) {
     }
 
     if (superAdmin) {
-        const activeKeys = await countBootstrapActiveAdminKeys(env, db);
-        if (activeKeys <= 0) {
-            await maybeNotifyZeroAdminKeys(env, kv, { reason: 'login_attempt', clientIp });
-            return { status: 503, body: { error: 'admin_key_not_configured' } };
+        const registeredKeys = await countRegisteredActiveAdminKeys(db);
+        if (registeredKeys > 0) {
+            if (!(await isAdminKeyAuthEnabled(env, db))) {
+                return { status: 503, body: { error: 'admin_key_not_configured' } };
+            }
+            return beginAdminKeyChallenge(env, kv, db, { sessionUser, clientIp });
         }
-        return beginAdminKeyChallenge(env, kv, db, { sessionUser, clientIp });
+        if (!isAdminOtpEnabled(env)) {
+            await maybeNotifyZeroAdminKeys(env, kv, { reason: 'login_attempt', clientIp });
+            return { status: 503, body: { error: 'otp_mail_not_configured' } };
+        }
+        return beginEmailOtpChallenge(env, kv, db, {
+            sessionUser,
+            superAdmin: true,
+            clientIp,
+            simUser: { email: ADMIN_KEY_REGISTER_NOTIFY_EMAIL },
+        });
     }
 
     if (isAdminOtpEnabled(env)) {

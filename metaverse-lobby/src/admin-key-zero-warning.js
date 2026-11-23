@@ -1,4 +1,12 @@
 import { countActiveAdminEd25519Keys } from './db-ops.js';
+
+/**
+ * ログイン第2要素の判定用（D1 の有効鍵のみ。env bootstrap は秘密鍵がサーバーに無い場合は数えない）。
+ * @param {D1Database | undefined} db
+ */
+export async function countRegisteredActiveAdminKeys(db) {
+    return countActiveAdminEd25519Keys(db);
+}
 import { ADMIN_KEY_REGISTER_NOTIFY_EMAIL } from './admin-ed25519-auth.js';
 import { formatJstTimestamp, sendAdminOtpEmail } from './admin-super-login.js';
 
@@ -6,11 +14,10 @@ const WARNING_KV_KEY = 'admin_ed25519_zero_keys_warn';
 const WARNING_COOLDOWN_SEC = 3600;
 
 const RECOVERY_STEPS = `復旧手順:
-1. ローカルで Ed25519 鍵ペアを生成する（秘密鍵はコミット・ログに出さない）。
-2. 公開鍵 32 バイトを base64 にし、Worker の ADMIN_ED25519_PUBLIC_KEY に設定するか、
-   metaverse-lobby 付属の CLI（scripts/lobby-admin-ed25519-register.mjs）で D1 に登録する。
-3. 初回は環境変数 bootstrap でも可。2 本目以降は管理画面「設定 → Ed25519 鍵」から登録。
-4. デプロイ後、admin でパスワード + 秘密鍵署名ログインを確認する。`;
+1. admin でパスワード入力後、Resend で developer@mmh-virtual.jp へ届くメール OTP でログイン（鍵ゼロ本時のフォールバック）。
+2. ログイン後、管理画面「設定 → Ed25519 鍵」で新しい鍵ペアを発行し、秘密鍵を安全に保管する。
+3. またはローカルで鍵ペアを生成し、公開鍵のみ D1 / Worker ADMIN_ED25519_PUBLIC_KEY に登録。
+4. 鍵登録後はパスワード + 秘密鍵署名が第2要素に戻る。`;
 
 /**
  * @param {Record<string, unknown>} env
@@ -42,8 +49,8 @@ async function maySendZeroKeysWarning(kv) {
  */
 export async function maybeNotifyZeroAdminKeys(env, kv, ctx) {
     const db = /** @type {D1Database | undefined} */ (env.LOBBY_DB);
-    const active = await countBootstrapActiveAdminKeys(env, db);
-    if (active > 0) return { sent: false, reason: 'keys_present', activeCount: active };
+    const d1Active = await countRegisteredActiveAdminKeys(db);
+    if (d1Active > 0) return { sent: false, reason: 'keys_present', activeCount: d1Active };
 
     const gate = await maySendZeroKeysWarning(kv);
     if (!gate.ok) return { sent: false, reason: gate.reason, retryAfterSec: gate.retryAfterSec };
@@ -60,7 +67,7 @@ export async function maybeNotifyZeroAdminKeys(env, kv, ctx) {
         reasonJa,
         `検知日時 (JST): ${atJst}`,
         '',
-        'この状態ではスーパー管理者 admin は第2要素を完了できずログインできません。',
+        'D1 に有効な登録鍵がありません。Resend 設定時はメール OTP でログインし、管理画面から鍵を再発行してください。',
         '',
         RECOVERY_STEPS,
     ].join('\n');

@@ -27,17 +27,18 @@ function createMemoryKv() {
     };
 }
 
-function createSuperAdminAuditDb() {
+function createSuperAdminAuditDb(activeD1KeyCount = 0) {
     /** @type {Array<Record<string, unknown>>} */
     const events = [];
     return {
         events,
+        activeD1KeyCount,
         prepare(sql) {
             const q = sql.replace(/\s+/g, ' ').trim();
             const stmt = {
                 async first() {
                     if (q.includes('COUNT(*)') && q.includes('admin_ed25519_keys')) {
-                        return { c: 0 };
+                        return { c: activeD1KeyCount };
                     }
                     return null;
                 },
@@ -90,7 +91,7 @@ test('formatJstTimestamp includes +09:00', () => {
 
 test('super-admin login issues Ed25519 key challenge', async () => {
     const kv = createMemoryKv();
-    const db = createSuperAdminAuditDb();
+    const db = createSuperAdminAuditDb(1);
     const { publicKeyB64 } = generateTestEd25519Keypair();
     const env = {
         LOBBY_ADMIN_USER: 'admin',
@@ -114,7 +115,7 @@ test('super-admin login issues Ed25519 key challenge', async () => {
 
 test('super-admin login verifies key signature and issues session', async () => {
     const kv = createMemoryKv();
-    const db = createSuperAdminAuditDb();
+    const db = createSuperAdminAuditDb(1);
     const { publicKeyB64, privateKeyPem } = generateTestEd25519Keypair();
     const env = {
         LOBBY_ADMIN_USER: 'admin',
@@ -145,9 +146,39 @@ test('super-admin login verifies key signature and issues session', async () => 
     assert.equal(session?.superAdmin, true);
 });
 
-test('super-admin login with wrong key rejects', async () => {
+test('super-admin uses email OTP when no active D1 keys (env bootstrap ignored)', async () => {
     const kv = createMemoryKv();
     const db = createSuperAdminAuditDb();
+    const mail = [];
+    const { publicKeyB64 } = generateTestEd25519Keypair();
+    const env = {
+        LOBBY_ADMIN_USER: 'admin',
+        LOBBY_ADMIN_PASSWORD: 'static-secret',
+        LOBBY_ADMIN_SESSION_SECRET: SECRET,
+        ADMIN_ED25519_PUBLIC_KEY: publicKeyB64,
+        LOBBY_DB: db,
+        RESEND_API_KEY: 're_test',
+        __test_mail_sink: mail,
+    };
+    const req = new Request('http://lobby.test/api/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'cf-connecting-ip': '198.51.100.8' },
+        body: JSON.stringify({ username: 'admin', password: 'static-secret' }),
+    });
+    const res = await handleAdminLogin(req, env, kv);
+    assert.equal(res?.status, 200);
+    const data = await res.json();
+    assert.equal(data.otpRequired, true);
+    assert.equal(data.otpChannel, 'email');
+    assert.ok(data.challengeId);
+    assert.equal(mail.length, 1);
+    assert.equal(mail[0].to, 'developer@mmh-virtual.jp');
+    assert.equal(data.keyChallengeRequired, undefined);
+});
+
+test('super-admin login with wrong key rejects', async () => {
+    const kv = createMemoryKv();
+    const db = createSuperAdminAuditDb(1);
     const good = generateTestEd25519Keypair();
     const wrong = generateTestEd25519Keypair();
     const env = {
