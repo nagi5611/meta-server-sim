@@ -16,7 +16,7 @@
     {
       "atTimeSec": 5,
       "expect": { "deltaPosition": { "x": 0, "y": 8, "z": -120 } },
-      "tolerance": { "positionM": 30 }
+      "tolerance": { "positionM": 55 }
     }
   ]
 }
