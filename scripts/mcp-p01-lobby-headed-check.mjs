@@ -56,7 +56,7 @@ export async function runP01LobbyHeadedCheck(opts = {}) {
     });
 
     const screenshotPath = path.join(artifactsDir, shotName);
-    await fs.writeFile(screenshotPath, await page.screenshot());
+    await fs.writeFile(screenshotPath, await page.screenshot({ timeout: 120_000 }));
 
     const pass =
         ready &&
