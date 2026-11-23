@@ -12,7 +12,7 @@ exec flock -w 7200 "$LOCK" bash -c "
   set -euo pipefail
   cd \"$ROOT\"
   for run in 1 2 3; do
-    xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight.json --out \"$ART/b787-straight-run\${run}.json\"
+    xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight.json --out \"$ART/b787-straight-run\${run}.json\" || true
     sleep 5
   done
   xvfb-run -a node scripts/prod-aircraft-flying-screenshot.mjs
