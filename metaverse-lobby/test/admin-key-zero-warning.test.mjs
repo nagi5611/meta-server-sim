@@ -27,14 +27,23 @@ test('zero keys warning sends once then rate limits', async () => {
     assert.equal(second.reason, 'rate_limited');
 });
 
-test('zero keys warning skipped when bootstrap env key set', async () => {
+test('zero D1 keys warning still sent when only bootstrap env key set', async () => {
     const kv = createMemoryKv();
     const mail = [];
     const env = {
         __test_mail_sink: mail,
         ADMIN_ED25519_PUBLIC_KEY: generateTestEd25519Keypair().publicKeyB64,
+        LOBBY_DB: {
+            prepare() {
+                return {
+                    async first() {
+                        return { c: 0 };
+                    },
+                };
+            },
+        },
     };
-    const r = await maybeNotifyZeroAdminKeys(env, kv, { reason: 'login_attempt', clientIp: '1.2.3.4' });
-    assert.equal(r.sent, false);
-    assert.equal(r.reason, 'keys_present');
+    const r = await maybeNotifyZeroAdminKeys(env, kv, { reason: 'startup' });
+    assert.equal(r.sent, true);
+    assert.equal(mail.length, 1);
 });

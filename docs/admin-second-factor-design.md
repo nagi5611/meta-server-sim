@@ -14,7 +14,9 @@
 
 **案 A（Ed25519 チャレンジ署名）** を採用する。
 
-理由: 公開鍵の登録・入れ替えをインフラ手順（SSH + 環境変数）に閉じられること、メール OTP への弱い復旧経路を作らない要件、ステージングでファイルベースの鍵を扱えること、Worker 上でシンプルに replay 防止（短命 nonce + KV 一回限り）を実装できること。
+理由: 公開鍵の登録・入れ替えをインフラ手順（SSH + 環境変数）に閉じられること、ステージングでファイルベースの鍵を扱えること、Worker 上でシンプルに replay 防止（短命 nonce + KV 一回限り）を実装できること。
+
+**鍵ゼロ本フォールバック（2026-11）:** D1 に有効な登録鍵が 0 本のとき（ホスト上の bootstrap 秘密鍵喪失時を含む）、静的 `admin` は Ed25519 ではなく **developer@ 宛ての Resend メール OTP** を第2要素とする。OTP ログイン後は管理画面から D1 へ新鍵を登録して復旧する。
 
 WebAuthn は将来の強化候補として残すが、本タスクの運用制約には Ed25519 の方が無理がない。
 
@@ -31,15 +33,20 @@ sequenceDiagram
   participant R as Resend
 
   UI->>W: POST /api/admin/login (user, password)
-  alt 静的 admin (LOBBY_ADMIN)
+  alt 静的 admin + D1 有効鍵 1 本以上
     W->>W: パスワード照合
     W->>KV: 鍵チャレンジ保存 (nonce, TTL)
     W-->>UI: keyChallengeRequired, challengeId, nonce
     UI->>UI: 秘密鍵 PEM で nonce 署名
     UI->>W: POST /api/admin/login/verify-key
-    W->>KV: チャレンジ削除（一回限り）
-    W->>W: Ed25519 検証
     W-->>UI: Set-Cookie lobby_admin_session (JWT)
+  else 静的 admin + D1 有効鍵 0 本
+    W->>W: パスワード照合
+    W->>KV: OTP ハッシュ保存
+    W->>R: developer@ 宛て確認コード
+    W-->>UI: otpRequired, resendCooldownSec
+    UI->>W: verify-otp / resend-otp (45s)
+    W-->>UI: Set-Cookie (JWT)
   else sim 経由の管理者
     W->>Sim: POST /service/lobby/admin-login
     Sim-->>W: user + email
@@ -70,11 +77,12 @@ sequenceDiagram
 2. 公開鍵 32 バイト（raw）を base64 にし、Worker の `ADMIN_ED25519_PUBLIC_KEY` に設定（GitHub Actions secret / `wrangler secret` / ステージング `.dev.vars`）。
 3. デプロイ後、パスワード + 新秘密鍵でログイン確認。
 
-### 鍵紛失時の復旧（メールフォールバックなし）
+### 鍵紛失時の復旧
 
-1. サーバー管理者が SSH でホストまたは秘密管理ストアに接続。
-2. 新しい鍵ペアを生成し、**公開鍵のみ**を `ADMIN_ED25519_PUBLIC_KEY` に反映して Worker を再デプロイ。
-3. 藤原さんが手元の新秘密鍵でログイン。
+1. **D1 有効鍵 0 本**（bootstrap 秘密鍵もホストから消えた場合）: `admin` パスワード → **developer@mmh-virtual.jp** へ届くメール OTP でログイン。
+2. 管理画面「設定 → Ed25519 鍵」で鍵ペアを新規発行（**D1 0 本時は再認証署名不要**。OTP セッション + `admin` 演算者のみで可）。
+3. 新秘密鍵を保管し、次回から署名ログインに戻る。通知メールは従来どおり developer@ に送る。
+4. 代替: SSH/CLI で公開鍵のみ D1 または `ADMIN_ED25519_PUBLIC_KEY` に投入。
 
 ## admin 以外の管理者 — Resend メール OTP
 
@@ -99,14 +107,16 @@ SMS（`ADMIN_PHONE`）は admin 鍵認証導入後の第2要素としては使�
 ## 鍵の発行（管理画面・admin のみ）
 
 - WebCrypto で鍵ペア生成 → 公開鍵のみ `POST /api/admin/admin-keys`。
-- 既に有効鍵がある場合は `POST /api/admin/admin-keys/reauth-challenge` の nonce を既存秘密鍵で署名してから登録。
+- **D1 に有効鍵が 1 本以上**ある場合は `reauth-challenge` + 既存秘密鍵署名が必須。
+- **D1 有効鍵 0 本**（OTP 復旧直後など）では再認証署名を省略し、OTP セッションのみで登録可。
 - 登録ごとに Resend で `developer@mmh-virtual.jp` へ通知（鍵名・FP・IP・UA・有効本数）。秘密鍵は含めない。
 - 初回 1 本目は **SSH/CLI**（`scripts/lobby-admin-ed25519-bootstrap.md`）。
 
 ## 公開鍵 0 件の警告メール
 
-- 条件: D1 有効鍵 0 かつ `ADMIN_ED25519_PUBLIC_KEY` 未設定。
-- 送信契機: Worker `scheduled`（起動相当）と、admin がパスワード OK 後に第2要素へ進めないとき。
+- 条件: **D1 有効鍵 0 本**（env bootstrap のみ残っていてもカウントしない）。
+- 送信契機: Worker `scheduled`（起動相当）。admin ログインで OTP フォールバックへ進むときは**警告を送らない**（OTP と二重にならない）。
+- Resend 未設定で OTP 不可のときのみ、ログイン試行で警告を送る。
 - レート: KV で **1 時間 1 通**。
 - 宛先: `developer@mmh-virtual.jp`。本文に復旧手順（SSH/CLI）。
 
