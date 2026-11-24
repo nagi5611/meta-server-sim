@@ -45,29 +45,67 @@ const reportOut =
 await fs.mkdir(ARTIFACTS, { recursive: true });
 
 const browser = await chromium.launch(chromiumScenarioLaunchOptions({}));
-const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+const url = `${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(tenantId)}/`;
+const entryAttempts = Number(process.env.MCP_SCENARIO_ENTRY_ATTEMPTS || 3);
+const socketAttempts = Number(process.env.MCP_SCENARIO_SOCKET_ATTEMPTS || 3);
+
+/** @type {import('playwright').Page} */
+let page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 await page.addInitScript(aircraftScenarioHarnessInitScript);
 
-const url = `${baseUrl.replace(/\/$/, '')}/${encodeURIComponent(tenantId)}/`;
-await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
-await prepareTenantPlaywrightEntry(page);
+let entryError = null;
+for (let entryTry = 1; entryTry <= entryAttempts; entryTry += 1) {
+    try {
+        if (entryTry > 1) {
+            await page.close().catch(() => undefined);
+            page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+            await page.addInitScript(aircraftScenarioHarnessInitScript);
+        }
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+        await prepareTenantPlaywrightEntry(page);
+        entryError = null;
+        break;
+    } catch (err) {
+        entryError = err;
+        if (entryTry < entryAttempts) {
+            await page.waitForTimeout(2000 * entryTry);
+        }
+    }
+}
+if (entryError) throw entryError;
 
 const kb = page.locator('#control-scheme-keyboard-btn');
 if (await kb.isVisible({ timeout: 2000 }).catch(() => false)) await kb.click();
 await page.keyboard.press('KeyW');
 await page.waitForTimeout(400);
 
-await page.waitForFunction(
-    () => globalThis.__tenantAircraftPluginLoaded && window.__tenantE2E?.runAircraftScenario,
-    null,
-    { timeout: 120_000 }
-);
-
-await page.waitForFunction(
-    () => Boolean(window.__tenantE2E?.getSocket?.()?.connected),
-    null,
-    { timeout: 180_000 }
-);
+let socketReady = false;
+for (let socketTry = 1; socketTry <= socketAttempts; socketTry += 1) {
+    try {
+        await page.waitForFunction(
+            () => globalThis.__tenantAircraftPluginLoaded && window.__tenantE2E?.runAircraftScenario,
+            null,
+            { timeout: 120_000 }
+        );
+        await page.waitForFunction(
+            () => Boolean(window.__tenantE2E?.getSocket?.()?.connected),
+            null,
+            { timeout: 120_000 }
+        );
+        socketReady = true;
+        break;
+    } catch (err) {
+        if (socketTry >= socketAttempts) throw err;
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 120_000 });
+        await prepareTenantPlaywrightEntry(page);
+        if (await kb.isVisible({ timeout: 2000 }).catch(() => false)) await kb.click();
+        await page.keyboard.press('KeyW');
+        await page.waitForTimeout(400);
+    }
+}
+if (!socketReady) {
+    throw new Error('socket connect failed after retries');
+}
 
 const tp = rawScenario.teleportPosition || { x: 211, y: 1.2, z: 11 };
 await page.evaluate(({ x, y, z }) => {
