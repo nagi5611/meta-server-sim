@@ -99,7 +99,7 @@ jobs:
           bash scripts/lobby-provision-cloudflare.sh
       - name: Upload lobby-secrets.env
         if: success() && hashFiles('lobby-secrets.env') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lobby-secrets
           path: lobby-secrets.env
@@ -107,7 +107,7 @@ jobs:
           if-no-files-found: ignore
       - name: Upload deploy log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lobby-deploy-log
           path: /tmp/lobby-wrangler-deploy.log
