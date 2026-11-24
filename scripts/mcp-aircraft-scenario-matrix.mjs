@@ -85,13 +85,41 @@ async function loadState(loaded) {
     };
 }
 
+/**
+ * @param {string} filePath
+ * @param {string} content
+ */
+async function writeFileWithRetry(filePath, content) {
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true });
+    const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    let lastErr = null;
+    for (let i = 1; i <= 8; i += 1) {
+        try {
+            await fs.writeFile(tmp, content);
+            await fs.rename(tmp, filePath);
+            return;
+        } catch (err) {
+            lastErr = err;
+            await fs.unlink(tmp).catch(() => undefined);
+            await new Promise((r) => setTimeout(r, 40 * i));
+        }
+    }
+    throw lastErr;
+}
+
 /** @param {Record<string, unknown>} state */
-async function saveState(state) {
+async function saveState(state, opts = {}) {
     const statePath = path.join(ARTIFACTS, STATE_NAME);
-    await fs.mkdir(ARTIFACTS, { recursive: true });
     state.updatedAt = new Date().toISOString();
-    await fs.writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
-    await writeReportFromState(state);
+    await writeFileWithRetry(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    if (opts.writeReport !== false) {
+        try {
+            await writeReportFromState(state);
+        } catch (err) {
+            console.warn(`writeReportFromState: ${err?.message || err}`);
+        }
+    }
 }
 
 /**
@@ -174,7 +202,7 @@ async function runCalibrationCase(state, variant, durationSec) {
             slotId: report.slotId,
         });
         row.median = medianPositiveFinite(row.calibrationPrimaries);
-        await saveState(state);
+        await saveState(state, { writeReport: row.calibrationPrimaries.length >= CALIB_REPEATS });
         console.log(
             JSON.stringify({
                 phase: 'calibration',
@@ -307,7 +335,7 @@ async function writeReportFromState(state) {
     };
 
     const jsonOut = path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.json');
-    await fs.writeFile(jsonOut, `${JSON.stringify(summary, null, 2)}\n`);
+    await writeFileWithRetry(jsonOut, `${JSON.stringify(summary, null, 2)}\n`);
 
     const mdLines = [
         '# P-01 A320 matrix (median calibration + validation)',
@@ -321,7 +349,7 @@ async function writeReportFromState(state) {
         );
     }
     const mdOut = path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.md');
-    await fs.writeFile(mdOut, `${mdLines.join('\n')}\n`);
+    await writeFileWithRetry(mdOut, `${mdLines.join('\n')}\n`);
 }
 
 /** @param {Record<string, unknown>} state */
