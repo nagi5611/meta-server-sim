@@ -163,7 +163,7 @@ export default class AircraftScenarioRunner {
             scenarioSlotId = slot.id;
             await mgr.prepareSlotForScenarioBoard(scenarioSlotId);
             await this._waitForStaticColliderReady(60_000);
-            const boarded = await this._ensurePiloting(mgr, slot, 12);
+            const boarded = await this._ensurePiloting(mgr, slot, 20);
             if (!boarded) {
                 return buildAircraftScenarioReport(scenario, [], {
                     startedAtIso,
