@@ -33,9 +33,15 @@ import {
     rotateAircraftRootByOmega,
     snapshotAircraftAutopilot,
 } from './aircraft-autopilot.js';
+import {
+    CLEARANCE_ABOVE_GROUND,
+    GROUND_PROBE_ORIGIN_LIFT,
+    VERTICAL_MOVE_MARGIN,
+    clampVerticalDrop,
+    resolveGroundMinY,
+} from '../lib/aircraft-ground-probe.js';
 
 const LANDING_RAY_MAX = 500;
-const CLEARANCE_ABOVE_GROUND = 0.5;
 /** @deprecated 接地は updateGroundedHysteresis の headroom で判定 */
 const GROUNDED_Y_TOLERANCE = 0.15;
 /** 前後速度がこの値未満なら静止摩擦（横滑り抑制に tireStaticFriction を使用） */
@@ -70,6 +76,9 @@ export default class AircraftControllerHard {
         this._worldQuat = new THREE.Quaternion();
         this._worldPos = new THREE.Vector3();
         this._lookTarget = new THREE.Vector3();
+        this._rayDown = new THREE.Vector3(0, -1, 0);
+        /** @type {number|null} レイが地形外でも直前の床高を保持 */
+        this._lastGroundMinY = null;
         this.keys = {
             throttleUp: false,
             throttleDown: false,
@@ -143,6 +152,58 @@ export default class AircraftControllerHard {
     }
 
     /**
+     * @param {THREE.Vector3} worldPos
+     * @returns {{ minY: number, headroom: number } | null}
+     */
+    _sampleGroundBelow(worldPos) {
+        const collider = this.physicsManager?.collider;
+        if (!collider?.geometry?.boundsTree || !this.physicsManager?.raycastStaticWorld) return null;
+
+        this._lookTarget.set(
+            worldPos.x,
+            worldPos.y + GROUND_PROBE_ORIGIN_LIFT,
+            worldPos.z
+        );
+        const hit = this.physicsManager.raycastStaticWorld(
+            this._lookTarget,
+            this._rayDown,
+            LANDING_RAY_MAX + GROUND_PROBE_ORIGIN_LIFT
+        );
+        if (!hit) return null;
+        const minY = hit.point.y + CLEARANCE_ABOVE_GROUND;
+        return { minY, headroom: worldPos.y - minY };
+    }
+
+    /**
+     * @param {THREE.Object3D} root
+     * @param {THREE.Vector3} worldPos
+     */
+    _writeRootWorldPosition(root, worldPos) {
+        if (root.parent) {
+            root.parent.updateMatrixWorld(true);
+            this._fwd.copy(worldPos);
+            root.parent.worldToLocal(this._fwd);
+            root.position.copy(this._fwd);
+        } else {
+            root.position.copy(worldPos);
+        }
+        root.updateMatrixWorld(true);
+    }
+
+    /**
+     * @param {THREE.Object3D} root
+     * @param {number} minY
+     * @returns {boolean}
+     */
+    _snapRootWorldY(root, minY) {
+        root.getWorldPosition(this._worldPos);
+        if (this._worldPos.y >= minY) return false;
+        this._worldPos.y = minY;
+        this._writeRootWorldPosition(root, this._worldPos);
+        return true;
+    }
+
+    /**
      * ワールドの aircraftPhysics（worlds.json）を反映。未指定キーは既定値。
      * @param {Record<string, unknown>|null|undefined} raw
      */
@@ -212,6 +273,7 @@ export default class AircraftControllerHard {
                         slot.root.position.copy(this._worldPos);
                     }
                     slot.root.updateMatrixWorld(true);
+                    this._lastGroundMinY = hit.point.y + CLEARANCE_ABOVE_GROUND;
                 }
             }
         }
@@ -830,8 +892,15 @@ export default class AircraftControllerHard {
             Math.max(0, this.velocity.lengthSq() - vAlongBodyUp * vAlongBodyUp)
         );
         const liftMag = flapLiftCoeff(this._flapIndex, ph) * vH * ls;
+        root.getWorldPosition(this._worldPos);
+        const groundBeforeMove = this._sampleGroundBelow(this._worldPos);
+        const headroomBefore = groundBeforeMove?.headroom ?? Infinity;
+        const onGroundNow = updateGroundedHysteresis(this._aircraftGrounded, headroomBefore);
+
         this.velocity.y -= g * dt;
-        if (!this._aircraftGrounded) {
+        if (onGroundNow) {
+            if (this.velocity.y < 0) this.velocity.y = 0;
+        } else {
             applyLiftVerticalOnly(this.velocity, this._bodyUp, liftMag, dt);
         }
         if (this._flapIndex > 0) {
@@ -843,90 +912,75 @@ export default class AircraftControllerHard {
         clampEngineHorizontalSpeedIfLevel(this.velocity, maxSpd, this._fwd);
 
         root.getWorldPosition(this._worldPos);
-        this._worldPos.addScaledVector(this.velocity, dt);
-        if (root.parent) {
-            root.parent.updateMatrixWorld(true);
-            root.parent.worldToLocal(this._worldPos);
-            root.position.copy(this._worldPos);
-        } else {
-            root.position.copy(this._worldPos);
-        }
-        root.updateMatrixWorld(true);
+        let dy = this.velocity.y * dt;
+        dy = clampVerticalDrop(dy, groundBeforeMove, VERTICAL_MOVE_MARGIN);
+        this._worldPos.x += this.velocity.x * dt;
+        this._worldPos.y += dy;
+        this._worldPos.z += this.velocity.z * dt;
+        this._writeRootWorldPosition(root, this._worldPos);
 
-        const collider = this.physicsManager?.collider;
-        if (collider?.geometry?.boundsTree) {
+        const groundAfterMove = this._sampleGroundBelow(this._worldPos);
+        const resolved = resolveGroundMinY(
+            groundAfterMove,
+            this._lastGroundMinY,
+            this._worldPos.y,
+            this.velocity.y
+        );
+        this._lastGroundMinY = resolved.lastGroundMinY;
+        const minY = resolved.minY;
+        if (minY != null) {
+            if (this._snapRootWorldY(root, minY) && this.velocity.y < 0) {
+                this.velocity.y *= 0.3;
+            }
             root.getWorldPosition(this._worldPos);
-            const hit = this.physicsManager.raycastStaticWorld(
-                this._worldPos,
-                new THREE.Vector3(0, -1, 0),
-                LANDING_RAY_MAX
-            );
-            if (hit) {
-                const minY = hit.point.y + CLEARANCE_ABOVE_GROUND;
-                if (this._worldPos.y < minY) {
-                    this._worldPos.y = minY;
-                    if (root.parent) {
-                        root.parent.updateMatrixWorld(true);
-                        root.parent.worldToLocal(this._worldPos);
-                        root.position.copy(this._worldPos);
+            const headroom = this._worldPos.y - minY;
+            const onGround = updateGroundedHysteresis(this._aircraftGrounded, headroom);
+            this._aircraftGrounded = onGround;
+            if (onGround) {
+                root.getWorldQuaternion(this._worldQuat);
+                this._fwd.set(0, 0, -1).applyQuaternion(this._worldQuat);
+                let hx = this._fwd.x;
+                let hz = this._fwd.z;
+                const lenH = Math.hypot(hx, hz);
+                if (lenH > AIRCRAFT_GROUND_FRICTION_MIN_FORWARD_HORIZ) {
+                    hx /= lenH;
+                    hz /= lenH;
+                    let fwdSpeed = this.velocity.x * hx + this.velocity.z * hz;
+                    const rollMu = ph.tireKineticFriction;
+                    const rollK = rollMu * g * 0.12;
+                    if (rollK > 0) {
+                        const mag = Math.abs(fwdSpeed);
+                        if (mag > 0) {
+                            const ds = Math.min(mag, rollK * dt);
+                            fwdSpeed -= Math.sign(fwdSpeed) * ds;
+                        }
+                    }
+                    if (this._hardKey('brake')) {
+                        const step = ph.tireBrakeAccel * ls * dt;
+                        const mag = Math.abs(fwdSpeed);
+                        if (mag > 0) {
+                            const ds = Math.min(mag, step);
+                            fwdSpeed -= Math.sign(fwdSpeed) * ds;
+                        }
+                    }
+                    const latX = this.velocity.x - hx * fwdSpeed;
+                    const latZ = this.velocity.z - hz * fwdSpeed;
+                    const latMag = Math.hypot(latX, latZ);
+                    const muLat =
+                        Math.abs(fwdSpeed) < FWD_SPEED_STATIC_FRICTION_EPS
+                            ? ph.tireStaticFriction
+                            : ph.tireKineticFriction;
+                    const latK = muLat * g;
+                    if (latK > 0 && latMag > 1e-9) {
+                        const reduce = Math.min(latMag, latK * dt);
+                        const scale = (latMag - reduce) / latMag;
+                        this.velocity.x = hx * fwdSpeed + latX * scale;
+                        this.velocity.z = hz * fwdSpeed + latZ * scale;
                     } else {
-                        root.position.copy(this._worldPos);
-                    }
-                    if (this.velocity.y < 0) this.velocity.y *= 0.3;
-                    root.updateMatrixWorld(true);
-                }
-                root.getWorldPosition(this._worldPos);
-                const headroom = this._worldPos.y - minY;
-                const onGround = updateGroundedHysteresis(this._aircraftGrounded, headroom);
-                this._aircraftGrounded = onGround;
-                if (onGround) {
-                    root.getWorldQuaternion(this._worldQuat);
-                    this._fwd.set(0, 0, -1).applyQuaternion(this._worldQuat);
-                    let hx = this._fwd.x;
-                    let hz = this._fwd.z;
-                    const lenH = Math.hypot(hx, hz);
-                    if (lenH > AIRCRAFT_GROUND_FRICTION_MIN_FORWARD_HORIZ) {
-                        hx /= lenH;
-                        hz /= lenH;
-                        let fwdSpeed = this.velocity.x * hx + this.velocity.z * hz;
-                        const rollMu = ph.tireKineticFriction;
-                        const rollK = rollMu * g * 0.12;
-                        if (rollK > 0) {
-                            const mag = Math.abs(fwdSpeed);
-                            if (mag > 0) {
-                                const ds = Math.min(mag, rollK * dt);
-                                fwdSpeed -= Math.sign(fwdSpeed) * ds;
-                            }
-                        }
-                        if (this._hardKey('brake')) {
-                            const step = ph.tireBrakeAccel * ls * dt;
-                            const mag = Math.abs(fwdSpeed);
-                            if (mag > 0) {
-                                const ds = Math.min(mag, step);
-                                fwdSpeed -= Math.sign(fwdSpeed) * ds;
-                            }
-                        }
-                        const latX = this.velocity.x - hx * fwdSpeed;
-                        const latZ = this.velocity.z - hz * fwdSpeed;
-                        const latMag = Math.hypot(latX, latZ);
-                        const muLat =
-                            Math.abs(fwdSpeed) < FWD_SPEED_STATIC_FRICTION_EPS
-                                ? ph.tireStaticFriction
-                                : ph.tireKineticFriction;
-                        const latK = muLat * g;
-                        if (latK > 0 && latMag > 1e-9) {
-                            const reduce = Math.min(latMag, latK * dt);
-                            const scale = (latMag - reduce) / latMag;
-                            this.velocity.x = hx * fwdSpeed + latX * scale;
-                            this.velocity.z = hz * fwdSpeed + latZ * scale;
-                        } else {
-                            this.velocity.x = hx * fwdSpeed;
-                            this.velocity.z = hz * fwdSpeed;
-                        }
+                        this.velocity.x = hx * fwdSpeed;
+                        this.velocity.z = hz * fwdSpeed;
                     }
                 }
-            } else {
-                this._aircraftGrounded = false;
             }
         } else {
             this._aircraftGrounded = false;

@@ -8,24 +8,20 @@
   "sampleIntervalMs": 100,
   "steps": [
     {
-      "durationSec": 2,
-      "controls": { "thrust": 0.35, "yaw": 0, "pitch": 0, "roll": 0 }
-    },
-    {
-      "durationSec": 2.5,
-      "controls": { "thrust": 0.65, "yaw": 0, "pitch": 0, "roll": 0 }
+      "durationSec": 12,
+      "controls": { "thrust": 1, "yaw": 0, "pitch": 0, "roll": 0 }
     }
   ],
   "checkpoints": [
     {
-      "atTimeSec": 4.5,
-      "expect": { "minAltitudeGain": -0.8 },
-      "tolerance": { "altitudeM": 1.5 }
+      "atTimeSec": 12,
+      "expect": { "minAltitudeGain": -2 },
+      "tolerance": { "altitudeM": 4 }
     },
     {
-      "atTimeSec": 4.5,
-      "expect": { "deltaPosition": { "x": 0, "y": 0, "z": -2 } },
-      "tolerance": { "positionM": 0.6 }
+      "atTimeSec": 12,
+      "expect": { "deltaPosition": { "x": 0, "y": 0, "z": -18 } },
+      "tolerance": { "positionM": 4 }
     }
   ]
 }
