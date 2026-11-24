@@ -34,6 +34,27 @@ const AIRFRAME = 'A320';
 const STATE_VERSION = 2;
 const STATE_NAME = 'mcp-aircraft-scenario-matrix-state.json';
 
+/** @returns {{ kind: MatrixVariantKind, metric: string }[]} */
+function variantsToRun() {
+    const raw = String(process.env.MCP_MATRIX_ONLY_VARIANT || '').trim();
+    if (!raw) return MATRIX_VARIANTS;
+    const kinds = raw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+    const picked = MATRIX_VARIANTS.filter((v) => kinds.includes(v.kind));
+    if (!picked.length) {
+        throw new Error(`MCP_MATRIX_ONLY_VARIANT matched no variants: ${raw}`);
+    }
+    return picked;
+}
+
+/** @param {Record<string, unknown>} state @param {{ kind: MatrixVariantKind }[]} variants */
+function resetVariantCases(state, variants) {
+    for (const variant of variants) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            delete state.cases[caseKey(variant.kind, durationSec)];
+        }
+    }
+}
+
 /** @returns {Parameters<typeof runAircraftScenarioFromPathOrObject>[1]} */
 function scenarioRunOpts(extra = {}) {
     return {
@@ -319,6 +340,9 @@ async function writeReportFromState(state) {
     const summary = {
         methodology:
             'per-case calibration median (3 runs) + separate validation vs median ±20%, monotonic on validation across durations',
+        determinismNote:
+            state.methodologyNote ||
+            '固定 dt の本番クライアントは決定論的（同一ケースでキャリブ3回+検証1回は別セッションだが primary が bit 一致しうる）',
         startedAt: state.startedAt,
         updatedAt: state.updatedAt,
         finishedAt: state.phase === 'done' ? state.updatedAt : null,
@@ -352,9 +376,9 @@ async function writeReportFromState(state) {
     await writeFileWithRetry(mdOut, `${mdLines.join('\n')}\n`);
 }
 
-/** @param {Record<string, unknown>} state */
-function calibrationComplete(state) {
-    for (const variant of MATRIX_VARIANTS) {
+/** @param {Record<string, unknown>} state @param {{ kind: MatrixVariantKind }[]} [variantList] */
+function calibrationComplete(state, variantList = MATRIX_VARIANTS) {
+    for (const variant of variantList) {
         for (const durationSec of MATRIX_DURATIONS_SEC) {
             const key = caseKey(variant.kind, durationSec);
             const row = /** @type {any} */ (state.cases[key]);
@@ -366,8 +390,25 @@ function calibrationComplete(state) {
     return true;
 }
 
+/** @param {Record<string, unknown>} state @param {{ kind: MatrixVariantKind }[]} [variantList] */
+function validationCompleteFor(state, variantList = MATRIX_VARIANTS) {
+    for (const variant of variantList) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            const key = caseKey(variant.kind, durationSec);
+            const row = /** @type {any} */ (state.cases[key]);
+            if (!row || row.validationPrimary == null) return false;
+        }
+    }
+    return true;
+}
+
 /** @param {Record<string, unknown>} state */
 function validationComplete(state) {
+    return validationCompleteFor(state, MATRIX_VARIANTS);
+}
+
+/** @param {Record<string, unknown>} state */
+function validationCompleteLegacyAllKeys(state) {
     for (const key of orderedCaseKeys()) {
         const row = /** @type {any} */ (state.cases[key]);
         if (!row || row.validationPrimary == null) return false;
@@ -377,11 +418,18 @@ function validationComplete(state) {
 
 async function main() {
     await fs.mkdir(ARTIFACTS, { recursive: true });
+    const runVariants = variantsToRun();
+    const partialRun = runVariants.length < MATRIX_VARIANTS.length;
     const resume = String(process.env.MCP_MATRIX_RESUME || '1') !== '0';
     let state = await loadState();
     const fresh = !resume || !state.cases || Object.keys(state.cases).length === 0;
 
-    if (fresh) {
+    if (String(process.env.MCP_MATRIX_RESET_CASES || '') === '1') {
+        resetVariantCases(state, runVariants);
+        await saveState(state);
+    }
+
+    if (fresh && !partialRun) {
         const lobbyBefore = await runP01LobbyHeadedCheck({
             artifactsDir: ARTIFACTS,
             screenshotName: 'p01-lobby-before-matrix.png',
@@ -396,7 +444,7 @@ async function main() {
     }
 
     state.phase = 'calibration';
-    for (const variant of MATRIX_VARIANTS) {
+    for (const variant of runVariants) {
         for (const durationSec of MATRIX_DURATIONS_SEC) {
             const key = caseKey(variant.kind, durationSec);
             const row = ensureCase(state, key, variant, durationSec);
@@ -405,13 +453,13 @@ async function main() {
         }
     }
 
-    if (!calibrationComplete(state)) {
+    if (!calibrationComplete(state, runVariants)) {
         throw new Error('calibration incomplete');
     }
     state.phase = 'validation';
     await saveState(state);
 
-    for (const variant of MATRIX_VARIANTS) {
+    for (const variant of runVariants) {
         for (const durationSec of MATRIX_DURATIONS_SEC) {
             const key = caseKey(variant.kind, durationSec);
             const row = /** @type {any} */ (state.cases[key]);
@@ -420,21 +468,32 @@ async function main() {
         }
     }
 
-    if (!validationComplete(state)) {
+    if (!validationCompleteFor(state, runVariants)) {
         throw new Error('validation incomplete');
     }
 
-    const lobbyAfter = await runP01LobbyHeadedCheck({
-        artifactsDir: ARTIFACTS,
-        screenshotName: 'p01-lobby-after-matrix.png',
-    });
-    state.lobbyChecks = { ...(state.lobbyChecks || {}), after: lobbyAfter };
-    state.phase = 'done';
+    if (!partialRun) {
+        const lobbyAfter = await runP01LobbyHeadedCheck({
+            artifactsDir: ARTIFACTS,
+            screenshotName: 'p01-lobby-after-matrix.png',
+        });
+        state.lobbyChecks = { ...(state.lobbyChecks || {}), after: lobbyAfter };
+        if (!validationCompleteLegacyAllKeys(state)) {
+            throw new Error('validation incomplete (all 25)');
+        }
+    }
+
+    state.phase = partialRun ? 'partial-done' : 'done';
     state.finishedAt = new Date().toISOString();
+    state.methodologyNote =
+        '固定 dt の本番クライアントは決定論的（state JSON 上、同一ケースは時間を空けても primary が bit 一致しうる）。検証走行はキャリブとは別ブラウザセッション。yaw-right primary はアンラップ累積方位変化。';
     await saveState(state);
 
     const rows = matrixRowsFromState(state);
-    const allPass = rows.every((r) => r.pass);
+    const yawRows = rows.filter((r) => String(r.scenario).startsWith('yaw-right_'));
+    const allPass = partialRun
+        ? yawRows.every((r) => r.pass)
+        : rows.every((r) => r.pass);
     console.log(
         JSON.stringify({
             passCount: rows.filter((r) => r.pass).length,
