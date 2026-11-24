@@ -636,8 +636,24 @@ export default class AircraftManager {
         }
         this.refreshSlotsFromScene();
         this.resetSlotToParked(sid);
+        await this._requestServerSlotRelease(sid);
         await this.waitForSlotBoardable(sid, 45_000);
         this.nearestSlot = this.slotsById.get(sid) || null;
+    }
+
+    /**
+     * サーバー側の占有解除（run 間の孤立 busy 対策。乗っていなくても idempotent）
+     * @param {string} slotId
+     */
+    async _requestServerSlotRelease(slotId) {
+        const sid = String(slotId || '').trim();
+        if (!sid) return;
+        const socket = this.networkManager?.socket;
+        if (!socket?.connected) return;
+        await new Promise((resolve) => {
+            socket.emit('aircraft-exit', { slotId: sid }, () => resolve());
+        });
+        this._slotPilotId.delete(sid);
     }
 
     async tryBoardSlot(slotId) {
@@ -694,41 +710,52 @@ export default class AircraftManager {
             }
         }
 
-        return new Promise((resolve) => {
-            let settled = false;
-            const finish = (ok) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                resolve(ok);
-            };
-            const timer = setTimeout(() => {
-                this._reportBoardFailure('timeout');
-                finish(false);
-            }, BOARD_ACK_TIMEOUT_MS);
-            socket.emit('aircraft-board', { slotId: slot.id }, (res) => {
-                if (res?.ok) {
-                    this._enterPiloting(slot);
-                    finish(true);
-                    return;
-                }
-                if (res?.error === 'busy') {
-                    const harness =
-                        typeof document !== 'undefined' &&
-                        (document.documentElement?.dataset?.e2eHarness === '1' ||
-                            globalThis.__TENANT_E2E_HARNESS__ === '1');
-                    if (harness) {
-                        finish(false);
+        const harness =
+            typeof document !== 'undefined' &&
+            (document.documentElement?.dataset?.e2eHarness === '1' ||
+                globalThis.__TENANT_E2E_HARNESS__ === '1');
+
+        const attemptBoard = () =>
+            new Promise((resolve) => {
+                let settled = false;
+                const finish = (ok) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(ok);
+                };
+                const timer = setTimeout(() => {
+                    this._reportBoardFailure('timeout');
+                    finish(false);
+                }, BOARD_ACK_TIMEOUT_MS);
+                socket.emit('aircraft-board', { slotId: slot.id }, (res) => {
+                    if (res?.ok) {
+                        this._enterPiloting(slot);
+                        finish(true);
                         return;
                     }
-                    this._enterPassenger(slot);
-                    finish(true);
-                    return;
-                }
-                this._reportBoardFailure(res?.error);
-                finish(false);
+                    if (res?.error === 'busy') {
+                        if (harness) {
+                            finish({ harnessBusy: true });
+                            return;
+                        }
+                        this._enterPassenger(slot);
+                        finish(true);
+                        return;
+                    }
+                    this._reportBoardFailure(res?.error);
+                    finish(false);
+                });
             });
-        });
+
+        let outcome = await attemptBoard();
+        if (outcome && typeof outcome === 'object' && outcome.harnessBusy) {
+            await this._requestServerSlotRelease(slot.id);
+            await new Promise((r) => setTimeout(r, 350));
+            outcome = await attemptBoard();
+        }
+        if (outcome && typeof outcome === 'object') return false;
+        return !!outcome;
     }
 
     /**
@@ -992,6 +1019,8 @@ export default class AircraftManager {
      * @param {string} slotId
      */
     onAircraftReleased(slotId) {
+        const sid = String(slotId || '').trim();
+        if (sid) this._slotPilotId.delete(sid);
         if (this.isPiloting && this.activeSlot?.id === slotId) {
             return;
         }
