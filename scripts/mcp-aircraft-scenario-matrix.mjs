@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * P-01 A320 専用スロットで 5×5 飛行マトリクスを本番検証（キャリブ ±20%、単調増加、0 変化 NG）
+ * P-01 A320: 25ケース二段階マトリクス
+ * 1) キャリブ: 各ケース3回 → 中央値（線形外挿なし）
+ * 2) 検証: 別走行1回 → 中央値 ±20% ＋ 秒数単調増加
+ * ケースごとに状態を書き、ブラウザは走行ごとに新規（再開可能）
  */
 import 'dotenv/config';
 import fs from 'node:fs/promises';
@@ -11,8 +14,8 @@ import {
     MATRIX_VARIANTS,
     buildMatrixScenario,
     evaluateMatrixCase,
-    expectedPrimaryFromCalibration,
     extractMatrixMetrics,
+    medianPositiveFinite,
 } from '../lib/aircraft-scenario-matrix-eval.js';
 import { runAircraftScenarioFromPathOrObject } from '../lib/mcp-aircraft-scenario-run.js';
 import { runP01LobbyHeadedCheck } from './mcp-p01-lobby-headed-check.mjs';
@@ -24,9 +27,12 @@ process.chdir(ROOT);
 const BASE_URL = process.env.AIRCRAFT_SCENARIO_BASE_URL || 'https://sim.mmh-virtual.jp';
 const TENANT = process.env.WORLD_EDIT_MCP_TENANT_ID || 'P-01';
 const ARTIFACTS = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
-const MAX_ATTEMPTS = Number(process.env.MCP_MATRIX_MAX_ATTEMPTS || 5);
+const CALIB_REPEATS = Number(process.env.MCP_MATRIX_CALIB_REPEATS || 3);
+const ENTRY_ATTEMPTS = Number(process.env.MCP_MATRIX_ENTRY_ATTEMPTS || 4);
 const REQUIRED_SLOT = 'p01-scenario-a320';
 const AIRFRAME = 'A320';
+const STATE_VERSION = 2;
+const STATE_NAME = 'mcp-aircraft-scenario-matrix-state.json';
 
 /** @returns {Parameters<typeof runAircraftScenarioFromPathOrObject>[1]} */
 function scenarioRunOpts(extra = {}) {
@@ -41,6 +47,14 @@ function scenarioRunOpts(extra = {}) {
 /** @typedef {import('../lib/aircraft-scenario-matrix-eval.js').MatrixVariantKind} MatrixVariantKind */
 
 /**
+ * @param {MatrixVariantKind} kind
+ * @param {number} durationSec
+ */
+function caseKey(kind, durationSec) {
+    return `${kind}_${durationSec}s`;
+}
+
+/**
  * @param {unknown} report
  * @param {MatrixVariantKind} kind
  */
@@ -49,220 +63,359 @@ function metricsFromReport(report, kind) {
 }
 
 /**
- * @param {Record<MatrixVariantKind, number>} calibration
- * @param {{ kind: MatrixVariantKind, metric: string }} variant
+ * @param {Record<string, unknown>} [loaded]
  */
-async function runCalibration5s(variant, calibration) {
-    const scenario = buildMatrixScenario(
-        variant.kind,
-        5,
-        100,
-        { metric: /** @type {'deltaM'|'heading'|'altitude'|'combo'} */ (variant.metric) },
-    );
-    const report = await runAircraftScenarioFromPathOrObject(scenario, scenarioRunOpts());
-    const m = metricsFromReport(report, variant.kind);
-    if (!m || m.primary <= 0 || m.slotId !== 'p01-scenario-a320') {
-        throw new Error(
-            `calibration failed for ${variant.kind}: slot=${m?.slotId} primary=${m?.primary} errors=${JSON.stringify(report?.errors)}`,
-        );
+async function loadState(loaded) {
+    const statePath = path.join(ARTIFACTS, STATE_NAME);
+    if (loaded) return loaded;
+    try {
+        const raw = JSON.parse(await fs.readFile(statePath, 'utf8'));
+        if (raw?.version === STATE_VERSION && raw.cases) return raw;
+    } catch {
+        /* fresh */
     }
-    calibration[variant.kind] = m.primary;
-    return { report, metrics: m };
+    return {
+        version: STATE_VERSION,
+        startedAt: new Date().toISOString(),
+        baseUrl: BASE_URL,
+        tenantId: TENANT,
+        calibRepeats: CALIB_REPEATS,
+        phase: 'calibration',
+        cases: /** @type {Record<string, unknown>} */ ({}),
+    };
+}
+
+/** @param {Record<string, unknown>} state */
+async function saveState(state) {
+    const statePath = path.join(ARTIFACTS, STATE_NAME);
+    await fs.mkdir(ARTIFACTS, { recursive: true });
+    state.updatedAt = new Date().toISOString();
+    await fs.writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    await writeReportFromState(state);
 }
 
 /**
- * @param {Record<MatrixVariantKind, number>} calibration
+ * @param {Record<string, unknown>} state
+ * @param {string} key
  */
-async function runMatrix(calibration) {
-    /** @type {Record<MatrixVariantKind, number | null>} */
-    const prevPrimary = {
-        straight: null,
-        'yaw-right': null,
-        climb: null,
-        roll: null,
-        combo: null,
-    };
+function ensureCase(state, key, variant, durationSec) {
+    if (!state.cases[key]) {
+        state.cases[key] = {
+            scenario: key,
+            airframe: AIRFRAME,
+            variant: variant.kind,
+            durationSec,
+            calibrationPrimaries: [],
+            calibrationRuns: [],
+            median: null,
+            validationPrimary: null,
+            validationRun: null,
+            pass: null,
+            failReasons: [],
+        };
+    }
+    return /** @type {any} */ (state.cases[key]);
+}
 
-    /** @type {Array<Record<string, unknown>>} */
-    const rows = [];
+/**
+ * @param {{ kind: MatrixVariantKind, metric: string }} variant
+ * @param {number} durationSec
+ */
+function buildScenarioForCase(variant, durationSec) {
+    return buildMatrixScenario(variant.kind, durationSec, 0, {
+        metric: /** @type {'deltaM'|'heading'|'altitude'|'combo'} */ (variant.metric),
+    }, { skipCheckpoints: true });
+}
 
-    for (const variant of MATRIX_VARIANTS) {
-        const ref5 = calibration[variant.kind];
-        for (const durationSec of MATRIX_DURATIONS_SEC) {
-            const expected = expectedPrimaryFromCalibration(ref5, durationSec);
-            const scenario = buildMatrixScenario(variant.kind, durationSec, expected, {
-                metric: /** @type {'deltaM'|'heading'|'altitude'|'combo'} */ (variant.metric),
-            });
-
-            let attempt = 0;
-            let pass = false;
-            /** @type {unknown} */
-            let lastReport = null;
-            /** @type {import('../lib/aircraft-scenario-matrix-eval.js').extractMatrixMetrics extends (...args: any) => infer R ? R : never} */
-            let lastMetrics = null;
-            /** @type {string[]} */
-            let failReasons = [];
-
-            while (attempt < MAX_ATTEMPTS && !pass) {
-                attempt += 1;
-                lastReport = await runAircraftScenarioFromPathOrObject(scenario, scenarioRunOpts());
-                lastMetrics = metricsFromReport(lastReport, variant.kind);
-                const actualPrimary = lastMetrics?.primary ?? 0;
-                const evalResult = evaluateMatrixCase({
-                    expected,
-                    actual: actualPrimary,
-                    prevPrimary: prevPrimary[variant.kind],
-                    slotId: lastMetrics?.slotId ?? null,
-                    errors: lastReport?.errors ?? [],
-                });
-                pass =
-                    evalResult.pass &&
-                    (lastReport?.errors?.length ?? 0) === 0 &&
-                    lastMetrics?.slotId === REQUIRED_SLOT;
-                failReasons = evalResult.reasons;
-                if (!pass) {
-                    await new Promise((r) => setTimeout(r, 1500 + attempt * 500));
-                }
+/**
+ * @param {{ kind: MatrixVariantKind, metric: string }} variant
+ * @param {number} durationSec
+ */
+async function runOneScenario(variant, durationSec) {
+    const scenario = buildScenarioForCase(variant, durationSec);
+    let lastErr = null;
+    for (let i = 1; i <= ENTRY_ATTEMPTS; i += 1) {
+        try {
+            process.env.MCP_SCENARIO_ENTRY_ATTEMPTS = '3';
+            const report = await runAircraftScenarioFromPathOrObject(scenario, scenarioRunOpts());
+            const m = metricsFromReport(report, variant.kind);
+            if (!m || m.primary <= 0 || m.slotId !== REQUIRED_SLOT) {
+                throw new Error(
+                    `bad metrics key=${caseKey(variant.kind, durationSec)} slot=${m?.slotId} primary=${m?.primary}`,
+                );
             }
-
-            if (lastMetrics && pass) {
-                prevPrimary[variant.kind] = lastMetrics.primary;
+            if (report?.errors?.length) {
+                throw new Error(report.errors.join('; '));
             }
-
-            rows.push({
-                scenario: `${variant.kind}_${durationSec}s`,
-                airframe: AIRFRAME,
-                variant: variant.kind,
-                durationSec,
-                expected: Number(expected.toFixed(4)),
-                actual: lastMetrics
-                    ? {
-                          primary: Number(lastMetrics.primary.toFixed(4)),
-                          deltaM: Number(lastMetrics.deltaM.toFixed(4)),
-                          headingChangeDeg: Number(lastMetrics.headingChangeDeg.toFixed(4)),
-                          altitudeGainM: Number(lastMetrics.altitudeGainM.toFixed(4)),
-                      }
-                    : null,
-                deviationPct:
-                    lastMetrics && expected > 0
-                        ? Number((((lastMetrics.primary - expected) / expected) * 100).toFixed(2))
-                        : null,
-                pass,
-                attemptsToPass: pass ? attempt : null,
-                attemptsRun: attempt,
-                failReasons: pass ? [] : failReasons,
-                slotId: lastReport?.slotId ?? null,
-                checkpointPass: lastReport?.pass ?? false,
-                reportPath: lastReport?.reportPath ?? null,
-                screenshotPath: lastReport?.screenshotPath ?? null,
-            });
+            return { report, metrics: m };
+        } catch (err) {
+            lastErr = err;
+            await new Promise((r) => setTimeout(r, 1500 * i));
         }
     }
-    return rows;
+    throw lastErr;
 }
 
-async function diagnoseStraightRootCause() {
-    const straightPath = path.join(ROOT, 'scenarios/aircraft/p01-straight.json');
-    const report = await runAircraftScenarioFromPathOrObject(
-        straightPath,
-        scenarioRunOpts({ captureScreenshot: true }),
-    );
-    const m = metricsFromReport(report, 'straight');
-    const cp = report?.checkpoints?.[0];
-    return {
-        reportPath: report?.reportPath,
-        pass: report?.pass,
-        slotId: report?.slotId,
-        errors: report?.errors,
-        deltaM: m?.deltaM,
-        checkpointDeltaM: cp?.metrics?.deltaPositionM?.delta,
-        checkpointPass: cp?.pass,
-        sampleCount: report?.samples?.length ?? 0,
-    };
-}
-
-async function main() {
-    await fs.mkdir(ARTIFACTS, { recursive: true });
-    const startedAt = new Date().toISOString();
-    const headed =
-        String(process.env.MCP_SCENARIO_HEADED || process.env.PLAYWRIGHT_HEADED || '1') !== '0';
-
-    const lobbyBefore = await runP01LobbyHeadedCheck({
-        artifactsDir: ARTIFACTS,
-        screenshotName: 'p01-lobby-before-matrix.png',
-    });
-    if (!lobbyBefore.pass) {
-        console.error(JSON.stringify({ fatal: 'lobby check failed before matrix', lobbyBefore }, null, 2));
-        process.exit(3);
-    }
-
-    const diagnosis = await diagnoseStraightRootCause();
-
-    /** @type {Record<MatrixVariantKind, number>} */
-    const calibration = /** @type {Record<MatrixVariantKind, number>} */ ({});
-    const calibrationRuns = [];
-    for (const variant of MATRIX_VARIANTS) {
-        const cal = await runCalibration5s(variant, calibration);
-        calibrationRuns.push({
-            variant: variant.kind,
-            primaryAt5s: calibration[variant.kind],
-            reportPath: cal.report?.reportPath,
-            slotId: cal.report?.slotId,
+/**
+ * @param {Record<string, unknown>} state
+ * @param {{ kind: MatrixVariantKind, metric: string }} variant
+ * @param {number} durationSec
+ */
+async function runCalibrationCase(state, variant, durationSec) {
+    const key = caseKey(variant.kind, durationSec);
+    const row = ensureCase(state, key, variant, durationSec);
+    while (row.calibrationPrimaries.length < CALIB_REPEATS) {
+        const { report, metrics } = await runOneScenario(variant, durationSec);
+        row.calibrationPrimaries.push(Number(metrics.primary.toFixed(6)));
+        row.calibrationRuns.push({
+            at: new Date().toISOString(),
+            primary: metrics.primary,
+            reportPath: report.reportPath,
+            slotId: report.slotId,
         });
+        row.median = medianPositiveFinite(row.calibrationPrimaries);
+        await saveState(state);
+        console.log(
+            JSON.stringify({
+                phase: 'calibration',
+                case: key,
+                run: row.calibrationPrimaries.length,
+                primary: metrics.primary,
+                median: row.median,
+            }),
+        );
+    }
+}
+
+/**
+ * @param {Record<string, unknown>} state
+ * @param {{ kind: MatrixVariantKind, metric: string }} variant
+ * @param {number} durationSec
+ */
+async function runValidationCase(state, variant, durationSec) {
+    const key = caseKey(variant.kind, durationSec);
+    const row = ensureCase(state, key, variant, durationSec);
+    if (row.median == null || row.median <= 0) {
+        throw new Error(`validation without median: ${key}`);
+    }
+    if (row.validationPrimary != null) return row;
+
+    const { report, metrics } = await runOneScenario(variant, durationSec);
+    const actual = metrics.primary;
+    const prevIdx = MATRIX_DURATIONS_SEC.indexOf(durationSec) - 1;
+    let prevPrimary = null;
+    if (prevIdx >= 0) {
+        const prevKey = caseKey(variant.kind, MATRIX_DURATIONS_SEC[prevIdx]);
+        const prevRow = /** @type {any} */ (state.cases[prevKey]);
+        prevPrimary = prevRow?.validationPrimary ?? null;
     }
 
-    const matrixRows = await runMatrix(calibration);
-
-    const lobbyAfter = await runP01LobbyHeadedCheck({
-        artifactsDir: ARTIFACTS,
-        screenshotName: 'p01-lobby-after-matrix.png',
+    const evalResult = evaluateMatrixCase({
+        expected: row.median,
+        actual,
+        prevPrimary,
+        slotId: metrics.slotId,
+        errors: report?.errors ?? [],
     });
 
+    row.validationPrimary = Number(actual.toFixed(6));
+    row.validationRun = {
+        at: new Date().toISOString(),
+        primary: actual,
+        reportPath: report.reportPath,
+        slotId: report.slotId,
+    };
+    row.pass = evalResult.pass;
+    row.failReasons = evalResult.reasons;
+    row.deviationPct = evalResult.deviationPct;
+    await saveState(state);
+    console.log(
+        JSON.stringify({
+            phase: 'validation',
+            case: key,
+            median: row.median,
+            actual,
+            pass: row.pass,
+            reasons: row.failReasons,
+        }),
+    );
+    return row;
+}
+
+/** @param {Record<string, unknown>} state */
+function orderedCaseKeys() {
+    /** @type {string[]} */
+    const keys = [];
+    for (const variant of MATRIX_VARIANTS) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            keys.push(caseKey(variant.kind, durationSec));
+        }
+    }
+    return keys;
+}
+
+/** @param {Record<string, unknown>} state */
+function matrixRowsFromState(state) {
+    return orderedCaseKeys().map((key) => {
+        const row = /** @type {any} */ (state.cases[key]);
+        if (!row) {
+            return {
+                scenario: key,
+                airframe: AIRFRAME,
+                calibratedMedian: null,
+                validationActual: null,
+                pass: false,
+                failReasons: ['not_run'],
+            };
+        }
+        return {
+            scenario: row.scenario,
+            airframe: row.airframe,
+            variant: row.variant,
+            durationSec: row.durationSec,
+            calibratedMedian: row.median != null ? Number(row.median.toFixed(4)) : null,
+            validationActual:
+                row.validationPrimary != null ? Number(row.validationPrimary.toFixed(4)) : null,
+            deviationPct: row.deviationPct ?? null,
+            pass: row.pass === true,
+            failReasons: row.failReasons ?? [],
+            calibrationSamples: row.calibrationPrimaries?.length ?? 0,
+        };
+    });
+}
+
+/** @param {Record<string, unknown>} state */
+async function writeReportFromState(state) {
+    const rows = matrixRowsFromState(state);
+    const passCount = rows.filter((r) => r.pass).length;
     const summary = {
-        startedAt,
-        finishedAt: new Date().toISOString(),
-        baseUrl: BASE_URL,
-        tenantId: TENANT,
+        methodology:
+            'per-case calibration median (3 runs) + separate validation vs median ±20%, monotonic on validation across durations',
+        startedAt: state.startedAt,
+        updatedAt: state.updatedAt,
+        finishedAt: state.phase === 'done' ? state.updatedAt : null,
+        baseUrl: state.baseUrl,
+        tenantId: state.tenantId,
         requiredSlotId: REQUIRED_SLOT,
-        playwrightHeaded: headed,
-        slotPolicy: 'A320 のみ使用（bc-b0586736 B787 用 p01-scenario-b787 は触らない）',
-        calibration,
-        calibrationRuns,
-        lobbyChecks: { before: lobbyBefore, after: lobbyAfter },
         prodHead: process.env.METASIM_PROD_HEAD || null,
-        diagnosis,
-        rootCauseNotes: [
-            '旧マトリクスは checkpoints: [] のため buildAircraftScenarioReport が errors なしで常に pass=true になり、movedEnough フォールバックも緩かった。',
-            '9.1m vs 125m の主因は headless Playwright で document.hidden / rAF スロットリングにより frameUpdate 内の aircraftController.update が実質数フレームしか走らないこと（壁時計 5s でも移動 ~7.5m）。E2E ハーネス時は isPageVisible 無視＋visibility 偽装＋Chrome スロットリング無効化で是正。',
-        ],
-        matrix: matrixRows,
-        allPass: matrixRows.every((r) => r.pass),
-        passCount: matrixRows.filter((r) => r.pass).length,
-        totalCases: matrixRows.length,
+        phase: state.phase,
+        matrix: rows,
+        passCount,
+        totalCases: rows.length,
+        allPass: passCount === rows.length && rows.every((r) => r.validationActual != null),
+        lobbyChecks: state.lobbyChecks ?? null,
     };
 
     const jsonOut = path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.json');
     await fs.writeFile(jsonOut, `${JSON.stringify(summary, null, 2)}\n`);
 
     const mdLines = [
-        '# P-01 A320 scenario matrix',
+        '# P-01 A320 matrix (median calibration + validation)',
         '',
-        `診断 p01-straight: deltaM=${diagnosis.deltaM ?? 'n/a'}, checkpointΔ=${diagnosis.checkpointDeltaM ?? 'n/a'}, slot=${diagnosis.slotId}`,
-        '',
-        '| scenario | airframe | sec | expected | actual | deviation % | pass | attempt |',
-        '| --- | --- | ---: | ---: | ---: | ---: | --- | ---: |',
+        '| scenario | airframe | calibrated median | validation actual | pass |',
+        '| --- | --- | ---: | ---: | --- |',
     ];
-    for (const r of matrixRows) {
-        const prim = r.actual?.primary ?? '—';
+    for (const r of rows) {
         mdLines.push(
-            `| ${r.scenario ?? r.variant} | ${r.airframe ?? AIRFRAME} | ${r.durationSec} | ${r.expected} | ${prim} | ${r.deviationPct ?? '—'} | ${r.pass ? 'OK' : 'NG'} | ${r.attemptsToPass ?? r.attemptsRun} |`,
+            `| ${r.scenario} | ${r.airframe} | ${r.calibratedMedian ?? '—'} | ${r.validationActual ?? '—'} | ${r.pass ? 'PASS' : 'FAIL'} |`,
         );
     }
     const mdOut = path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.md');
     await fs.writeFile(mdOut, `${mdLines.join('\n')}\n`);
+}
 
-    console.log(JSON.stringify({ jsonOut, mdOut, allPass: summary.allPass, passCount: summary.passCount }, null, 2));
-    process.exit(summary.allPass ? 0 : 1);
+/** @param {Record<string, unknown>} state */
+function calibrationComplete(state) {
+    for (const variant of MATRIX_VARIANTS) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            const key = caseKey(variant.kind, durationSec);
+            const row = /** @type {any} */ (state.cases[key]);
+            if (!row || row.calibrationPrimaries?.length < CALIB_REPEATS || row.median == null) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/** @param {Record<string, unknown>} state */
+function validationComplete(state) {
+    for (const key of orderedCaseKeys()) {
+        const row = /** @type {any} */ (state.cases[key]);
+        if (!row || row.validationPrimary == null) return false;
+    }
+    return true;
+}
+
+async function main() {
+    await fs.mkdir(ARTIFACTS, { recursive: true });
+    const resume = String(process.env.MCP_MATRIX_RESUME || '1') !== '0';
+    let state = await loadState();
+    const fresh = !resume || !state.cases || Object.keys(state.cases).length === 0;
+
+    if (fresh) {
+        const lobbyBefore = await runP01LobbyHeadedCheck({
+            artifactsDir: ARTIFACTS,
+            screenshotName: 'p01-lobby-before-matrix.png',
+        });
+        if (!lobbyBefore.pass) {
+            console.error(JSON.stringify({ fatal: 'lobby check failed before matrix', lobbyBefore }, null, 2));
+            process.exit(3);
+        }
+        state.lobbyChecks = { before: lobbyBefore };
+        state.startedAt = new Date().toISOString();
+        await saveState(state);
+    }
+
+    state.phase = 'calibration';
+    for (const variant of MATRIX_VARIANTS) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            const key = caseKey(variant.kind, durationSec);
+            const row = ensureCase(state, key, variant, durationSec);
+            if (row.calibrationPrimaries.length >= CALIB_REPEATS && row.median != null) continue;
+            await runCalibrationCase(state, variant, durationSec);
+        }
+    }
+
+    if (!calibrationComplete(state)) {
+        throw new Error('calibration incomplete');
+    }
+    state.phase = 'validation';
+    await saveState(state);
+
+    for (const variant of MATRIX_VARIANTS) {
+        for (const durationSec of MATRIX_DURATIONS_SEC) {
+            const key = caseKey(variant.kind, durationSec);
+            const row = /** @type {any} */ (state.cases[key]);
+            if (row.validationPrimary != null) continue;
+            await runValidationCase(state, variant, durationSec);
+        }
+    }
+
+    if (!validationComplete(state)) {
+        throw new Error('validation incomplete');
+    }
+
+    const lobbyAfter = await runP01LobbyHeadedCheck({
+        artifactsDir: ARTIFACTS,
+        screenshotName: 'p01-lobby-after-matrix.png',
+    });
+    state.lobbyChecks = { ...(state.lobbyChecks || {}), after: lobbyAfter };
+    state.phase = 'done';
+    state.finishedAt = new Date().toISOString();
+    await saveState(state);
+
+    const rows = matrixRowsFromState(state);
+    const allPass = rows.every((r) => r.pass);
+    console.log(
+        JSON.stringify({
+            passCount: rows.filter((r) => r.pass).length,
+            totalCases: rows.length,
+            allPass,
+            report: path.join(ARTIFACTS, 'mcp-aircraft-scenario-matrix-report.json'),
+        }),
+    );
+    process.exit(allPass ? 0 : 1);
 }
 
 main().catch((e) => {

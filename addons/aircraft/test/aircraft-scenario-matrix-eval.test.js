@@ -5,6 +5,7 @@ import {
     evaluateMatrixCase,
     expectedPrimaryFromCalibration,
     extractMatrixMetrics,
+    medianPositiveFinite,
 } from '../../../lib/aircraft-scenario-matrix-eval.js';
 
 test('expectedPrimaryFromCalibration scales linearly with duration', () => {
