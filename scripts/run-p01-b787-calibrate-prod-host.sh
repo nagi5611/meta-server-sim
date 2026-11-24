@@ -15,7 +15,7 @@ exec flock -w 7200 "$LOCK" bash -c "
   for run in 1 2 3 4 5; do
     out=\"${ART}/calib-run\${run}.json\"
     xvfb-run -a node scripts/aircraft-scenario.mjs scenarios/aircraft/p01-b787-straight-calibrate.json --out \"\${out}\" || true
-    sleep 10
+    sleep 45
   done
 "
 echo \"calibration artifacts in ${ART}\"
