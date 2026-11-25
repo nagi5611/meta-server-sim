@@ -1,5 +1,6 @@
 // public/js/mt-console-shell.js — CONSOLE シェル（サイドバー・トップバー）を既存 admin ページに適用
 import { mtEsc, mtIcon } from './mt-console-ui.js';
+import { wireTenantConsolePanelNav } from './mt-console-panel-nav.js';
 
 /** @typedef {'platform' | 'tenant' | 'world-edit'} MtConsolePage */
 
@@ -44,7 +45,7 @@ function refreshCrumbs() {
     parts.push('管理');
     if (runtimeConfig.page === 'platform') {
         parts.push('全テナント');
-        const active = document.querySelector('#admin-side-nav .nav.on')?.getAttribute('data-admin-panel');
+        const active = document.querySelector('.side .nav[data-admin-panel].on')?.getAttribute('data-admin-panel');
         if (active === 'settings') parts.push('設定');
         else if (active === 'audit') parts.push('監査ログ・権限');
         else parts.push('ダッシュボード');
@@ -150,6 +151,69 @@ function ensurePlatformAuditPanel() {
 /**
  * テナント: アドオン画面にデザイン見出しを付与
  */
+/**
+ * プラットフォーム各パネルに CONSOLE 見出しを付与
+ */
+function decoratePlatformPanels() {
+    const overview = document.querySelector('[data-admin-panel-id="overview"]');
+    if (overview && !overview.querySelector('.head')) {
+        const head = document.createElement('header');
+        head.className = 'head block';
+        head.innerHTML = `
+          <div>
+            <p class="kicker">プラットフォーム</p>
+            <h1>ダッシュボード</h1>
+            <p class="sub">全テナントの稼働状況・接続数・HTTP トラフィックの概要です。</p>
+          </div>
+        `;
+        overview.insertBefore(head, overview.firstChild);
+    }
+    const settings = document.querySelector('[data-admin-panel-id="settings"]');
+    if (settings && !settings.querySelector('.head')) {
+        const head = document.createElement('header');
+        head.className = 'head block';
+        head.innerHTML = `
+          <div>
+            <p class="kicker">プラットフォーム</p>
+            <h1>設定</h1>
+            <p class="sub">環境変数・ネットワーク・Lobby 同期などプラットフォーム全体の構成です。</p>
+          </div>
+        `;
+        settings.insertBefore(head, settings.firstChild);
+    }
+}
+
+function decorateTenantStatusPanels() {
+    const overview = document.querySelector('[data-tenant-panel-id="overview"]');
+    if (overview && !overview.querySelector('.head')) {
+        const head = document.createElement('header');
+        head.className = 'head block';
+        head.innerHTML = `
+          <div>
+            <p class="kicker">テナント · <span>${mtEsc(runtimeConfig?.tenantLabel || runtimeConfig?.tenantId || '')}</span></p>
+            <h1>ステータス</h1>
+            <p class="sub">接続数・ワールド一覧と稼働サマリです。通信ログはサイドバーの「通信ログ」から開きます。</p>
+          </div>
+        `;
+        overview.insertBefore(head, overview.firstChild);
+        overview.querySelectorAll('.stats-section').forEach((s) => s.classList.add('sheet'));
+    }
+    const logs = document.querySelector('[data-tenant-panel-id="logs"]');
+    if (logs && !logs.querySelector('.head')) {
+        const head = document.createElement('header');
+        head.className = 'head block';
+        head.innerHTML = `
+          <div>
+            <p class="kicker">テナント · 通信</p>
+            <h1>通信ログ</h1>
+            <p class="sub">HTTP 送信トラフィックのレート・カテゴリ別内訳です。</p>
+          </div>
+        `;
+        logs.insertBefore(head, logs.firstChild);
+        logs.querySelectorAll('.stats-section').forEach((s) => s.classList.add('sheet'));
+    }
+}
+
 function decorateTenantAddonsPanel() {
     const panel = document.querySelector('[data-tenant-panel-id="plugins"]');
     if (!panel || panel.querySelector('.head')) return;
@@ -190,10 +254,15 @@ export function initMtConsoleShell(config) {
     if (legacyHeader) legacyHeader.classList.add('admin-legacy-header');
 
     const panels = main.querySelector('.admin-panels');
-    const modals = [...main.children].filter((n) => !n.classList?.contains('admin-panels'));
+    const legacyActionsFragment = document.createDocumentFragment();
+    const legacyActions = legacyHeader?.querySelector('.header-actions');
+    if (legacyActions) {
+        legacyActionsFragment.append(...legacyActions.childNodes);
+    }
 
     if (config.page === 'tenant') {
         splitTenantTrafficPanel();
+        decorateTenantStatusPanels();
     }
     if (config.page === 'platform') {
         ensurePlatformAuditPanel();
@@ -221,9 +290,6 @@ export function initMtConsoleShell(config) {
 
     main.remove();
     document.body.insertBefore(app, document.body.firstChild);
-    for (const m of modals) {
-        document.body.appendChild(m);
-    }
 
     if (!document.getElementById('mt-toast')) {
         const toast = document.createElement('div');
@@ -236,23 +302,21 @@ export function initMtConsoleShell(config) {
     if (config.page === 'tenant') {
         decorateTenantAddonsPanel();
     }
+    if (config.page === 'platform') {
+        decoratePlatformPanels();
+    }
+
+    const actionSlot = document.getElementById('mt-topbar-actions');
+    if (actionSlot && legacyActionsFragment.childNodes.length) {
+        actionSlot.replaceChildren(...legacyActionsFragment.childNodes);
+    }
 
     wireSidebarInteractions(config);
+    if (config.page === 'tenant') {
+        wireTenantConsolePanelNav();
+        document.addEventListener('mt-console-tenant-panel', () => refreshCrumbs());
+    }
     refreshCrumbs();
-    mountLegacyHeaderActions(config, legacyHeader);
-}
-
-/**
- * 旧ヘッダーの操作群をトップバー右へ移す
- * @param {MtConsoleConfig} config
- * @param {HTMLElement | null} legacyHeader
- */
-function mountLegacyHeaderActions(config, legacyHeader) {
-    const slot = document.getElementById('mt-topbar-actions');
-    if (!slot || !legacyHeader) return;
-    const actions = legacyHeader.querySelector('.header-actions');
-    if (!actions) return;
-    slot.replaceChildren(...actions.childNodes);
 }
 
 /**
@@ -381,11 +445,6 @@ function buildSidebar(config) {
     `;
     side.appendChild(foot);
 
-    const navRoot = document.createElement('nav');
-    navRoot.id = config.page === 'platform' ? 'admin-side-nav' : 'mt-tenant-side-nav';
-    navRoot.hidden = true;
-    side.appendChild(navRoot);
-
     return side;
 }
 
@@ -401,7 +460,7 @@ function buildTenantSwitch(config) {
       <button type="button" class="switch-btn" id="mt-tenant-switch-btn" aria-expanded="false">
         <span class="av">${mtEsc(initial)}</span>
         <span class="tx"><b>${mtEsc(label)}</b><span>${mtEsc(config.tenantId || '')}</span></span>
-        ${mtIcon('chev')}
+        ${mtIcon('chev', 'chev')}
       </button>
       <div class="popover" id="mt-tenant-popover" hidden>
         <p class="pop-head">テナントを切替</p>
@@ -491,25 +550,11 @@ function wireSidebarInteractions(config) {
         );
     });
 
-    document.querySelectorAll('.side .nav[data-tenant-panel], .side .nav[data-admin-panel]').forEach((btn) => {
+    document.querySelectorAll('.side .nav[data-admin-panel]').forEach((btn) => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.side .nav').forEach((n) => n.classList.remove('on'));
+            document.querySelectorAll('.side .nav[data-admin-panel]').forEach((n) => n.classList.remove('on'));
             btn.classList.add('on');
             refreshCrumbs();
         });
     });
-
-    if (config.page === 'platform') {
-        const mirror = document.getElementById('admin-side-nav');
-        document.querySelectorAll('.side .nav[data-admin-panel]').forEach((btn) => {
-            const id = btn.getAttribute('data-admin-panel');
-            if (!id || !mirror) return;
-            const clone = btn.cloneNode(true);
-            clone.classList.remove('on');
-            mirror.appendChild(clone);
-            btn.addEventListener('click', () => {
-                clone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            });
-        });
-    }
 }
