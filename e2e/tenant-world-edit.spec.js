@@ -56,7 +56,7 @@ test.describe('tenant world edit', () => {
             null,
             { timeout: 180_000 }
         );
-        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 180_000 });
+        await expect(page.locator('.wed-root .vout .vo-row').first()).toBeVisible({ timeout: 180_000 });
 
         const diag = await page.evaluate(() => ({
             tenant: window.MT?.state?.tenant,

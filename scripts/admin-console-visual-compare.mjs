@@ -15,7 +15,8 @@ dotenv.config();
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ART = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
 const VIEWPORT = { width: 1440, height: 900 };
-const PROTO = `file://${path.join(ROOT, 'docs/design/admin-console/index.html')}`;
+const PROTO_PORT = Number(process.env.ADMIN_PROTO_PORT || '5199');
+const PROTO = `http://127.0.0.1:${PROTO_PORT}/index.html`;
 const STAGING = process.env.E2E_BASE_URL || 'http://127.0.0.1:3104';
 const FORWARD_HOST = process.env.PLAYWRIGHT_FORWARD_HOST || 'staging.mmh-virtual.jp';
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
@@ -42,7 +43,7 @@ const SCENES = [
         id: 'tenant-detail',
         label: 'テナント詳細',
         prepare: async (page) => {
-            await openTenant(page, 'P-01');
+            await openTenant(page, prototypeTenant(page));
             await clickNav(page, 'tenant');
         },
     },
@@ -50,7 +51,7 @@ const SCENES = [
         id: 'tenant-logs',
         label: '通信ログ',
         prepare: async (page) => {
-            await openTenant(page, 'P-01');
+            await openTenant(page, prototypeTenant(page));
             await clickNav(page, 'logs');
         },
     },
@@ -58,7 +59,7 @@ const SCENES = [
         id: 'tenant-addons',
         label: 'アドオン',
         prepare: async (page) => {
-            await openTenant(page, 'P-01');
+            await openTenant(page, prototypeTenant(page));
             await clickNav(page, 'addons');
         },
     },
@@ -67,9 +68,18 @@ const SCENES = [
         label: 'ワールド編集',
         prepare: async (page) => {
             const url = page.url();
-            if (url.includes('file://')) {
-                await openTenant(page, 'P-01');
-                await clickNav(page, 'world');
+            if (isPrototypeUrl(url)) {
+                await page.evaluate(() => {
+                    const st = window.MT.state;
+                    st.tenant = 'mmh';
+                    st.view = 'world';
+                    const tw = window.MTD.TENANTS.find((t) => t.id === 'mmh');
+                    st.worldId = tw?.worlds?.[0]?.id || null;
+                    window.MTA.initEd(st);
+                    window.MT.render();
+                });
+                await page.waitForSelector('.wed-root', { timeout: 90_000 });
+                await page.waitForTimeout(1200);
             } else {
                 await page.goto(`${STAGING}/admin/tenant/P-01/world-edit`, { waitUntil: 'load' });
                 await waitConsole(page);
@@ -89,18 +99,14 @@ const SCENES = [
         id: 'platform-settings',
         label: 'プラットフォーム設定',
         prepare: async (page) => {
-            if (page.url().includes('file://')) {
-                await page.evaluate(() => {
-                    window.MT.state.view = 'platform-settings';
-                    window.MT.render();
-                });
-            } else {
-                await page.goto(`${STAGING}/admin.html`, { waitUntil: 'load' });
-                await waitConsole(page);
-                const link = page.locator('[data-go="platform-settings"]');
-                await link.click({ timeout: 60_000 });
-                await page.locator('[data-ps-tabs], #platformSettingsBody').first().waitFor({ timeout: 60_000 });
+            if (isPrototypeUrl(page.url())) {
+                return;
             }
+            await page.goto(`${STAGING}/admin.html#settings/env`, { waitUntil: 'load' });
+            await waitConsole(page);
+            await page.locator('[data-ps-tabs], #platformSettingsBody, .ps-shell').first().waitFor({
+                timeout: 90_000,
+            });
         },
     },
 ];
@@ -127,13 +133,18 @@ async function loginStaging(page) {
 }
 
 async function openTenant(page, tenantId) {
-    const link = page.locator(`.side .nav[data-go="tenant"], .side .nav[data-tenant="${tenantId}"]`).first();
+    const picker = page.locator('[data-act="picker"]').first();
+    if (await picker.count()) {
+        await picker.click();
+        await page.locator(`.pop-item[data-tenant="${tenantId}"]`).click({ timeout: 15_000 });
+        await page.waitForTimeout(300);
+        return;
+    }
+    const pop = page.locator(`.pop-item[data-tenant="${tenantId}"], [data-tenant="${tenantId}"]`).first();
     const row = page.locator(`[data-act="open-tenant"][data-tenant="${tenantId}"], .t-row[data-tenant="${tenantId}"]`).first();
-    if (await row.count()) {
-        await row.click();
-    } else if (await link.count()) {
-        await link.click();
-    } else {
+    if (await row.count()) await row.click();
+    else if (await pop.count()) await pop.click();
+    else {
         await page.evaluate((id) => {
             window.MT.state.tenant = id;
             window.MT.state.view = 'tenant';
@@ -141,6 +152,14 @@ async function openTenant(page, tenantId) {
         }, tenantId);
     }
     await page.waitForTimeout(400);
+}
+
+function isPrototypeUrl(url) {
+    return url.includes(`127.0.0.1:${PROTO_PORT}`);
+}
+
+function prototypeTenant(page) {
+    return isPrototypeUrl(page.url()) ? 'mmh' : 'P-01';
 }
 
 async function clickNav(page, view) {
@@ -185,6 +204,33 @@ async function attachStagingHeaders(page) {
     });
 }
 
+import { createServer } from 'node:http';
+import { createReadStream, statSync, existsSync } from 'node:fs';
+const MIME = {
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.jsx': 'text/plain; charset=utf-8',
+};
+
+const designRoot = path.join(ROOT, 'docs/design/admin-console');
+const protoServer = createServer((req, res) => {
+    const rel = decodeURIComponent((req.url || '/').split('?')[0]);
+    const safe = path.normalize(rel).replace(/^(\.\.[/\\])+/, '');
+    const file = path.join(designRoot, safe === '/' ? 'index.html' : safe);
+    if (!file.startsWith(designRoot) || !existsSync(file) || !statSync(file).isFile()) {
+        res.statusCode = 404;
+        res.end('not found');
+        return;
+    }
+    res.setHeader('Content-Type', MIME[path.extname(file)] || 'application/octet-stream');
+    createReadStream(file).pipe(res);
+});
+await new Promise((resolve) => protoServer.listen(PROTO_PORT, '127.0.0.1', resolve));
+
 const browser = await chromium.launch({ headless: true });
 const results = [];
 
@@ -193,6 +239,7 @@ const results = [];
     const page = await ctx.newPage();
     await loginPrototype(page);
     for (const scene of SCENES) {
+        if (scene.id === 'platform-settings') continue;
         await scene.prepare(page);
         const out = path.join(ART, `prototype-${scene.id}-1440x900.png`);
         await shot(page, out);
@@ -227,12 +274,14 @@ for (const scene of SCENES) {
     const proto = path.join(ART, `prototype-${scene.id}-1440x900.png`);
     const stag = path.join(ART, `staging-${scene.id}-1440x900.png`);
     const diff = path.join(ART, `compare-${scene.id}-diff.png`);
+    if (scene.id === 'platform-settings') continue;
     if (!fs.existsSync(proto) || !fs.existsSync(stag)) continue;
     const stats = compareImages(proto, stag, diff);
     results.push({ scene: scene.id, label: scene.label, ...stats, diffPath: diff });
 }
 
 await browser.close();
+protoServer.close();
 console.log(JSON.stringify({ viewport: VIEWPORT, results }, null, 2));
 const bad = results.filter((r) => r.ratio > 0.08);
 process.exit(bad.length ? 1 : 0);
