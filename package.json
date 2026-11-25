@@ -52,7 +52,7 @@
         "aws4fetch": "^1.0.20",
         "bcryptjs": "^3.0.3",
         "better-sqlite3": "^12.11.1",
-        "bootstrap-icons": "^1.13.1",
+        "bootstrap-icons": "^1.13.2",
         "cheerio": "^1.2.0",
         "cross-env": "^7.0.3",
         "dotenv": "^17.2.3",
