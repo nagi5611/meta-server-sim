@@ -43,6 +43,11 @@
             window.MT.state.tenant = exists ? boot.tenantId : boot.tenantId;
             if (boot.view) window.MT.state.view = boot.view;
             else if (pathMatch) window.MT.state.view = 'tenant';
+            if (boot.view === 'world') {
+                const t = window.MTD.TENANTS.find((x) => x.id === boot.tenantId);
+                const lobby = t?.worlds?.find((w) => w.id === 'lobby');
+                window.MT.state.worldId = lobby?.id || t?.worlds?.[0]?.id || null;
+            }
         }
         const hash = (window.location.hash || '').replace(/^#/, '');
         if (hash.startsWith('settings')) {

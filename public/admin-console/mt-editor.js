@@ -213,13 +213,14 @@
   function queueGltfLoad(g, o) {
     const url = o.props && o.props.modelUrl;
     if (!url || !window.THREE.GLTFLoader) return;
-    if (gltfPending.has(url)) return;
-    gltfPending.add(url);
+    const pendingKey = o.id + "|" + url;
+    if (gltfPending.has(pendingKey)) return;
+    gltfPending.add(pendingKey);
     const loader = new T3.GLTFLoader();
     loader.load(
       url,
       (gl) => {
-        gltfPending.delete(url);
+        gltfPending.delete(pendingKey);
         const root = gl.scene || gl.scenes?.[0];
         if (!root) return;
         const ph = g.children.find((c) => c.name === "__placeholder");
@@ -237,7 +238,7 @@
       },
       undefined,
       (err) => {
-        gltfPending.delete(url);
+        gltfPending.delete(pendingKey);
         console.error("[mt-editor] GLTF load failed", url, err);
       }
     );

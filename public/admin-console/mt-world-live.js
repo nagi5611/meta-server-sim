@@ -371,9 +371,17 @@
             },
             body: JSON.stringify(worlds),
         });
-        if (!res.ok) throw new Error(`save failed ${res.status}`);
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            throw new Error(`save failed ${res.status} ${text.slice(0, 200)}`);
+        }
         ed._worldsRoot = worlds;
         ed.dirty = false;
+        const t = window.MTD.TENANTS.find((x) => x.id === st.tenant);
+        if (t) {
+            const w = t.worlds.find((x) => x.id === ed.worldId);
+            if (w) w.name = ed.worldName;
+        }
         if (window.MT?.toast) {
             window.MT.toast(publish ? '公開しました' : '保存しました');
         }
@@ -489,6 +497,39 @@
                     window.MT?.toast?.('保存に失敗しました');
                 });
         };
+
+        document.addEventListener(
+            'click',
+            (e) => {
+                const btn = e.target.closest('[data-ed-act="draft"], [data-ed-act="publish"]');
+                if (!btn) return;
+                const st = window.MT?.state;
+                if (!st?.ed?._live) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const publish = btn.getAttribute('data-ed-act') === 'publish';
+                void saveWorldsToApi(st, publish)
+                    .then(() => {
+                        window.MTA.paintStatus?.();
+                        const now = new Date();
+                        const at = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                        st.ed.history.unshift({
+                            at,
+                            who: 'admin',
+                            msg: publish ? '公開' : '下書きを保存',
+                            published: !!publish,
+                        });
+                        window.MT?.toast?.(publish ? '公開しました' : '下書きを保存しました');
+                    })
+                    .catch((err) => {
+                        console.error('[mt-world-live] save click failed', err);
+                        if (st.ed) st.ed.dirty = true;
+                        window.MTA.paintStatus?.();
+                        window.MT?.toast?.('保存に失敗しました');
+                    });
+            },
+            true
+        );
 
         window.MTWL = {
             fetchAllWorlds,
