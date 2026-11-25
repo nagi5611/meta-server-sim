@@ -12,7 +12,7 @@
      */
     async function uploadModelLive(tenantId, file, confirmOverwrite) {
         const fd = new FormData();
-        fd.append('file', file);
+        fd.append('model', file);
         const q = confirmOverwrite ? '?confirm=1' : '';
         const fetchFn = window.__nativeAdminFetch || window.fetch;
         const res = await fetchFn(`/admin/tenants/${encodeURIComponent(tenantId)}/upload${q}`, {
@@ -42,7 +42,7 @@
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             const fd = new FormData();
-            fd.append('file', file);
+            fd.append('model', file);
             const url = `/admin/tenants/${encodeURIComponent(tenantId)}/upload${confirmOverwrite ? '?confirm=1' : ''}`;
             xhr.open('POST', url);
             xhr.withCredentials = true;
