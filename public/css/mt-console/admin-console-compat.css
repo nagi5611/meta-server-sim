@@ -1,0 +1,211 @@
+/* admin-console-compat.css — 既存 admin マークアップを CONSOLE デザイン言語へ橋渡し */
+
+body.mt-console {
+    display: block;
+    overflow: auto;
+    height: auto;
+    min-height: 100dvh;
+}
+
+body.mt-console.in-editor .app {
+    grid-template-columns: 1fr;
+}
+
+body.mt-console.in-editor .side {
+    display: none;
+}
+
+body.mt-console .admin-sidebar {
+    display: none !important;
+}
+
+body.mt-console .admin-main {
+    display: contents;
+}
+
+body.mt-console .admin-main > header.admin-legacy-header {
+    display: none !important;
+}
+
+body.mt-console .admin-panels {
+    max-width: none;
+    padding: 0;
+    overflow: visible;
+}
+
+body.mt-console .admin-panel {
+    display: none;
+    padding: 0;
+}
+
+body.mt-console .admin-panel.active {
+    display: block;
+}
+
+body.mt-console .stats-section {
+    border: 1px solid var(--color-border, #e2e5ea);
+    border-radius: var(--r, 8px);
+    background: var(--color-surface, #fff);
+    padding: 16px 18px;
+    margin-bottom: 20px;
+}
+
+body.mt-console .stats-section h2 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-heading, #101624);
+    margin-bottom: 12px;
+}
+
+body.mt-console .stats-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+body.mt-console .stat-card {
+    border: 1px solid var(--color-border, #e2e5ea);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--color-surface-muted, #f8f9fb);
+}
+
+body.mt-console .stat-label {
+    font-size: 10.5px;
+    color: var(--color-text-faint, #8a92a1);
+    margin-bottom: 4px;
+}
+
+body.mt-console .stat-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--color-heading, #101624);
+    font-variant-numeric: tabular-nums;
+}
+
+body.mt-console .hint {
+    font-size: 12px;
+    color: var(--color-text-muted, #5e6778);
+    line-height: 1.6;
+}
+
+body.mt-console .tenants-table,
+body.mt-console .worlds-table,
+body.mt-console .fleet-cores-table,
+body.mt-console .network-config-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+body.mt-console .tenants-table th,
+body.mt-console .worlds-table th,
+body.mt-console .fleet-cores-table th,
+body.mt-console .network-config-table th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--color-text-faint, #8a92a1);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border, #e2e5ea);
+}
+
+body.mt-console .tenants-table td,
+body.mt-console .worlds-table td,
+body.mt-console .fleet-cores-table td,
+body.mt-console .network-config-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--color-border, #e2e5ea);
+    color: var(--color-text, #1d2433);
+}
+
+body.mt-console .tenants-table tbody tr:hover,
+body.mt-console .worlds-table tbody tr:hover {
+    background: var(--color-surface-muted, #f8f9fb);
+}
+
+body.mt-console .section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+body.mt-console .admin-settings-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px;
+    background: var(--color-track, #eceef2);
+    border-radius: 7px;
+    margin-bottom: 16px;
+}
+
+body.mt-console .admin-settings-subnav-item {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 5px;
+    border: 0;
+    background: transparent;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--color-text-muted, #5e6778);
+    cursor: pointer;
+}
+
+body.mt-console .admin-settings-subnav-item.active {
+    background: var(--color-surface, #fff);
+    color: var(--color-heading, #101624);
+    box-shadow: 0 1px 1px rgba(16, 22, 36, 0.08);
+}
+
+body.mt-console .admin-modal-dialog {
+    border-radius: 8px;
+    border: 1px solid var(--color-border, #e2e5ea);
+}
+
+body.mt-console .admin-nav-item .bi {
+    display: none;
+}
+
+body.mt-console .mt-disconnected {
+    border: 1px dashed var(--color-border-strong, #c9ced6);
+    border-radius: 8px;
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--color-text-faint, #8a92a1);
+    background: var(--color-surface-muted, #f8f9fb);
+}
+
+@media (max-width: 768px) {
+    body.mt-console .stats-grid-compact {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+body.mt-console .menu-btn {
+    display: none;
+}
+
+body.mt-console .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+body.mt-console .topbar .rule {
+    width: 1px;
+    height: 16px;
+    background: var(--color-border-strong, #c9ced6);
+    flex: none;
+}
+
+@media (max-width: 900px) {
+    body.mt-console .menu-btn {
+        display: inline-grid;
+    }
+}

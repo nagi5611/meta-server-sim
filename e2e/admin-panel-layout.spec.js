@@ -36,7 +36,8 @@ async function assertSectionHeaderRow(page, sectionSelector) {
 
 async function openAdminSettings(page, settingsTab = 'env') {
     await page.goto(`/admin.html#settings/${settingsTab}`, { waitUntil: 'networkidle' });
-    await expect(page.locator('.admin-sidebar')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('body.mt-console .app.mt-console-app')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('.side')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('#env-config-save-btn, #network-config-save-btn')).toBeVisible({
         timeout: 30_000,
     });
@@ -51,11 +52,13 @@ test.describe('admin panel layout', () => {
         httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     });
 
-    test('settings subnav and env/network sections layout', async ({ page, baseURL }) => {
+    test('CONSOLE shell settings subnav and env/network sections layout', async ({ page, baseURL }) => {
         fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
         const host = new URL(baseURL || 'http://localhost:3003').hostname;
 
         await openAdminSettings(page, 'env');
+        const legacyHeader = page.locator('header:not(.topbar):has(h1)');
+        await expect(legacyHeader).toHaveCount(0);
         await assertSettingsSubnav(page);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, `${host}-settings-env.png`),

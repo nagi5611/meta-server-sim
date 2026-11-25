@@ -1,9 +1,14 @@
 // public/js/admin-sim.js — プラットフォーム管理ランディング（Tenant 一覧）
-import '../css/admin.css';
+import '../css/mt-console/colors_and_type.css';
+import '../css/mt-console/mt.css';
+import '../css/mt-console/mt-addons.css';
+import '../css/mt-console/admin-console-compat.css';
 import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';
 import { initFleetOpsPanel } from './admin-fleet-ops.js';
+import { initMtConsoleShell } from './mt-console-shell.js';
+import { initAdminAuditUsersPanel } from './admin-audit-users.js';
 
 const UPDATE_INTERVAL = 2000;
 
@@ -757,7 +762,7 @@ const ENV_SOURCE_LABELS = {
     unset: '—',
 };
 
-const ADMIN_PANEL_IDS = ['overview', 'settings'];
+const ADMIN_PANEL_IDS = ['overview', 'settings', 'audit'];
 const SETTINGS_TAB_IDS = ['env', 'network', 'fleet', 'code'];
 let fleetPanelInitialized = false;
 const LEGACY_PANEL_TO_SETTINGS_TAB = {
@@ -790,16 +795,15 @@ function activateSettingsTab(tabId) {
  * サイドメニューでタブ切替
  */
 function initAdminSideNav() {
-    const nav = document.getElementById('admin-side-nav');
-    if (!nav) return;
+    const buttons = document.querySelectorAll('.side .nav[data-admin-panel]');
+    if (!buttons.length) return;
 
-    const buttons = nav.querySelectorAll('[data-admin-panel]');
     const panels = document.querySelectorAll('[data-admin-panel-id]');
 
     const activate = (panelId, settingsTab) => {
         if (!ADMIN_PANEL_IDS.includes(panelId)) panelId = 'overview';
         for (const btn of buttons) {
-            btn.classList.toggle('active', btn.getAttribute('data-admin-panel') === panelId);
+            btn.classList.toggle('on', btn.getAttribute('data-admin-panel') === panelId);
         }
         for (const panel of panels) {
             panel.classList.toggle('active', panel.getAttribute('data-admin-panel-id') === panelId);
@@ -811,6 +815,9 @@ function initAdminSideNav() {
                 void initFleetOpsPanel();
             }
         }
+        if (panelId === 'audit') {
+            void initAdminAuditUsersPanel();
+        }
         try {
             const hash = panelId === 'settings'
                 ? `settings/${settingsTab || 'env'}`
@@ -821,9 +828,10 @@ function initAdminSideNav() {
         }
     };
 
-    nav.addEventListener('click', (e) => {
+    const side = document.querySelector('.side');
+    side?.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-admin-panel]');
-        if (!btn) return;
+        if (!btn || !side.contains(btn)) return;
         activate(btn.getAttribute('data-admin-panel') || 'overview');
     });
 
@@ -1666,6 +1674,7 @@ async function bootstrapAdminSim() {
         return;
     }
 
+    initMtConsoleShell({ page: 'platform', username: document.getElementById('header-username')?.textContent || 'admin' });
     initThemeToggle();
     initAdminSideNav();
     initTenantAddModal();

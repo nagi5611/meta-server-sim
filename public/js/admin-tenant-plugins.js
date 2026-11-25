@@ -1,35 +1,55 @@
-// public/js/admin-tenant-plugins.js — Tenant プラグイン管理 UI
+// public/js/admin-tenant-plugins.js — Tenant アドオン管理（mt-addons デザイン）
 import { adminFetch } from './admin-api-fetch.js';
+import { mtEsc, mtIcon, mtToast } from './mt-console-ui.js';
+
+const ADDON_CATS = [
+    { id: 'platform', label: 'プラットフォーム', en: 'PLATFORM' },
+    { id: 'tenant', label: 'テナント', en: 'TENANT' },
+    { id: 'both', label: '共通', en: 'SHARED' },
+];
+
+/**
+ * @typedef {object} TenantPluginRow
+ * @property {string} id
+ * @property {string} name
+ * @property {string} description
+ * @property {string} version
+ * @property {string} scope
+ * @property {string} category
+ * @property {string[]} dependsOn
+ * @property {string} source
+ * @property {boolean} enabled
+ */
 
 /**
  * @param {string} tenantId
  */
-export function initTenantPluginsPanel(tenantId) {
-    const statusEl = document.getElementById('tenant-plugins-status');
-    const tbody = document.getElementById('tenant-plugins-table-body');
-    const reloadBtn = document.getElementById('tenant-plugins-reload-btn');
-    const configPanel = document.getElementById('tenant-plugin-config-panel');
-    const configPluginIdEl = document.getElementById('tenant-plugin-config-plugin-id');
-    const configForm = document.getElementById('tenant-plugin-config-form');
-    const configSaveBtn = document.getElementById('tenant-plugin-config-save-btn');
+export async function initTenantPluginsPanel(tenantId) {
+    const panel = document.querySelector('[data-tenant-panel-id="plugins"]');
+    if (!panel) return;
 
-    /** @type {string | null} */
-    let selectedPluginId = null;
-
-    const setStatus = (msg) => {
-        if (statusEl) statusEl.textContent = msg;
-    };
-
-    /**
-     * @param {string} s
-     */
-    function escapeHtml(s) {
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+    let mount = document.getElementById('tenant-plugins-mount');
+    if (!mount) {
+        mount = document.createElement('div');
+        mount.id = 'tenant-plugins-mount';
+        mount.className = 'tenant-plugins-mount';
+        const legacy = panel.querySelector('.stats-section');
+        legacy?.remove();
+        panel.appendChild(mount);
     }
+
+    /** @type {TenantPluginRow[]} */
+    let plugins = [];
+    let serverOnline = true;
+    let addonCat = 'all';
+    let addonState = 'all';
+    let addonQ = '';
+    /** @type {string | null} */
+    let addonOpen = null;
+    /** @type {string | null} */
+    let configPluginId = null;
+
+    const pluginById = () => Object.fromEntries(plugins.map((p) => [p.id, p]));
 
     async function loadPlugins() {
         const res = await adminFetch(`/admin/tenant/${encodeURIComponent(tenantId)}/plugins`, {
@@ -39,42 +59,8 @@ export function initTenantPluginsPanel(tenantId) {
         if (!res.ok) {
             throw new Error(data.message || `HTTP ${res.status}`);
         }
-        return data.plugins || [];
-    }
-
-    /**
-     * @param {Array<{ id: string, version: string, enabled: boolean, source: string }>} plugins
-     */
-    function renderTable(plugins) {
-        if (!tbody) return;
-        tbody.replaceChildren();
-        if (!plugins.length) {
-            tbody.innerHTML = '<tr><td colspan="5">プラグインがありません</td></tr>';
-            return;
-        }
-        for (const p of plugins) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><code>${escapeHtml(p.id)}</code><br><span class="hint">${escapeHtml(p.version || '')}</span></td>
-                <td>${escapeHtml(p.source || '')}</td>
-                <td>${p.enabled ? '有効' : '無効'}</td>
-                <td>
-                    <button type="button" class="btn btn-secondary btn-sm tenant-plugin-enable-btn" data-id="${escapeHtml(p.id)}" ${p.enabled ? 'disabled' : ''}>有効化</button>
-                    <button type="button" class="btn btn-secondary btn-sm tenant-plugin-disable-btn" data-id="${escapeHtml(p.id)}" ${p.enabled ? '' : 'disabled'}>無効化</button>
-                </td>
-                <td>
-                    <button type="button" class="btn btn-secondary btn-sm tenant-plugin-config-btn" data-id="${escapeHtml(p.id)}">設定</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        }
-    }
-
-    async function refresh() {
-        setStatus('読み込み中…');
-        const plugins = await loadPlugins();
-        renderTable(plugins);
-        setStatus(`${plugins.length} 件`);
+        serverOnline = data.serverOnline !== false;
+        return /** @type {TenantPluginRow[]} */ (data.plugins || []);
     }
 
     async function setEnabled(pluginId, enabled) {
@@ -101,133 +87,306 @@ export function initTenantPluginsPanel(tenantId) {
         return data.report || [];
     }
 
-    async function loadConfig(pluginId) {
-        const res = await adminFetch(
-            `/admin/tenant/${encodeURIComponent(tenantId)}/plugins/${encodeURIComponent(pluginId)}/config`,
-            { credentials: 'include' }
+    /**
+     * @param {string} id
+     */
+    function nameOf(id) {
+        const p = plugins.find((x) => x.id === id);
+        return p?.name || id;
+    }
+
+    /**
+     * @param {TenantPluginRow} plugin
+     */
+    function missingDeps(plugin) {
+        const map = pluginById();
+        return (plugin.dependsOn || []).filter((d) => !map[d]?.enabled);
+    }
+
+    /**
+     * @param {TenantPluginRow[]} list
+     */
+    function dependentsOf(id, list) {
+        return list.filter(
+            (p) => p.enabled && Array.isArray(p.dependsOn) && p.dependsOn.includes(id)
         );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            throw new Error(data.message || `HTTP ${res.status}`);
-        }
-        return data.values || {};
     }
 
-    async function saveConfig(pluginId, updates) {
-        const res = await adminFetch(
-            `/admin/tenant/${encodeURIComponent(tenantId)}/plugins/${encodeURIComponent(pluginId)}/config`,
-            {
-                method: 'PUT',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ updates }),
+    /**
+     * @param {TenantPluginRow} plugin
+     */
+    function rowHtml(plugin) {
+        const open = addonOpen === plugin.id;
+        const depMissing = missingDeps(plugin);
+        const locked = !plugin.enabled && depMissing.length > 0;
+        const depBadge =
+            locked && depMissing.length
+                ? `<em class="ad-lk">${mtEsc(depMissing.map(nameOf).join('・'))} が必要</em>`
+                : '';
+
+        const det = open
+            ? `<div class="ad-det">
+        <div><div class="ad-k">バージョン</div><div class="ad-v mono">${mtEsc(plugin.version)}</div></div>
+        <div><div class="ad-k">由来</div><div class="ad-v">${mtEsc(plugin.source)}</div></div>
+        <div><div class="ad-k">スコープ</div><div class="ad-v">${mtEsc(plugin.scope)}</div></div>
+        <div><div class="ad-k">依存</div>
+          <div class="ad-v">${
+              plugin.dependsOn?.length
+                  ? plugin.dependsOn
+                        .map((d) => {
+                            const on = pluginById()[d]?.enabled;
+                            return `<span class="ad-dep ${on ? 'ok' : 'ng'}">${mtEsc(nameOf(d))}</span>`;
+                        })
+                        .join('')
+                  : `<span style="color:var(--faint)">なし（manifest に dependsOn が無い場合は未接続扱い）</span>`
+          }</div></div>
+        <div id="tenant-plugin-config-slot" data-config-for="${mtEsc(plugin.id)}"></div>
+      </div>`
+            : '';
+
+        return `<div class="ad-row ${plugin.enabled ? 'is-on' : 'is-off'} ${open ? 'is-open' : ''}">
+      <button type="button" class="ad-sw ${plugin.enabled ? 'on' : ''}" data-addon-toggle="${mtEsc(plugin.id)}" role="switch"
+        aria-checked="${plugin.enabled ? 'true' : 'false'}" ${locked ? 'disabled aria-disabled="true"' : ''}
+        title="${locked ? `${mtEsc(depMissing.map(nameOf).join('・'))} が必要です` : ''}">
+        <i></i><small>${plugin.enabled ? '有効' : '無効'}</small>
+      </button>
+      <span class="ad-ic">${mtIcon('modules')}</span>
+      <button type="button" class="ad-main" data-addon-exp="${mtEsc(plugin.id)}" aria-expanded="${open ? 'true' : 'false'}">
+        <span class="nm">${mtEsc(plugin.name)}${depBadge}</span>
+        <span class="ds">${mtEsc(plugin.description || plugin.id)}</span>
+      </button>
+      <span class="ad-meta"><span><code>${mtEsc(plugin.id)}</code></span></span>
+      <button type="button" class="ad-more ${open ? 'on' : ''}" data-addon-exp="${mtEsc(plugin.id)}" aria-label="詳細">
+        ${mtIcon('chev', 'chev')}
+      </button>
+      ${det}
+    </div>`;
+    }
+
+    function render() {
+        const q = addonQ.toLowerCase();
+        const match = (p) => {
+            if (addonCat !== 'all' && p.category !== addonCat) return false;
+            if (addonState === 'on' && !p.enabled) return false;
+            if (addonState === 'off' && p.enabled) return false;
+            if (q && !(p.name + p.description + p.id + p.source).toLowerCase().includes(q)) return false;
+            return true;
+        };
+        const shown = plugins.filter(match);
+
+        const groups = ADDON_CATS.map((c) => {
+            const list = shown.filter((p) => p.category === c.id);
+            if (!list.length) return '';
+            const onN = list.filter((p) => p.enabled).length;
+            return `<section class="ad-cat">
+        <div class="ad-cat-h">
+          <b>${mtEsc(c.label)}</b><span class="en">${mtEsc(c.en)}</span>
+          <span class="cnt"><b>${onN}</b> / ${list.length} 有効</span>
+        </div>
+        <div class="sheet">${list.map((p) => rowHtml(p)).join('')}</div>
+      </section>`;
+        })
+            .filter(Boolean)
+            .join('');
+
+        const offlineNote = serverOnline
+            ? ''
+            : `<p class="hint" style="margin-bottom:12px">テナントの Socket ワーカーが未接続のため、有効化はブロックされます（API: serverOnline=false）。</p>`;
+
+        mount.innerHTML = `
+      ${offlineNote}
+      <div class="ad-tools">
+        <div class="seg">
+          <button type="button" data-addon-cat="all" class="${addonCat === 'all' ? 'on' : ''}">すべて</button>
+          ${ADDON_CATS.map(
+              (c) =>
+                  `<button type="button" data-addon-cat="${mtEsc(c.id)}" class="${addonCat === c.id ? 'on' : ''}">${mtEsc(c.label)}</button>`
+          ).join('')}
+        </div>
+        <div class="seg" style="margin-left:8px">
+          <button type="button" data-addon-state="all" class="${addonState === 'all' ? 'on' : ''}">全件</button>
+          <button type="button" data-addon-state="on" class="${addonState === 'on' ? 'on' : ''}">有効</button>
+          <button type="button" data-addon-state="off" class="${addonState === 'off' ? 'on' : ''}">無効</button>
+        </div>
+        <div class="search ad-search">${mtIcon('net')}
+          <input class="inp" data-addon-q value="${mtEsc(addonQ)}" placeholder="アドオン名・IDで検索">
+        </div>
+        <button type="button" class="btn btn-warning btn-sm" id="tenant-plugins-reload-btn">Reload</button>
+      </div>
+      ${shown.length ? groups : `<div class="sheet"><div class="empty">条件に一致するアドオンはありません</div></div>`}
+      <div class="wfoot">
+        <span id="tenant-plugins-status" role="status">登録 ${plugins.length} 件</span>
+        <span class="sp"></span>
+        <span>変更後は <b>Reload</b> で反映</span>
+      </div>
+    `;
+
+        wireMountEvents();
+        if (configPluginId && addonOpen === configPluginId) {
+            void renderConfigForm(configPluginId);
+        }
+    }
+
+    async function renderConfigForm(pluginId) {
+        const slot = mount.querySelector('#tenant-plugin-config-slot');
+        if (!slot) return;
+        slot.innerHTML = '<p class="hint">設定を読み込み中…</p>';
+        try {
+            const res = await adminFetch(
+                `/admin/tenant/${encodeURIComponent(tenantId)}/plugins/${encodeURIComponent(pluginId)}/config`,
+                { credentials: 'include' }
+            );
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+            const values = data.values || {};
+            const keys = Object.keys(values);
+            if (!keys.length) {
+                slot.innerHTML =
+                    '<div><div class="ad-k">設定</div><div class="ad-v" style="color:var(--faint)">未接続（設定キーなし）</div></div>';
+                return;
             }
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            throw new Error(data.message || `HTTP ${res.status}`);
+            const fields = keys
+                .map(
+                    (key) =>
+                        `<label class="admin-form-field"><span>${mtEsc(key)}</span>
+              <input type="text" class="prop-input full" data-config-key="${mtEsc(key)}" value="${mtEsc(String(values[key] ?? ''))}"></label>`
+                )
+                .join('');
+            slot.innerHTML = `<div><div class="ad-k">設定</div>
+        <form id="tenant-plugin-config-form">${fields}</form>
+        <button type="button" class="btn btn-primary btn-sm" id="tenant-plugin-config-save-btn">保存</button></div>`;
+            slot.querySelector('#tenant-plugin-config-save-btn')?.addEventListener('click', async () => {
+                const form = slot.querySelector('#tenant-plugin-config-form');
+                if (!form) return;
+                /** @type {Record<string, string>} */
+                const updates = {};
+                form.querySelectorAll('input[data-config-key]').forEach((input) => {
+                    if (!(input instanceof HTMLInputElement)) return;
+                    updates[input.dataset.configKey || ''] = input.value;
+                });
+                try {
+                    const res = await adminFetch(
+                        `/admin/tenant/${encodeURIComponent(tenantId)}/plugins/${encodeURIComponent(pluginId)}/config`,
+                        {
+                            method: 'PUT',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ updates }),
+                        }
+                    );
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+                    mtToast('設定を保存しました。Reload を実行してください。');
+                } catch (e) {
+                    alert(e instanceof Error ? e.message : '保存に失敗しました');
+                }
+            });
+        } catch {
+            slot.innerHTML =
+                '<div><div class="ad-k">設定</div><div class="ad-v" style="color:var(--faint)">未接続</div></div>';
         }
     }
 
-    function showConfigForm(pluginId, values) {
-        selectedPluginId = pluginId;
-        if (configPanel) configPanel.hidden = false;
-        if (configPluginIdEl) configPluginIdEl.textContent = pluginId;
-        if (!configForm) return;
-        configForm.replaceChildren();
-        const keys = Object.keys(values);
-        if (keys.length === 0) {
-            keys.push('greeting');
-            values.greeting = '';
-        }
-        for (const key of keys) {
-            const label = document.createElement('label');
-            label.className = 'admin-form-field';
-            label.innerHTML = `<span>${escapeHtml(key)}</span>`;
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'prop-input full';
-            input.dataset.configKey = key;
-            input.value = String(values[key] ?? '');
-            label.appendChild(input);
-            configForm.appendChild(label);
-        }
-    }
-
-    tbody?.addEventListener('click', async (ev) => {
-        const t = ev.target;
-        if (!(t instanceof HTMLElement)) return;
-        const pluginId = t.dataset.id;
-        if (!pluginId) return;
-        try {
-            if (t.classList.contains('tenant-plugin-enable-btn')) {
-                await setEnabled(pluginId, true);
-                setStatus(`${pluginId} を有効化しました。Reload を実行してください。`);
-                await refresh();
-            } else if (t.classList.contains('tenant-plugin-disable-btn')) {
-                await setEnabled(pluginId, false);
-                setStatus(`${pluginId} を無効化しました。`);
-                await refresh();
-            } else if (t.classList.contains('tenant-plugin-config-btn')) {
-                const values = await loadConfig(pluginId);
-                showConfigForm(pluginId, values);
-            }
-        } catch (e) {
-            alert(e instanceof Error ? e.message : '操作に失敗しました');
-        }
-    });
-
-    reloadBtn?.addEventListener('click', async () => {
-        try {
-            setStatus('Reload 中…');
-            const report = await reloadPlugins();
-            const loaded = report.filter((r) => r.loaded).length;
-            await refresh();
-            setStatus(`Reload 完了 (${loaded} loaded)`);
-        } catch (e) {
-            alert(e instanceof Error ? e.message : 'Reload に失敗しました');
-        }
-    });
-
-    configSaveBtn?.addEventListener('click', async () => {
-        if (!selectedPluginId || !configForm) return;
-        /** @type {Record<string, string>} */
-        const updates = {};
-        configForm.querySelectorAll('input[data-config-key]').forEach((input) => {
-            if (!(input instanceof HTMLInputElement)) return;
-            updates[input.dataset.configKey || ''] = input.value;
-        });
-        try {
-            await saveConfig(selectedPluginId, updates);
-            setStatus('設定を保存しました。Reload を実行してください。');
-        } catch (e) {
-            alert(e instanceof Error ? e.message : '保存に失敗しました');
-        }
-    });
-
-    return refresh();
-}
-
-/**
- * 概要 / プラグイン パネル切替
- */
-export function wireTenantAdminPanelNav() {
-    const navItems = document.querySelectorAll('[data-tenant-panel]');
-    const panels = document.querySelectorAll('[data-tenant-panel-id]');
-    navItems.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const panelId = btn.getAttribute('data-tenant-panel');
-            if (!panelId) return;
-            navItems.forEach((n) => n.classList.remove('active'));
-            btn.classList.add('active');
-            panels.forEach((p) => {
-                const id = p.getAttribute('data-tenant-panel-id');
-                p.classList.toggle('active', id === panelId);
+    function wireMountEvents() {
+        mount.querySelectorAll('[data-addon-cat]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                addonCat = btn.getAttribute('data-addon-cat') || 'all';
+                render();
             });
         });
-    });
-    const overviewBtn = document.querySelector('[data-tenant-panel="overview"]');
-    if (overviewBtn instanceof HTMLElement) {
-        overviewBtn.classList.add('active');
+        mount.querySelectorAll('[data-addon-state]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                addonState = btn.getAttribute('data-addon-state') || 'all';
+                render();
+            });
+        });
+        const qInput = mount.querySelector('[data-addon-q]');
+        qInput?.addEventListener('input', () => {
+            if (!(qInput instanceof HTMLInputElement)) return;
+            addonQ = qInput.value;
+            render();
+        });
+
+        mount.querySelectorAll('[data-addon-exp]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-addon-exp');
+                if (!id) return;
+                addonOpen = addonOpen === id ? null : id;
+                configPluginId = addonOpen;
+                render();
+            });
+        });
+
+        mount.querySelectorAll('[data-addon-toggle]').forEach((btn) => {
+            btn.addEventListener('click', () => void toggleAddon(btn.getAttribute('data-addon-toggle')));
+        });
+
+        mount.querySelector('#tenant-plugins-reload-btn')?.addEventListener('click', async () => {
+            try {
+                mtToast('Reload 中…');
+                await reloadPlugins();
+                plugins = await loadPlugins();
+                render();
+                mtToast('Reload 完了');
+            } catch (e) {
+                alert(e instanceof Error ? e.message : 'Reload に失敗しました');
+            }
+        });
+    }
+
+    /**
+     * @param {string | null} id
+     */
+    async function toggleAddon(id) {
+        if (!id) return;
+        const plugin = plugins.find((p) => p.id === id);
+        if (!plugin) return;
+
+        if (!plugin.enabled) {
+            const missing = missingDeps(plugin);
+            if (missing.length) {
+                mtToast(`${missing.map(nameOf).join('・')} が無効のため有効にできません`);
+                return;
+            }
+            if (!serverOnline) {
+                mtToast('停止中のサーバーではアドオンを有効にできません');
+                return;
+            }
+            try {
+                await setEnabled(id, true);
+                plugin.enabled = true;
+                mtToast(`${plugin.name} を有効にしました`);
+            } catch (e) {
+                alert(e instanceof Error ? e.message : '有効化に失敗しました');
+                return;
+            }
+        } else {
+            try {
+                await setEnabled(id, false);
+                plugin.enabled = false;
+                const dependents = dependentsOf(id, plugins);
+                for (const child of dependents) {
+                    await setEnabled(child.id, false);
+                    child.enabled = false;
+                }
+                mtToast(
+                    dependents.length
+                        ? `${plugin.name} を無効化しました。依存する ${dependents.length} 件も停止しました`
+                        : `${plugin.name} を無効にしました`
+                );
+            } catch (e) {
+                alert(e instanceof Error ? e.message : '無効化に失敗しました');
+                return;
+            }
+        }
+        render();
+    }
+
+    try {
+        plugins = await loadPlugins();
+        render();
+    } catch (e) {
+        mount.innerHTML = `<div class="mt-disconnected">アドオン一覧の取得に失敗しました: ${mtEsc(e instanceof Error ? e.message : String(e))}</div>`;
+        console.error(e);
     }
 }

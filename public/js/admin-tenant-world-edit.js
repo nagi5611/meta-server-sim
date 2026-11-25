@@ -1,5 +1,10 @@
 // public/js/admin-tenant-world-edit.js — Tenant ワールド編集ページ
+import '../css/mt-console/colors_and_type.css';
+import '../css/mt-console/mt.css';
+import '../css/mt-console/mt-editor.css';
+import '../css/mt-console/admin-console-compat.css';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
+import { initMtConsoleShell } from './mt-console-shell.js';
 import { initTenantSettingEditor } from './tenant-setting-editor.js';
 import { initTenantWorldEditShell } from './tenant-world-edit-shell.js';
 import { installTenantWorldEditXhrShim } from './tenant-world-edit-xhr.js';
@@ -33,6 +38,12 @@ if (!tenantId) {
     showError('Tenant ID が URL にありません。');
 } else {
     initTenantWorldEditShell(tenantId);
+    initMtConsoleShell({
+        page: 'world-edit',
+        tenantId,
+        tenantLabel: tenantId,
+        username: document.getElementById('header-username')?.textContent || 'admin',
+    });
 
     bootstrapAdminApi()
         .then(() => {

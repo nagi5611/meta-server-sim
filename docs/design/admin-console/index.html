@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理パネル｜みんなでメタ</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="mt.css?v=20261125c">
+<link rel="stylesheet" href="mt-editor.css?v=20261125n">
+<link rel="stylesheet" href="mt-addons.css?v=20261125b">
+</head>
+<body>
+
+<!-- ========== ログイン ========== -->
+<section class="gate" id="gate" data-screen-label="01 ログイン">
+  <div class="gate-in">
+    <div class="gate-brand">
+      <img src="assets/icon-192.png" alt="">
+      みんなでメタ
+      <span class="sep"></span>
+      <span>管理パネル</span>
+    </div>
+    <h1>ログイン</h1>
+    <p class="lead">テナント管理コンソールです。管理用のユーザー名とパスワードを入力してください。</p>
+    <form id="gateForm" autocomplete="off" novalidate>
+      <div class="field">
+        <label for="gUser">ユーザー名</label>
+        <input class="inp" id="gUser" type="text" autocomplete="username" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="gPass">パスワード</label>
+        <input class="inp" id="gPass" type="password" autocomplete="current-password">
+      </div>
+      <p class="gate-err" id="gateErr" role="alert"></p>
+      <button class="btn btn-primary btn-block" type="submit" style="height:38px">続ける</button>
+    </form>
+    <div class="gate-foot">
+      <span>Realm <code>mmh-admin</code></span>
+      <span>試用 <code>admin / admin1234</code></span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== アプリ ========== -->
+<div class="app" id="app" hidden>
+  <aside class="side" id="side"></aside>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="page" id="main"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  window.MT_TWEAKS = /*EDITMODE-BEGIN*/{
+  "dashMode": "sheet",
+  "accent": "#f38020"
+}/*EDITMODE-END*/;
+</script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/TransformControls.js"></script>
+<script src="mt-data.js?v=20261125a"></script>
+<script src="mt-ui.js?v=20261125d"></script>
+<script src="mt-views.js?v=20261125j"></script>
+<script src="mt-addons.js?v=20261125a"></script>
+<script src="mt-editor.js?v=20261125j"></script>
+<script src="mt-world.js?v=20261125n"></script>
+<script src="mt-editor-state.js?v=20261125n"></script>
+<script src="mt-app.js?v=20261125n"></script>
+
+<!-- Tweaks -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<div id="tweakRoot"></div>
+<script type="text/babel" src="tweaks_panel.jsx"></script>
+<script type="text/babel" data-presets="react">
+const ACCENTS = ['#f38020', '#2f6f4e', '#3a5ba0', '#8a4b6d'];
+
+function Tweaks() {
+  const [t, setTweak] = useTweaks(window.MT.tweakDefaults);
+  React.useEffect(() => { window.MT.applyTweaks(t); }, [t]);
+  return (
+    <TweaksPanel title="Tweaks">
+      <TweakSection label="ダッシュボード">
+        <TweakRadio label="レイアウト" value={t.dashMode}
+          options={[{ value: 'sheet', label: '一枚シート' }, { value: 'cards', label: 'カード' }]}
+          onChange={(v) => { setTweak('dashMode', v); window.MT.state.dashMode = v; }} />
+      </TweakSection>
+      <TweakSection label="アクセント">
+        <TweakColor label="カラー" value={t.accent} options={ACCENTS}
+          onChange={(v) => setTweak('accent', v)} />
+      </TweakSection>
+      <TweakSection label="試用アカウント">
+        <div style={{fontSize: 11.5, color: 'rgba(41,38,27,.62)', lineHeight: 1.6}}>
+          admin / admin1234
+        </div>
+      </TweakSection>
+    </TweaksPanel>
+  );
+}
+ReactDOM.createRoot(document.getElementById('tweakRoot')).render(<Tweaks />);
+</script>
+
+</body>
+</html>

@@ -16,35 +16,36 @@ test.describe('tenant plugins (sample-echo)', () => {
         request,
     }) => {
         await page.goto(`/admin/tenant/${TENANT_ID}`);
-        await expect(page.locator('.admin-sidebar')).toBeVisible();
+        await expect(page.locator('body.mt-console .side')).toBeVisible({ timeout: 30_000 });
 
-        const pluginsNav = page.locator('[data-tenant-panel="plugins"]');
+        const pluginsNav = page.locator('.side .nav[data-tenant-panel="plugins"]');
         await expect(pluginsNav).toBeVisible();
 
         await pluginsNav.click();
-        await expect(page.locator('#panel-plugins')).toHaveClass(/active/);
+        await expect(pluginsNav).toHaveClass(/on/);
+        await expect(page.locator('.side .nav[data-tenant-panel].on')).toHaveCount(1);
 
-        const row = page.locator('#tenant-plugins-table-body tr', {
+        const row = page.locator(`.ad-row`, {
             has: page.locator(`code:has-text("${PLUGIN_ID}")`),
         });
         await expect(row).toBeVisible({ timeout: 30_000 });
 
-        const disableBtn = row.locator('.tenant-plugin-disable-btn');
-        if (await disableBtn.isEnabled()) {
-            await disableBtn.click();
+        const toggle = row.locator(`[data-addon-toggle="${PLUGIN_ID}"]`);
+        const wasOn = await toggle.evaluate((el) => el.classList.contains('on'));
+
+        if (wasOn) {
+            await toggle.click();
             await page.locator('#tenant-plugins-reload-btn').click();
-            await expect(page.locator('#tenant-plugins-status')).toContainText(/Reload/i, {
-                timeout: 30_000,
-            });
+            await expect(page.locator('#mt-toast')).toContainText(/Reload/i, { timeout: 30_000 });
         }
 
-        await row.locator('.tenant-plugin-enable-btn').click();
-        await expect(row.locator('.tenant-plugin-disable-btn')).toBeEnabled({ timeout: 15_000 });
+        if (!(await toggle.evaluate((el) => el.classList.contains('on')))) {
+            await toggle.click();
+        }
+        await expect(toggle).toHaveClass(/on/, { timeout: 15_000 });
 
         await page.locator('#tenant-plugins-reload-btn').click();
-        await expect(page.locator('#tenant-plugins-status')).toContainText(/Reload 完了/i, {
-            timeout: 30_000,
-        });
+        await expect(page.locator('#mt-toast')).toContainText(/Reload/i, { timeout: 30_000 });
 
         const helloRes = await request.get(
             `/${TENANT_ID}/api/tenant-plugins/${PLUGIN_ID}/hello`
@@ -65,6 +66,11 @@ test.describe('tenant plugins (sample-echo)', () => {
             `/${TENANT_ID}/addons-client/${PLUGIN_ID}/client/game.js`
         );
         expect(modRes.ok()).toBeTruthy();
+
+        if (!wasOn) {
+            await toggle.click();
+            await page.locator('#tenant-plugins-reload-btn').click();
+        }
 
         await page.goto(`/${TENANT_ID}/`);
         await page.evaluate(async ({ tenantId, pluginId }) => {

@@ -1,10 +1,14 @@
 // public/js/admin-tenant.js — Tenant 別管理パネル
-import '../css/admin.css';
+import '../css/mt-console/colors_and_type.css';
+import '../css/mt-console/mt.css';
+import '../css/mt-console/mt-addons.css';
+import '../css/mt-console/admin-console-compat.css';
 import { adminFetch } from './admin-api-fetch.js';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { wirePlatformOpsButtons } from './admin-platform-ops.js';
-import { initTenantPluginsPanel, wireTenantAdminPanelNav } from './admin-tenant-plugins.js';
+import { initTenantPluginsPanel } from './admin-tenant-plugins.js';
 import { loadTenantPluginAdminClientModules } from './tenant-plugin-admin-client-loader.js';
+import { initMtConsoleShell, updateMtConsoleTenantContext } from './mt-console-shell.js';
 
 const UPDATE_INTERVAL = 2000;
 
@@ -146,6 +150,10 @@ function applyTenantHeader(data) {
         });
     }
     document.title = `${data.displayName || data.tenantId} — 管理パネル`;
+    updateMtConsoleTenantContext({
+        tenantId: data.tenantId,
+        tenantLabel: data.displayName || data.tenantId,
+    });
 }
 
 /**
@@ -336,8 +344,13 @@ if (!tenantId) {
 } else {
     bootstrapAdminApi()
         .then(() => {
+            initMtConsoleShell({
+                page: 'tenant',
+                tenantId,
+                tenantLabel: tenantId,
+                username: document.getElementById('header-username')?.textContent || 'admin',
+            });
             initThemeToggle();
-            wireTenantAdminPanelNav();
             wirePlatformOpsButtons({
                 onReloadSuccess: async () => {
                     await loadTenantStats();
