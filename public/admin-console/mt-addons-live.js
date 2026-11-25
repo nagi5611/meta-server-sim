@@ -45,7 +45,8 @@
                 if (!res.ok || j.ok === false) {
                     throw new Error(j.message || `HTTP ${res.status}`);
                 }
-                protoToggle.call(V, id);
+                row.on = enabling;
+                window.MT.toast(`${enabling ? '有効化' : '無効化'}: ${id}`);
                 if (j.restartRequired) {
                     window.MT.toast('反映にはプラグイン reload が必要な場合があります');
                 }

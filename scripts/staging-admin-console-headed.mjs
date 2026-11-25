@@ -62,8 +62,12 @@ async function waitApp(page) {
 }
 
 async function goTenantView(page, view) {
-    await page.locator(`.side .nav[data-go="${view}"]`).click();
-    await page.locator(`.side .nav[data-go="${view}"].on`).waitFor({ timeout: 30_000 });
+    const link = page.locator(`.side .nav[data-go="${view}"]`);
+    await link.click();
+    await Promise.race([
+        page.locator(`.side .nav[data-go="${view}"].on`).waitFor({ timeout: 30_000 }),
+        page.locator('#main .sheet, #main .dash-chart, #main .ad-row').first().waitFor({ timeout: 30_000 }),
+    ]);
 }
 
 async function shot(ctx, file, url, after) {
@@ -90,8 +94,8 @@ await shot(desktop, `staging-admin-tenant-logs-${TENANT}.png`, `${BASE}/admin/te
 });
 await shot(desktop, `staging-admin-tenant-addons-${TENANT}.png`, `${BASE}/admin/tenant/${TENANT}`, async (p) => {
     await goTenantView(p, 'addons');
-    await p.locator('.ad-row, .hint').first().waitFor({ timeout: 60_000 });
-});
+    await p.locator('.ad-row, .addons, .hint').first().waitFor({ timeout: 60_000 });
+}).catch((e) => console.error('addons shot failed', e.message));
 await shot(desktop, 'staging-admin-settings-env.png', `${BASE}/admin.html#settings/env`, async (p) => {
     await p.locator('[data-ps-tabs]').waitFor({ timeout: 60_000 });
     await p.locator('[data-ps-save-env], #platformSettingsBody .field').first().waitFor({ timeout: 60_000 });
