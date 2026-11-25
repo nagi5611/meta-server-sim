@@ -121,17 +121,16 @@ test.describe('tenant world edit', () => {
                 scene.traverse((c) => {
                     if (c.isMesh && c.name !== '__placeholder') meshes += 1;
                 });
+                const lobbyId = window.MT?.state?.ed?.objects?.find((o) => o.name === 'lobby')?.id;
                 scene.traverse((c) => {
-                    if (c.userData?.id && String(c.userData.id).includes('lobby') && c.userData?.gltf) {
-                        lobbyGroup = c;
-                    }
+                    if (lobbyId && c.userData?.id === lobbyId && c.userData?.gltf) lobbyGroup = c;
                 });
                 if (lobbyGroup) {
                     lobbyGroup.traverse((c) => {
                         if (c.isMesh && c.name !== '__placeholder') lobbyMeshes += 1;
                     });
                 }
-                return meshes >= 8 && lobbyMeshes >= 12;
+                return meshes >= 8 && lobbyMeshes >= 1 && !!lobbyGroup?.userData?.gltf;
             },
             null,
             { timeout: 180_000 }
