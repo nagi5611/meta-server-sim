@@ -171,8 +171,11 @@ export default defineConfig({
                 main: path.join(projectRoot, 'public/index.html'),
                 tenant: path.join(projectRoot, 'public/tenant.html'),
                 admin: path.join(projectRoot, 'public/admin.html'),
-                adminTenant: path.join(projectRoot, 'public/admin-tenant.html'),
-                adminTenantWorldEdit: path.join(projectRoot, 'public/admin-tenant-world-edit.html'),
+                adminLegacyTenant: path.join(projectRoot, 'public/admin-legacy-tenant.html'),
+                adminLegacyTenantWorldEdit: path.join(
+                    projectRoot,
+                    'public/admin-legacy-tenant-world-edit.html'
+                ),
             },
             external: (id) => isThreeBareModuleId(id),
             output: {
