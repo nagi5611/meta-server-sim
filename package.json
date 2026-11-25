@@ -61,7 +61,7 @@
         "express-rate-limit": "^8.3.2",
         "fflate": "^0.8.3",
         "mediasoup": "^3.26.0",
-        "mediasoup-client": "^3.23.1",
+        "mediasoup-client": "^3.26.0",
         "multer": "^2.3.0",
         "semver": "^7.8.5",
         "socket.io": "^4.7.2",
