@@ -231,6 +231,7 @@
             c.receiveShadow = true;
           }
         });
+        tameGltfRoot(root);
         g.add(root);
         g.userData.gltf = root;
         EV.emit("gltf-loaded", o.id);
@@ -244,15 +245,49 @@
     );
   }
 
+  const FIT_MAX_OBJECT_SPAN = 320;
+
+  /** GLB の外れ値メッシュでカメラが飛ばないよう、ローカル AABB を正規化する */
+  function tameGltfRoot(root) {
+    if (!root) return;
+    root.updateMatrixWorld(true);
+    const box = new T3.Box3().setFromObject(root);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new T3.Vector3());
+    const span = Math.max(size.x, size.y, size.z);
+    if (!Number.isFinite(span) || span <= FIT_MAX_OBJECT_SPAN) return;
+    const center = box.getCenter(new T3.Vector3());
+    root.position.x -= center.x;
+    root.position.y -= center.y;
+    root.position.z -= center.z;
+    if (span > FIT_MAX_OBJECT_SPAN * 4) {
+      const k = FIT_MAX_OBJECT_SPAN / span;
+      root.scale.multiplyScalar(k);
+    }
+  }
+
   function fitScene() {
     if (!M.camera || !M.orbit || !M.scene) return;
     const box = new T3.Box3();
     let any = false;
     M.objs.forEach((obj) => {
       if (!obj.visible) return;
-      box.expandByObject(obj);
+      obj.updateMatrixWorld(true);
+      const b = new T3.Box3().setFromObject(obj);
+      if (b.isEmpty()) return;
+      const size = b.getSize(new T3.Vector3());
+      const span = Math.max(size.x, size.y, size.z);
+      if (!Number.isFinite(span) || span > FIT_MAX_OBJECT_SPAN) return;
+      box.union(b);
       any = true;
     });
+    if (!any || box.isEmpty()) {
+      if (M.env) {
+        M.env.updateMatrixWorld(true);
+        box.setFromObject(M.env);
+        any = !box.isEmpty();
+      }
+    }
     if (!any || box.isEmpty()) {
       fitHome();
       return;
@@ -260,7 +295,7 @@
     const center = box.getCenter(new T3.Vector3());
     const size = box.getSize(new T3.Vector3());
     const span = Math.max(size.x, size.y, size.z, 2);
-    const dist = Math.min(180, Math.max(8, span * 1.85));
+    const dist = Math.min(M.orbit.maxDistance || 220, Math.max(8, span * 1.85));
     M.orbit.target.copy(center);
     const elev = Math.PI / 5;
     const az = Math.PI / 4;
@@ -380,7 +415,12 @@
     M.camera.position.set(7.5, 7, 9);
 
     try {
-      M.renderer = new T3.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+      M.renderer = new T3.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        preserveDrawingBuffer: true,
+        powerPreference: "high-performance",
+      });
     } catch (err) {
       // コンテキストが枯渇している場合のフォールバック
       container.innerHTML = `<div style="position:absolute;inset:0;display:grid;place-items:center;color:#8a92a1;font-size:12px;gap:6px;text-align:center">
@@ -916,6 +956,8 @@
     select, addObject, removeObject, updateObject, rebuild, setVisible, hover,
     setTheme, applySettings, on: EV.on, get selected() { return M.selected.slice(); },
     get state() { return M.state; }, get scene() { return M.scene; },
+    get renderer() { return M.renderer; },
+    get camera() { return M.camera; },
     get isMounted() { return !!M.renderer; },
     getCamera, setCamera,
     syncFromScene
