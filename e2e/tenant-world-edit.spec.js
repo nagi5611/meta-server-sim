@@ -9,6 +9,8 @@ import {
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'dev-admin-password-16';
 
+const MOCK_MARKERS = ['街灯 01', '中央ステージ', '案内アバター', '夜のネオン商店街', 'AKARI City'];
+
 /**
  * CSP / 致命的コンソールを収集する
  * @param {import('@playwright/test').Page} page
@@ -24,6 +26,30 @@ function attachConsoleWatchers(page) {
     return lines;
 }
 
+async function gotoMtWorldEdit(page) {
+    await attachStagingSimForwardHeaders(page);
+    await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
+    await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('.side.rail')).toBeVisible();
+    await page.waitForFunction(
+        () => window.MT?.state?.ed?._live && !window.MT.state.ed.loading,
+        null,
+        { timeout: 180_000 }
+    );
+    await page.waitForFunction(
+        () => {
+            const root = document.querySelector('.wed-root');
+            if (!root) return false;
+            const canvas = root.querySelector('[data-canvas] canvas');
+            if (!canvas) return false;
+            return canvas.getBoundingClientRect().width > 64;
+        },
+        null,
+        { timeout: 180_000 }
+    );
+}
+
 test.describe('tenant world edit', () => {
     test.use({
         httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
@@ -37,36 +63,48 @@ test.describe('tenant world edit', () => {
         const worldsJson = await worldsApi.json();
         expect(Object.keys(worldsJson).length).toBeGreaterThan(0);
 
-        await attachStagingSimForwardHeaders(page);
-        await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
+        await gotoMtWorldEdit(page);
 
-        await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
-        await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 30_000 });
-        await expect(page.locator('.side.rail')).toBeVisible();
+        const railBox = await page.locator('.side.rail').boundingBox();
+        expect(railBox?.width ?? 999, 'collapsed rail width').toBeLessThan(56);
+
+        const outlinerText = await page.locator('.wed-root .vout-scroll').innerText();
+        for (const phrase of MOCK_MARKERS) {
+            expect(outlinerText, `mock phrase "${phrase}" must be absent`).not.toContain(phrase);
+        }
+
+        const counts = await page.evaluate(() => {
+            const wid = window.MT?.state?.ed?.worldId || 'lobby';
+            const w = window.MT?.state?.ed?._worldsRoot?.[wid];
+            const expected = window.MTWL?.expectedObjectCount?.(w) ?? -1;
+            const rows = document.querySelectorAll('.wed-root .vout-scroll .vo-row').length;
+            return { expected, rows, live: !!window.MT?.state?.ed?._live };
+        });
+        expect(counts.live).toBe(true);
+        expect(counts.rows).toBe(counts.expected);
+
         await page.waitForFunction(
             () => {
-                const root = document.querySelector('.wed-root');
-                if (!root) return false;
-                const canvas =
-                    root.querySelector('[data-canvas] canvas') || root.querySelector('[data-canvas]');
-                if (!canvas) return false;
-                const r = canvas.getBoundingClientRect();
-                return r.width > 64 && r.height > 64;
+                let meshes = 0;
+                const scene = window.ME?.scene;
+                if (!scene) return false;
+                scene.traverse((c) => {
+                    if (c.isMesh && c.name !== '__placeholder') meshes += 1;
+                });
+                return meshes >= 8;
             },
             null,
             { timeout: 180_000 }
         );
-        await expect(page.locator('.wed-root .vout .vo-row').first()).toBeVisible({ timeout: 180_000 });
 
         const diag = await page.evaluate(() => ({
             tenant: window.MT?.state?.tenant,
             worldId: window.MT?.state?.worldId,
-            worldCount: window.MTD?.TENANTS?.find((t) => t.id === 'P-01')?.worlds?.length ?? 0,
             editorMounted: Boolean(window.ME?.isMounted),
         }));
 
         expect(diag.tenant, 'tenant context').toBe('P-01');
-        expect(diag.worldCount, 'worlds from API').toBeGreaterThan(0);
+        expect(diag.editorMounted).toBe(true);
 
         const cspViolations = consoleLines.filter(
             (t) =>
@@ -75,8 +113,6 @@ test.describe('tenant world edit', () => {
         );
         const moduleFailures = consoleLines.filter(
             (t) =>
-                t.includes('world-editor.js') ||
-                t.includes('flight-board-filter.js') ||
                 t.includes('Failed to load module') ||
                 t.includes('Failed to fetch dynamically imported module')
         );
@@ -100,7 +136,7 @@ test.describe('tenant world edit', () => {
         const lobby = worldsBefore.lobby;
         expect(lobby).toBeTruthy();
 
-        const marker = Date.now() % 1000;
+        const marker = (Date.now() % 1000) / 10 + 0.1;
         const nextSpawn = {
             ...(lobby.spawnPoint || { x: 0, y: 10, z: 0 }),
             x: marker,
@@ -126,63 +162,59 @@ test.describe('tenant world edit', () => {
         const worldsAfterRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
         expect(worldsAfterRes.ok()).toBeTruthy();
         const worldsAfter = await worldsAfterRes.json();
-        expect(worldsAfter.lobby?.spawnPoint?.x).toBe(marker);
+        expect(worldsAfter.lobby?.spawnPoint?.x).toBeCloseTo(marker, 5);
 
         const modelHead = await request.head('/P-01/models/lobby.glb');
         expect(modelHead.status(), 'lobby.glb should be served (R2 or local fallback)').toBe(200);
 
-        await page.goto('/admin-legacy/tenant/P-01/world-edit');
-        await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
-        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
+        await gotoMtWorldEdit(page);
 
-        const lobbyItem = page.locator('#world-list .item').filter({ hasText: /lobby/i });
-        await lobbyItem.click();
-        await page.locator('.we-right-category-btn[data-we-right-category="settings"]').click();
-        await page
-            .locator('#panel-spawn details')
-            .filter({ hasText: 'スポーン位置' })
-            .locator('summary')
-            .click();
-        const spawnX = page.locator('#spawn-x');
-        await expect(spawnX).toBeVisible();
-        await spawnX.fill(String(marker));
-        await expect(page.locator('#spawn-x')).toHaveValue(String(marker));
+        const spawnInState = await page.evaluate(() => {
+            const sp = window.MT?.state?.ed?.objects?.find((o) => o.type === 'spawn');
+            return sp?.pos?.[0];
+        });
+        expect(spawnInState).toBeCloseTo(marker, 5);
     });
 
-    test('P-01 legacy world-edit save button succeeds (worlds/patch)', async ({ page }) => {
-        const consoleLines = attachConsoleWatchers(page);
+    test('P-01 mt-editor draft save succeeds (worlds POST)', async ({ page, request }) => {
+        attachConsoleWatchers(page);
 
-        await page.goto('/admin-legacy/tenant/P-01/world-edit');
-        await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
-        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
+        const worldsRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
+        const worldsBefore = await worldsRes.json();
+        const lobby = worldsBefore.lobby;
+        const prevDesc = lobby.description || '';
 
-        const lobbyItem = page.locator('#world-list .item').filter({ hasText: /lobby/i });
-        await lobbyItem.click();
+        await gotoMtWorldEdit(page);
 
-        await page.locator('.we-right-category-btn[data-we-right-category="settings"]').click();
-        await page
-            .locator('#panel-spawn details')
-            .filter({ hasText: 'スポーン位置' })
-            .locator('summary')
-            .click();
+        const tag = `pw-draft-${Date.now()}`;
+        await page.evaluate((descTag) => {
+            const ed = window.MT.state.ed;
+            ed.settings.desc = descTag;
+            ed.dirty = true;
+            window.MT.render();
+        }, tag);
 
-        const spawnX = page.locator('#spawn-x');
-        await expect(spawnX).toBeVisible();
-        const current = Number(await spawnX.inputValue());
-        const next = Number.isFinite(current) ? current + 0.001 : 42;
-        await spawnX.fill(String(next));
-
-        const saveBtn = page.locator('#btn-save');
-        await expect(saveBtn).toBeEnabled();
-        await saveBtn.click();
-
-        const saveStatus = page.locator('#save-status');
-        await expect(saveStatus).toContainText(/保存しました/, { timeout: 120_000 });
-        await expect(saveStatus).not.toHaveClass(/error/);
-
-        const failures = consoleLines.filter(
-            (t) => t.includes('tenant_not_found') || t.includes('tenant not found')
+        await page.locator('.wed-root [data-ed-act="draft"]').click();
+        await page.waitForFunction(
+            () => {
+                const s = document.querySelector('[data-save-state]');
+                return s && !s.classList.contains('dirty') && s.textContent?.includes('保存');
+            },
+            null,
+            { timeout: 120_000 }
         );
-        expect(failures, failures.join(' | ')).toEqual([]);
+
+        const worldsAfterRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
+        const worldsAfter = await worldsAfterRes.json();
+        expect(worldsAfter.lobby?.description).toBe(tag);
+
+        await request.post('/admin/tenants/P-01/worlds', {
+            headers: {
+                ...adminBasicAuthHeaders(),
+                'Content-Type': 'application/json',
+                'X-Admin-CSRF': (await request.get('/admin/csrf-token', { headers: adminBasicAuthHeaders() }).then((r) => r.json())).token,
+            },
+            data: { ...worldsAfter, lobby: { ...worldsAfter.lobby, description: prevDesc } },
+        });
     });
 });

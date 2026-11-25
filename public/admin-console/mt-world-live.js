@@ -1,0 +1,511 @@
+/* mt-world-live.js — worlds.json ↔ mt-editor 状態（本番 API） */
+(function () {
+    'use strict';
+
+    const MOCK_PHRASES = ['街灯 01', '中央ステージ', '案内アバター', '夜のネオン商店街', 'AKARI City'];
+
+    function vec3ToArr(v, d) {
+        if (!v || typeof v !== 'object') return d || [0, 0, 0];
+        return [Number(v.x) || 0, Number(v.y) || 0, Number(v.z) || 0];
+    }
+
+    function arrToVec3(a) {
+        const x = Array.isArray(a) ? a : [0, 0, 0];
+        return { x: x[0] || 0, y: x[1] || 0, z: x[2] || 0 };
+    }
+
+    function scaleToArr(s) {
+        if (typeof s === 'number') return [s, s, s];
+        if (!s || typeof s !== 'object') return [1, 1, 1];
+        return [Number(s.x) || 1, Number(s.y) || 1, Number(s.z) || 1];
+    }
+
+    function scaleToWorld(s) {
+        const a = scaleToArr(s);
+        if (a[0] === a[1] && a[1] === a[2]) return a[0];
+        return { x: a[0], y: a[1], z: a[2] };
+    }
+
+    function modelBaseName(path) {
+        const base = String(path || '').split('/').pop() || 'model';
+        return base.replace(/\.[^.]+$/, '');
+    }
+
+    function hexLightColor(c) {
+        if (typeof c === 'string' && c.startsWith('#')) return c;
+        const n = Number(c);
+        if (!Number.isFinite(n)) return '#ffffff';
+        return '#' + (n & 0xffffff).toString(16).padStart(6, '0');
+    }
+
+    function hasMockData(ed) {
+        if (!ed) return false;
+        const text = [
+            ed.settings?.desc,
+            ed.worldName,
+            ...(ed.objects || []).map((o) => o.name),
+            ...(ed.history || []).map((h) => h.msg),
+        ]
+            .filter(Boolean)
+            .join('\u0000');
+        return MOCK_PHRASES.some((p) => text.includes(p));
+    }
+
+    async function fetchJson(url) {
+        const liveFetch = window.__nativeAdminFetch || window.fetch;
+        const res = await liveFetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+        return res.json();
+    }
+
+    async function fetchCsrf() {
+        const j = await fetchJson('/admin/csrf-token');
+        return j.token || '';
+    }
+
+    /**
+     * @param {string} tenantId
+     * @returns {Promise<Record<string, unknown>>}
+     */
+    async function fetchAllWorlds(tenantId) {
+        return fetchJson(`/admin/tenants/${encodeURIComponent(tenantId)}/worlds`);
+    }
+
+    /**
+     * worlds.json の1ワールド → エディタ objects[]
+     * @param {string} tenantId
+     * @param {string} worldId
+     * @param {Record<string, unknown>} w
+     */
+    function worldDocToObjects(tenantId, worldId, w) {
+        const objects = [];
+        let n = 0;
+        const mkId = (pfx) => `${pfx}-${tenantId}-${worldId}-${++n}`;
+
+        if (w.spawnPoint) {
+            objects.push({
+                id: mkId('spawn'),
+                type: 'spawn',
+                name: 'スポーン',
+                pos: vec3ToArr(w.spawnPoint, [0, 1, 5]),
+                rot: [0, 0, 0],
+                scale: [1, 1, 1],
+                visible: true,
+                props: { yaw: 0 },
+                options: {},
+                _src: 'spawnPoint',
+            });
+        }
+
+        (w.models || []).forEach((m, idx) => {
+            const path = String(m.path || '');
+            const name = modelBaseName(path) || `model-${idx + 1}`;
+            const pos = vec3ToArr(m.position);
+            const rot = vec3ToArr(m.rotation);
+            const scale = scaleToArr(m.scale);
+            let type = 'model';
+            const props = {
+                modelPath: path,
+                modelUrl: path ? `/${encodeURIComponent(tenantId)}/${path.replace(/^\//, '')}` : '',
+            };
+            const options = {};
+            if (m.aircraft) {
+                type = 'plane';
+                props.aircraft = m.aircraft;
+                props.speed = w.aircraftPhysics?.maxThrustSpeed || 12;
+            }
+            if (m.teleporter) {
+                options.teleporter = {
+                    on: true,
+                    to: m.teleporter.destinationWorld || '',
+                    radius: m.teleporter.radius ?? 2,
+                    mode: m.teleporter.autoTeleport ? 'auto' : 'manual',
+                    prompt: true,
+                    key: 'E',
+                };
+            }
+            if (m.animate) props.animate = m.animate;
+            objects.push({
+                id: mkId('mdl'),
+                type,
+                name,
+                pos,
+                rot,
+                scale,
+                visible: true,
+                props,
+                options,
+                _src: 'models',
+                _modelIndex: idx,
+                _raw: m,
+            });
+        });
+
+        (w.lights || []).forEach((L, idx) => {
+            if (L.type === 'ambient' || L.type === 'directional') return;
+            objects.push({
+                id: mkId('lt'),
+                type: 'light',
+                name: L.type === 'point' ? `ライト ${idx + 1}` : String(L.type || 'light'),
+                pos: vec3ToArr(L.position, [0, 2, 0]),
+                rot: [0, 0, 0],
+                scale: [1, 1, 1],
+                visible: true,
+                props: {
+                    color: hexLightColor(L.color),
+                    intensity: L.intensity ?? 1,
+                    distance: L.distance ?? 8,
+                },
+                options: {},
+                _src: 'lights',
+                _lightIndex: idx,
+                _raw: L,
+            });
+        });
+
+        (w.flightBoards || w.flightboards || []).forEach((fb, idx) => {
+            objects.push({
+                id: mkId('fb'),
+                type: 'board',
+                name: fb.id || `発着板 ${idx + 1}`,
+                pos: vec3ToArr(fb.position),
+                rot: vec3ToArr(fb.rotation),
+                scale: scaleToArr(fb.scale),
+                visible: true,
+                props: { filter: fb.filter || 'all', rows: fb.rows || 7 },
+                options: {},
+                _src: 'flightBoards',
+                _boardIndex: idx,
+                _raw: fb,
+            });
+        });
+
+        (w.pdfs || []).forEach((p, idx) => {
+            objects.push({
+                id: mkId('pdf'),
+                type: 'pdf',
+                name: p.path ? modelBaseName(p.path) : `PDF ${idx + 1}`,
+                pos: vec3ToArr(p.position),
+                rot: vec3ToArr(p.rotation),
+                scale: scaleToArr(p.scale),
+                visible: true,
+                props: { file: p.path || '', pages: p.pages || 1, page: p.page || 1 },
+                options: {},
+                _src: 'pdfs',
+                _pdfIndex: idx,
+                _raw: p,
+            });
+        });
+
+        (w.fdsSmoke || []).forEach((s, idx) => {
+            objects.push({
+                id: mkId('smk'),
+                type: 'smoke',
+                name: s.label || s.path || `煙 ${idx + 1}`,
+                pos: vec3ToArr(s.position),
+                rot: vec3ToArr(s.rotation),
+                scale: scaleToArr(s.scale),
+                visible: true,
+                props: { file: s.path || s.file || '', density: s.density ?? 0.6, playing: false },
+                options: {},
+                _src: 'fdsSmoke',
+                _fdsIndex: idx,
+                _raw: s,
+            });
+        });
+
+        (w.vdbs || []).forEach((v, idx) => {
+            objects.push({
+                id: mkId('vdb'),
+                type: 'cloud',
+                name: v.path ? modelBaseName(v.path) : `雲 ${idx + 1}`,
+                pos: vec3ToArr(v.position),
+                rot: vec3ToArr(v.rotation),
+                scale: scaleToArr(v.scale),
+                visible: true,
+                props: { file: v.path || '', density: v.density ?? 0.45, tint: '#ffffff', scale: 1 },
+                options: {},
+                _src: 'vdbs',
+                _vdbIndex: idx,
+                _raw: v,
+            });
+        });
+
+        return objects;
+    }
+
+  function worldDocToSettings(w) {
+        return {
+            desc: String(w.description || w.desc || '').trim(),
+            viewDistance: w.viewDistanceM ?? w.viewDistance ?? 60,
+            quality: w.quality || 'mid',
+            cap: w.playerCap ?? w.cap ?? 320,
+            sky: w.skyColor ? hexLightColor(w.skyColor) : w.sky || '#eef0f4',
+            ambient: w.ambientSound || w.ambient || 'none',
+            spawnPoint: w.spawnPoint || null,
+            lightsWorld: (w.lights || []).filter((l) => l.type === 'ambient' || l.type === 'directional'),
+        };
+    }
+
+    function listFilesFromWorlds(worldsRoot) {
+        const files = [];
+        let fi = 0;
+        Object.values(worldsRoot || {}).forEach((w) => {
+            (w.models || []).forEach((m) => {
+                if (!m.path) return;
+                const kind = (m.path.split('.').pop() || 'glb').toLowerCase();
+                files.push({
+                    id: `live-f${++fi}`,
+                    path: ['models'],
+                    name: m.path.split('/').pop(),
+                    kind,
+                    size: 0,
+                    date: '—',
+                    asset: null,
+                });
+            });
+        });
+        return files;
+    }
+
+    /**
+     * @param {Record<string, unknown>} ed
+     * @param {Record<string, unknown>} worldsRoot
+     * @param {string} worldId
+     */
+    function editorToWorldDoc(ed, worldsRoot, worldId) {
+        const base = JSON.parse(JSON.stringify(worldsRoot[worldId] || { id: worldId }));
+        base.id = worldId;
+        base.name = ed.worldName || base.name || worldId;
+        base.description = ed.settings?.desc ?? base.description ?? '';
+        if (ed.settings?.viewDistance != null) base.viewDistanceM = ed.settings.viewDistance;
+
+        const models = [];
+        const lights = [...(base.lights || []).filter((l) => l.type === 'ambient' || l.type === 'directional')];
+        const flightBoards = [];
+        const pdfs = [];
+        const fdsSmoke = [];
+        const vdbs = [];
+
+        (ed.objects || []).forEach((o) => {
+            if (o._raw && o._src === 'models') {
+                const m = JSON.parse(JSON.stringify(o._raw));
+                m.position = { x: o.pos[0], y: o.pos[1], z: o.pos[2] };
+                m.rotation = { x: o.rot[0], y: o.rot[1], z: o.rot[2] };
+                m.scale = scaleToWorld(o.scale);
+                if (o._modelIndex != null) m._idx = o._modelIndex;
+                models.push(m);
+                return;
+            }
+            if (o.type === 'spawn' && o._src === 'spawnPoint') {
+                base.spawnPoint = { x: o.pos[0], y: o.pos[1], z: o.pos[2] };
+                return;
+            }
+            if (o.type === 'model' || o.type === 'plane') {
+                const path = o.props?.modelPath || o.props?.file || o._raw?.path;
+                if (!path) return;
+                const entry = {
+                    path,
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                    rotation: { x: o.rot[0], y: o.rot[1], z: o.rot[2] },
+                    scale: scaleToWorld(o.scale),
+                };
+                if (o.options?.teleporter?.on) {
+                    entry.teleporter = {
+                        destinationWorld: o.options.teleporter.to,
+                        radius: o.options.teleporter.radius,
+                        autoTeleport: o.options.teleporter.mode === 'auto',
+                    };
+                }
+                if (o.props?.animate) entry.animate = o.props.animate;
+                if (o.type === 'plane' && o.props?.id) entry.aircraft = { ...o.props };
+                models.push(entry);
+                return;
+            }
+            if (o.type === 'light' && o._src === 'lights') {
+                lights.push({
+                    type: 'point',
+                    intensity: o.props?.intensity ?? 1,
+                    color: parseInt(String(o.props?.color || '#ffffff').replace('#', ''), 16) || 0xffffff,
+                    distance: o.props?.distance ?? 8,
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                });
+            }
+            if (o.type === 'board') {
+                flightBoards.push({
+                    id: o.name,
+                    filter: o.props?.filter || 'all',
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                    rotation: { x: o.rot[0], y: o.rot[1], z: o.rot[2] },
+                    scale: scaleToWorld(o.scale),
+                });
+            }
+        });
+
+        base.models = models.sort((a, b) => (a._idx ?? 0) - (b._idx ?? 0)).map((m) => {
+            const c = { ...m };
+            delete c._idx;
+            return c;
+        });
+        base.lights = lights;
+        base.flightBoards = flightBoards.length ? flightBoards : base.flightBoards;
+        base.pdfs = pdfs.length ? pdfs : base.pdfs;
+        base.fdsSmoke = fdsSmoke.length ? fdsSmoke : base.fdsSmoke;
+        base.vdbs = vdbs.length ? vdbs : base.vdbs;
+        return base;
+    }
+
+    async function saveWorldsToApi(st, publish) {
+        const ed = st.ed;
+        if (!ed?._worldsRoot || !ed.worldId) throw new Error('worlds snapshot missing');
+        const worlds = JSON.parse(JSON.stringify(ed._worldsRoot));
+        worlds[ed.worldId] = editorToWorldDoc(ed, worlds, ed.worldId);
+        const token = await fetchCsrf();
+        const liveFetch = window.__nativeAdminFetch || window.fetch;
+        const res = await liveFetch(`/admin/tenants/${encodeURIComponent(st.tenant)}/worlds`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-CSRF': token,
+            },
+            body: JSON.stringify(worlds),
+        });
+        if (!res.ok) throw new Error(`save failed ${res.status}`);
+        ed._worldsRoot = worlds;
+        ed.dirty = false;
+        if (window.MT?.toast) {
+            window.MT.toast(publish ? '公開しました' : '保存しました');
+        }
+        return worlds;
+    }
+
+    /**
+     * 本番 initEd 置換
+     * @param {object} st
+     */
+    function initEdLive(st) {
+        const D = window.MTD;
+        const t = D.TENANTS.find((x) => x.id === st.tenant) || D.TENANTS[0];
+        const wid = st.worldId || t?.worlds?.[0]?.id;
+        const wMeta = t?.worlds?.find((x) => x.id === wid);
+        const ed = {
+            worlds: t?.worlds || [],
+            worldId: wid,
+            worldName: wMeta?.name || wid || '',
+            objects: [],
+            settings: {
+                desc: '',
+                viewDistance: 60,
+                quality: 'mid',
+                cap: 320,
+                sky: '#eef0f4',
+                ambient: 'none',
+            },
+            selected: [],
+            selKind: 'world',
+            mode: 'translate',
+            snapOn: true,
+            snap: 0.5,
+            theme: 'light',
+            panels: { props: true },
+            sec: { tf: true, vis: true, own: true, meta: false, world: true, lod: true, env: true, limit: false },
+            split: 46,
+            collapsed: {},
+            q: '',
+            files: [],
+            explorer: { open: false, path: [], q: '', view: 'list', sel: null },
+            ctx: null,
+            preview: null,
+            uploads: [],
+            dirty: false,
+            undo: [],
+            redo: [],
+            dialog: null,
+            json: '',
+            jsonErr: '',
+            history: [],
+            loading: { label: 'ワールドを読み込み中', pct: 0 },
+            _live: true,
+            _worldsRoot: null,
+        };
+        if (window.innerWidth < 900) ed.panels.props = false;
+        st.ed = ed;
+
+        void hydrateFromApi(st).catch((err) => {
+            console.error('[mt-world-live] hydrate failed', err);
+            if (window.MT?.toast) window.MT.toast('ワールドデータの読み込みに失敗しました');
+            ed.loading = null;
+            window.MT?.render?.();
+        });
+
+        return ed;
+    }
+
+    async function hydrateFromApi(st) {
+        const ed = st.ed;
+        const worldsRoot = await fetchAllWorlds(st.tenant);
+        const wid = ed.worldId;
+        const wdoc = worldsRoot[wid];
+        if (!wdoc) throw new Error(`world ${wid} missing`);
+        ed._worldsRoot = worldsRoot;
+        ed.worldName = wdoc.name || ed.worldName;
+        ed.objects = worldDocToObjects(st.tenant, wid, wdoc);
+        ed.settings = worldDocToSettings(wdoc);
+        ed.files = listFilesFromWorlds(worldsRoot);
+        ed.loading = null;
+        ed.dirty = false;
+        window.MT?.render?.();
+        requestAnimationFrame(() => {
+            if (!window.ME?.isMounted) window.MTA?.mountScene?.(st);
+            else {
+                window.ME.unmount();
+                window.MTA?.mountScene?.(st);
+            }
+            window.MTA?.bindDropzones?.();
+            window.MTA?.bindSplitter?.();
+            window.MTA?.bindOutlinerWheel?.();
+            if (window.ME?.fitScene) window.ME.fitScene();
+        });
+    }
+
+    function install() {
+        if (!window.MTA || !window.MTD) return;
+        const protoInit = window.MTA.initEd;
+        window.MTA.initEd = initEdLive;
+        window.MTA._protoInitEd = protoInit;
+
+        const protoSave = window.MTA.saveDraft;
+        window.MTA.saveDraft = function saveDraftLive(st, publish) {
+            if (!st?.ed?._live) return protoSave(st, publish);
+            return saveWorldsToApi(st, publish)
+                .then(() => {
+                    window.MTA.paintStatus?.();
+                })
+                .catch((err) => {
+                    console.error('[mt-world-live] save failed', err);
+                    if (st.ed) st.ed.dirty = true;
+                    window.MTA.paintStatus?.();
+                    window.MT?.toast?.('保存に失敗しました');
+                });
+        };
+
+        window.MTWL = {
+            fetchAllWorlds,
+            worldDocToObjects,
+            worldDocToSettings,
+            editorToWorldDoc,
+            hasMockData,
+            expectedObjectCount(wdoc) {
+                return worldDocToObjects('x', 'y', wdoc || {}).length;
+            },
+            MOCK_PHRASES,
+        };
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', install);
+    } else {
+        install();
+    }
+})();

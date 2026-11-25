@@ -183,8 +183,13 @@
       const fin = addMesh(new T3.BoxGeometry(0.05, 0.34, 0.28), mat("#d3dce7"), 0.62);
       fin.position.z = -0.74;
       g.userData.plane = body;
+    } else if ((o.type === "model" || o.type === "plane") && p.modelUrl && window.THREE.GLTFLoader) {
+      const ph = addMesh(new T3.BoxGeometry(0.35, 0.35, 0.35), mat("#c8d0dc", { transparent: true, opacity: 0.25 }), 0.2);
+      ph.name = "__placeholder";
+      g.userData._glbUrl = p.modelUrl;
+      queueGltfLoad(g, o);
     } else {
-      // model / prop
+      // model / prop（プレースホルダ）
       const b = addMesh(new T3.BoxGeometry(size[0], size[1], size[2]), mat(t.color), 0);
       b.position.y = size[1] / 2;
       const edge = new T3.LineSegments(new T3.EdgesGeometry(b.geometry), new T3.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28 }));
@@ -202,6 +207,63 @@
     g.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
     applyOptions(g, o);
     return g;
+  }
+
+  const gltfPending = new Set();
+  function queueGltfLoad(g, o) {
+    const url = o.props && o.props.modelUrl;
+    if (!url || !window.THREE.GLTFLoader) return;
+    if (gltfPending.has(url)) return;
+    gltfPending.add(url);
+    const loader = new T3.GLTFLoader();
+    loader.load(
+      url,
+      (gl) => {
+        gltfPending.delete(url);
+        const root = gl.scene || gl.scenes?.[0];
+        if (!root) return;
+        const ph = g.children.find((c) => c.name === "__placeholder");
+        if (ph) g.remove(ph);
+        root.traverse((c) => {
+          if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        g.add(root);
+        g.userData.gltf = root;
+        EV.emit("gltf-loaded", o.id);
+        fitScene();
+      },
+      undefined,
+      (err) => {
+        gltfPending.delete(url);
+        console.error("[mt-editor] GLTF load failed", url, err);
+      }
+    );
+  }
+
+  function fitScene() {
+    if (!M.camera || !M.orbit || !M.scene) return;
+    const box = new T3.Box3();
+    let any = false;
+    M.objs.forEach((obj) => {
+      if (!obj.visible) return;
+      box.expandByObject(obj);
+      any = true;
+    });
+    if (!any || box.isEmpty()) {
+      fitHome();
+      return;
+    }
+    const center = box.getCenter(new T3.Vector3());
+    const size = box.getSize(new T3.Vector3()).length();
+    const dist = Math.max(4, size * 1.35);
+    const dir = M.camera.position.clone().sub(M.orbit.target).normalize();
+    if (dir.lengthSq() < 0.01) dir.set(0.4, 0.5, 0.7).normalize();
+    M.orbit.target.copy(center);
+    M.camera.position.copy(center.clone().add(dir.multiplyScalar(dist)));
+    M.orbit.update();
   }
 
   /* ================= オプション（テレポーター / 太鼓） ================= */
@@ -810,7 +872,7 @@
   }
 
   window.ME = {
-    TYPES, mount, unmount, setMode, setSnap, setView, focus,
+    TYPES, mount, unmount, setMode, setSnap, setView, focus, fitScene,
     select, addObject, removeObject, updateObject, rebuild, setVisible, hover,
     setTheme, applySettings, on: EV.on, get selected() { return M.selected.slice(); },
     get state() { return M.state; }, get scene() { return M.scene; },

@@ -16,7 +16,7 @@ const COPY = [
     'mt-ui.js',
     'mt-views.js',
     'mt-addons.js',
-    'mt-editor.js',
+    /* mt-editor.js — GLTF 本番読込は public 側を手動維持 */
     'mt-world.js',
     'mt-editor-state.js',
     'mt-app.js',

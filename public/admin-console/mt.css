@@ -145,7 +145,7 @@ textarea.inp{height:auto;min-height:70px;padding:7px 10px;line-height:1.7;resize
 
 /* ---------- シェル ---------- */
 .app{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100dvh}
-body.in-editor .app{grid-template-columns:1fr}
+body.in-editor .app{grid-template-columns:48px minmax(0,1fr)}
 body.in-editor .page{padding:0;max-width:none}
 body.in-editor .main{height:100dvh;overflow:hidden}
 .side{

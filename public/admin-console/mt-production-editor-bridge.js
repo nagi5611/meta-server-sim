@@ -1,24 +1,8 @@
-/* mt-production-editor-bridge.js — デザインエディタ ↔ 本番 setting.js 移植の拡張点 */
+/* mt-production-editor-bridge.js — 拡張メモ（実装は mt-world-live.js） */
 (function () {
     'use strict';
-
     /**
-     * 移植対応表は docs/admin-console-migration-map.md を参照。
-     * 現段階: ワールド一覧は MTD（API）由来。保存・モデル読込は mt-editor（プロトタイプ）＋今後 setting.js API へ接続。
+     * 本番ワールド編集のデータ・保存は mt-world-live.js。
+     * FDS / VDB / PDF / 発着の詳細編集は tenant-setting-editor モジュール群への段階接続。
      */
-    if (!window.MTA || !window.MTD) return;
-
-    const origInit = window.MTA.initEd || window.MTES?.initEd;
-    if (origInit && window.MT) {
-        const wrapInit = (st) => {
-            const t = window.MTD.TENANTS.find((x) => x.id === st.tenant);
-            if (t && (!st.worldId || st.worldId === 'lobby')) {
-                const first = t.worlds?.[0];
-                if (first) st.worldId = first.id;
-            }
-            return origInit(st);
-        };
-        if (window.MTES) window.MTES.initEd = wrapInit;
-    }
-
 })();
