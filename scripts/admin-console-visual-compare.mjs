@@ -93,7 +93,7 @@ const SCENES = [
                 await page.waitForFunction(
                     () => window.MT?.state?.ed?._live && !window.MT.state.ed.loading,
                     null,
-                    { timeout: 180_000 }
+                    { timeout: 240_000 }
                 );
                 await page.waitForFunction(
                     () => {
