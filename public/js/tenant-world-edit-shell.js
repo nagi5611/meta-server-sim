@@ -52,22 +52,9 @@ async function hardReloadAdminCaches() {
  * @param {string} tenantId
  */
 export function initTenantWorldEditShell(tenantId) {
-    const tenantAdminLink = document.getElementById('world-edit-tenant-admin-link');
     const backToMetaverse = document.getElementById('back-to-metaverse');
-    const titleEl = document.getElementById('world-edit-tenant-title');
-    const usernameEl = document.getElementById('header-username');
-
-    if (tenantAdminLink) {
-        tenantAdminLink.href = `/admin/tenant/${encodeURIComponent(tenantId)}`;
-    }
     if (backToMetaverse) {
         backToMetaverse.href = `/${encodeURIComponent(tenantId)}/`;
-    }
-    if (titleEl) {
-        titleEl.textContent = `${tenantId} — ワールド編集`;
-    }
-    if (usernameEl) {
-        usernameEl.textContent = 'admin';
     }
 
     const storedTheme = localStorage.getItem(ADMIN_THEME_STORAGE_KEY);

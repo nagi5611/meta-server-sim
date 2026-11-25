@@ -257,9 +257,12 @@ export function initMtConsoleShell(config) {
 
     const panels = main.querySelector('.admin-panels');
     const legacyActionsFragment = document.createDocumentFragment();
-    const legacyActions = legacyHeader?.querySelector('.header-actions');
+    const legacyActions =
+        legacyHeader?.querySelector('.header-actions') ||
+        main.querySelector('.header-actions, #world-edit-topbar-actions');
     if (legacyActions) {
         legacyActionsFragment.append(...legacyActions.childNodes);
+        legacyActions.remove();
     }
 
     if (config.page === 'tenant') {
@@ -326,7 +329,7 @@ export function initMtConsoleShell(config) {
  */
 function buildSidebar(config) {
     const side = document.createElement('aside');
-    side.className = 'side';
+    side.className = config.page === 'world-edit' ? 'side rail' : 'side';
 
     const brand = document.createElement('a');
     brand.className = 'brand';
@@ -402,7 +405,7 @@ function buildSidebar(config) {
             tg.appendChild(navLink({ href: tenantHref, icon: 'pulse', label: 'ステータス' }));
             tg.appendChild(navLink({ href: tenantHref, icon: 'net', label: '通信ログ' }));
             tg.appendChild(
-                navButton({ tag: 'span', attrs: {}, icon: 'cube', label: 'ワールド編集', active: true })
+                navButton({ tag: 'span', attrs: { 'aria-current': 'page' }, icon: 'cube', label: 'ワールド編集', active: true })
             );
             tg.appendChild(navLink({ href: tenantHref, icon: 'modules', label: 'アドオン管理' }));
         }
@@ -501,7 +504,7 @@ function navButton(opts) {
     el.className = `nav${opts.active ? ' on' : ''}`;
     if (opts.attrs) {
         for (const [k, v] of Object.entries(opts.attrs)) {
-            if (k === 'data-tenant-panel' || k === 'data-admin-panel') el.setAttribute(k, v);
+            if (k.startsWith('data-') || k.startsWith('aria-')) el.setAttribute(k, v);
         }
     }
     el.innerHTML = `${mtIcon(opts.icon)}<span>${mtEsc(opts.label)}</span>`;

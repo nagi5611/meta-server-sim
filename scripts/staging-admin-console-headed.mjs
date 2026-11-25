@@ -76,6 +76,34 @@ await shot(mobile, `staging-admin-tenant-addons-mobile-${TENANT}.png`, `${BASE}/
     await page.locator('.side .nav[data-tenant-panel="plugins"]').click();
     await page.locator('.ad-tools, .mt-disconnected').first().waitFor({ timeout: 30_000 });
 });
+await shot(
+    desktop,
+    `staging-admin-world-edit-${TENANT}.png`,
+    `${BASE}/admin/tenant/${TENANT}/world-edit`,
+    async (page) => {
+        await page.locator('.wed-root, .setting-layout').first().waitFor({ timeout: 60_000 });
+        await page.locator('.admin-sidebar').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+    }
+);
+await shot(
+    desktop,
+    `staging-admin-tenant-topbar-${TENANT}.png`,
+    `${BASE}/admin/tenant/${TENANT}`,
+    async (page) => {
+        await page.locator('.topbar-actions').waitFor({ timeout: 30_000 });
+    }
+);
+
+const loginCtx = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    extraHTTPHeaders: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': FORWARD_HOST },
+});
+const loginPage = await loginCtx.newPage();
+await loginPage.goto(`${BASE}/admin.html`, { waitUntil: 'commit', timeout: 30_000 });
+await loginPage.screenshot({ path: path.join(OUT, `staging-admin-login-${TENANT}.png`), fullPage: true });
+console.log('saved', path.join(OUT, `staging-admin-login-${TENANT}.png`));
+await loginPage.close();
+await loginCtx.close();
 
 await browser.close();
 console.log(JSON.stringify({ ok: true, base: BASE, out: OUT }, null, 2));

@@ -7,13 +7,7 @@ body.mt-console {
     min-height: 100dvh;
 }
 
-body.mt-console.in-editor .app {
-    grid-template-columns: 1fr;
-}
-
-body.mt-console.in-editor .side {
-    display: none;
-}
+/* in-editor grid: see world-edit-console-bridge.css */
 
 body.mt-console .admin-sidebar {
     display: none !important;
@@ -208,4 +202,105 @@ body.mt-console .topbar .rule {
     body.mt-console .menu-btn {
         display: inline-grid;
     }
+}
+
+body.mt-console .side .nav:not(.on) {
+    background: transparent;
+    color: var(--muted, #5e6778);
+}
+
+body.mt-console .side .nav:not(.on) svg {
+    opacity: 0.72;
+}
+
+body.mt-console .side a.nav:not(.on):hover {
+    background: var(--color-surface-muted, #f8f9fb);
+    color: var(--ink, #101624);
+}
+
+body.mt-console .topbar-actions {
+    align-items: center;
+    gap: 6px;
+}
+
+body.mt-console .topbar-actions .admin-ops-status:empty {
+    display: none;
+}
+
+body.mt-console .topbar-actions .btn,
+body.mt-console .topbar-actions .btn-secondary,
+body.mt-console .topbar-actions .btn-danger,
+body.mt-console .topbar-actions .btn-warning,
+body.mt-console .topbar-actions a.btn,
+body.mt-console .topbar-actions summary.admin-ops-menu-trigger {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--line-strong, #c9ced6);
+    background: var(--color-surface, #fff);
+    color: var(--ink, #101624);
+    box-shadow: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+body.mt-console .topbar-actions .btn-icon {
+    width: 28px;
+    padding: 0;
+    justify-content: center;
+}
+
+body.mt-console .topbar-actions .btn-danger {
+    background: #fff5f5;
+    border-color: #efb8b8;
+    color: #9b2c2c;
+}
+
+body.mt-console .topbar-actions details.admin-ops-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+body.mt-console .topbar-actions details.admin-ops-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+body.mt-console .topbar-actions .last-update {
+    font-size: 10.5px;
+    color: var(--faint, #8a92a1);
+    white-space: nowrap;
+}
+
+body.mt-console .admin-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body.mt-console .admin-modal[hidden] {
+    display: none !important;
+}
+
+body.mt-console .admin-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 22, 36, 0.35);
+}
+
+body.mt-console .admin-modal-dialog {
+    position: relative;
+    z-index: 1;
+    width: min(520px, calc(100vw - 32px));
+    max-height: calc(100dvh - 48px);
+    overflow: auto;
+    background: var(--color-surface, #fff);
+    padding: 18px 20px;
+    box-shadow: 0 16px 40px rgba(16, 22, 36, 0.16);
 }

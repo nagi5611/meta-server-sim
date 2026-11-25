@@ -5,9 +5,8 @@
  * @param {string} panelId
  */
 export function activateTenantPanel(panelId) {
-    document.querySelectorAll('.side .nav').forEach((n) => n.classList.remove('on'));
     document.querySelectorAll('.side .nav[data-tenant-panel]').forEach((btn) => {
-        if (btn.getAttribute('data-tenant-panel') === panelId) btn.classList.add('on');
+        btn.classList.toggle('on', btn.getAttribute('data-tenant-panel') === panelId);
     });
     const panels = document.querySelectorAll('[data-tenant-panel-id]');
     panels.forEach((p) => {
