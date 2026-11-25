@@ -19,7 +19,7 @@ const PLATFORM_FETCH_NO_REWRITE = new Set([
  * @param {string} urlStr
  */
 function maybeRewriteAdminFetchUrl(urlStr) {
-    const pathOnly = String(urlStr || '').split('?')[0];
+    const pathOnly = adminFetchPath(urlStr).split('?')[0];
     if (PLATFORM_FETCH_NO_REWRITE.has(pathOnly)) return urlStr;
     return rewriteTenantWorldEditApiUrl(urlStr);
 }

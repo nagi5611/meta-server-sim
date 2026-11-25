@@ -33,6 +33,15 @@ await page.route('**/*', async (route) => {
 });
 
 await page.goto(`${BASE}/admin/tenant/P-01/world-edit`, { waitUntil: 'load', timeout: 120_000 });
+const early = await page.evaluate(async () => ({
+    patched: Boolean(window.__adminFetchPatched),
+    tenants: await fetch('/admin/tenants', { credentials: 'include' }).then((r) => ({
+        status: r.status,
+        url: r.url,
+    })),
+    gateHidden: document.getElementById('gate')?.hidden,
+    appHidden: document.getElementById('app')?.hidden,
+}));
 await page.waitForTimeout(15_000);
 
 const rewriteCheck = await page.evaluate(async () => {
@@ -75,5 +84,5 @@ const snap = await page.evaluate(() => ({
     mainHtmlLen: document.getElementById('main')?.innerHTML?.length,
 }));
 
-console.log(JSON.stringify({ rewriteCheck, probe, snap, consoleTail: lines.slice(-40) }, null, 2));
+console.log(JSON.stringify({ early, rewriteCheck, probe, snap, consoleTail: lines.slice(-40) }, null, 2));
 await browser.close();
