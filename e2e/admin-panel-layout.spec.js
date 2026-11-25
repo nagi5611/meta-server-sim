@@ -22,9 +22,7 @@ async function openAdminSettings(page, settingsTab = 'env') {
     });
     await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
     await expect(page.locator('.side')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('#platformSettingsBody, .sheet .head h1')).toContainText(/設定/, {
-        timeout: 30_000,
-    });
+    await expect(page.locator('.sheet .head h1')).toContainText(/設定/, { timeout: 30_000 });
     await expect(page.locator('[data-ps-tabs]')).toBeVisible();
 }
 
