@@ -55,21 +55,20 @@ for (const name of COPY) {
       if (!state.tenant) {
         state.tenant = D.TENANTS[0]?.id || null;
       }
-      if (window.MTDesignWorldEdit?.mount) {
-        void window.MTDesignWorldEdit.mount(state);
-        return;
-      }
-      if (!state.ed) window.MTA.initEd(state);
-      root.innerHTML = V.world();
-      window.MTA.mountScene(state);
-      window.MTA.bindDropzones();
-      window.MTA.bindSplitter();
-      requestAnimationFrame(() => {
-        if (!window.ME.isMounted) window.MTA.mountScene(state);
+      void (window.__mtWorldEditReady || Promise.resolve()).then(() => {
+        if (window.MTDesignWorldEdit?.mount) return window.MTDesignWorldEdit.mount(state);
+        if (!state.ed) window.MTA.initEd(state);
+        root.innerHTML = V.world();
+        window.MTA.mountScene(state);
         window.MTA.bindDropzones();
-        window.MTA.bindFileInput();
         window.MTA.bindSplitter();
-        bindWorldDrag();
+        requestAnimationFrame(() => {
+          if (!window.ME.isMounted) window.MTA.mountScene(state);
+          window.MTA.bindDropzones();
+          window.MTA.bindFileInput();
+          window.MTA.bindSplitter();
+          bindWorldDrag();
+        });
       });
       return;
     }

@@ -46,8 +46,8 @@ async function injectWorldEditDom(tenantId) {
         return r.text();
     });
 
-    main.innerHTML = `
-      <div class="wed-design-host" data-tenant="${tenantId}">
+    main.innerHTML = `<div class="hint" id="wed-loading">ワールド編集を読み込み中…</div>
+      <div class="wed-design-host" data-tenant="${tenantId}" hidden>
         <div class="header-actions" id="world-edit-topbar-actions">
           <button type="button" class="btn btn-icon" id="admin-theme-toggle" title="ダークモードに切替"><i class="bi bi-moon-fill" id="admin-theme-icon"></i></button>
           <button type="button" class="btn btn-icon" id="admin-cache-hard-reload" title="キャッシュを削除して再読み込み" aria-label="キャッシュ再読み込み"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
@@ -90,6 +90,8 @@ export async function mountDesignProductionWorldEdit(state) {
 
         const main = document.getElementById('main');
         if (main) main.dataset.prodWorldMounted = tenantId;
+        main.querySelector('.wed-design-host')?.removeAttribute('hidden');
+        main.querySelector('#wed-loading')?.remove();
     })().catch((e) => {
         console.error('[mt-design-world-edit-host]', e);
         mountedTenant = null;

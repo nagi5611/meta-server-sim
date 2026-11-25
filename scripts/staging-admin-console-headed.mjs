@@ -57,7 +57,13 @@ const ctxOpts = {
 };
 
 async function waitApp(page) {
-    await page.locator('#app').waitFor({ state: 'visible', timeout: 120_000 });
+    await page.waitForFunction(
+        () => {
+            const app = document.getElementById('app');
+            return app && !app.hidden && window.MT?.state?.authed;
+        },
+        { timeout: 120_000 }
+    );
     await page.locator('.side').waitFor({ state: 'visible', timeout: 60_000 });
 }
 
@@ -73,7 +79,7 @@ async function goTenantView(page, view) {
 async function shot(ctx, file, url, after) {
     const page = await ctx.newPage();
     await attachSimForwardHeaders(page);
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
+    await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
     await waitApp(page);
     if (after) await after(page);
     const out = path.join(OUT, file);
