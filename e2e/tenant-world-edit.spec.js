@@ -114,12 +114,24 @@ test.describe('tenant world edit', () => {
         await page.waitForFunction(
             () => {
                 let meshes = 0;
+                let lobbyMeshes = 0;
                 const scene = window.ME?.scene;
                 if (!scene) return false;
+                let lobbyGroup = null;
                 scene.traverse((c) => {
                     if (c.isMesh && c.name !== '__placeholder') meshes += 1;
                 });
-                return meshes >= 8;
+                scene.traverse((c) => {
+                    if (c.userData?.id && String(c.userData.id).includes('lobby') && c.userData?.gltf) {
+                        lobbyGroup = c;
+                    }
+                });
+                if (lobbyGroup) {
+                    lobbyGroup.traverse((c) => {
+                        if (c.isMesh && c.name !== '__placeholder') lobbyMeshes += 1;
+                    });
+                }
+                return meshes >= 8 && lobbyMeshes >= 12;
             },
             null,
             { timeout: 180_000 }

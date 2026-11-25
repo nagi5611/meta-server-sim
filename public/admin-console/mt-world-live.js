@@ -58,6 +58,24 @@
         return { x: a[0], y: a[1], z: a[2] };
     }
 
+    const DEG2RAD = Math.PI / 180;
+    const RAD2DEG = 180 / Math.PI;
+
+    /** worlds.json の回転（度）→ エディタ（ラジアン） */
+    function rotWorldToEditor(rot) {
+        return vec3ToArr(rot).map((v) => (Number(v) || 0) * DEG2RAD);
+    }
+
+    /** エディタ（ラジアン）→ worlds.json（度） */
+    function rotEditorToWorld(rot) {
+        const a = Array.isArray(rot) ? rot : [0, 0, 0];
+        return {
+            x: (Number(a[0]) || 0) * RAD2DEG,
+            y: (Number(a[1]) || 0) * RAD2DEG,
+            z: (Number(a[2]) || 0) * RAD2DEG,
+        };
+    }
+
     function modelBaseName(path) {
         const base = String(path || '').split('/').pop() || 'model';
         return base.replace(/\.[^.]+$/, '');
@@ -133,7 +151,7 @@
             const path = String(m.path || '');
             const name = modelBaseName(path) || `model-${idx + 1}`;
             const pos = vec3ToArr(m.position);
-            const rot = vec3ToArr(m.rotation);
+            const rot = rotWorldToEditor(m.rotation);
             const scale = scaleToArr(m.scale);
             let type = 'model';
             const props = {
@@ -201,7 +219,7 @@
                 type: 'board',
                 name: fb.id || `発着板 ${idx + 1}`,
                 pos: vec3ToArr(fb.position),
-                rot: vec3ToArr(fb.rotation),
+                rot: rotWorldToEditor(fb.rotation),
                 scale: scaleToArr(fb.scale),
                 visible: true,
                 props: { filter: fb.filter || 'all', rows: fb.rows || 7 },
@@ -218,7 +236,7 @@
                 type: 'pdf',
                 name: p.path ? modelBaseName(p.path) : `PDF ${idx + 1}`,
                 pos: vec3ToArr(p.position),
-                rot: vec3ToArr(p.rotation),
+                rot: rotWorldToEditor(p.rotation),
                 scale: scaleToArr(p.scale),
                 visible: true,
                 props: { file: p.path || '', pages: p.pages || 1, page: p.page || 1 },
@@ -235,7 +253,7 @@
                 type: 'smoke',
                 name: s.label || s.path || `煙 ${idx + 1}`,
                 pos: vec3ToArr(s.position),
-                rot: vec3ToArr(s.rotation),
+                rot: rotWorldToEditor(s.rotation),
                 scale: scaleToArr(s.scale),
                 visible: true,
                 props: { file: s.path || s.file || '', density: s.density ?? 0.6, playing: false },
@@ -252,7 +270,7 @@
                 type: 'cloud',
                 name: v.path ? modelBaseName(v.path) : `雲 ${idx + 1}`,
                 pos: vec3ToArr(v.position),
-                rot: vec3ToArr(v.rotation),
+                rot: rotWorldToEditor(v.rotation),
                 scale: scaleToArr(v.scale),
                 visible: true,
                 props: { file: v.path || '', density: v.density ?? 0.45, tint: '#ffffff', scale: 1 },
@@ -323,7 +341,7 @@
             if (o._raw && o._src === 'models') {
                 const m = JSON.parse(JSON.stringify(o._raw));
                 m.position = { x: o.pos[0], y: o.pos[1], z: o.pos[2] };
-                m.rotation = { x: o.rot[0], y: o.rot[1], z: o.rot[2] };
+                m.rotation = rotEditorToWorld(o.rot);
                 m.scale = scaleToWorld(o.scale);
                 if (o._modelIndex != null) m._idx = o._modelIndex;
                 models.push(m);
@@ -339,7 +357,7 @@
                 const entry = {
                     path,
                     position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
-                    rotation: { x: o.rot[0], y: o.rot[1], z: o.rot[2] },
+                    rotation: rotEditorToWorld(o.rot),
                     scale: scaleToWorld(o.scale),
                 };
                 if (o.options?.teleporter?.on) {
@@ -368,8 +386,34 @@
                     id: o.name,
                     filter: o.props?.filter || 'all',
                     position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
-                    rotation: { x: o.rot[0], y: o.rot[1], z: o.rot[2] },
+                    rotation: rotEditorToWorld(o.rot),
                     scale: scaleToWorld(o.scale),
+                });
+            }
+            if (o.type === 'pdf' && o._src === 'pdfs') {
+                pdfs.push({
+                    path: o.props?.file || o._raw?.path || '',
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                    rotation: rotEditorToWorld(o.rot),
+                    scale: scaleToWorld(o.scale),
+                });
+            }
+            if (o.type === 'smoke' && o._src === 'fdsSmoke') {
+                fdsSmoke.push({
+                    ...(o._raw || {}),
+                    path: o.props?.file || o._raw?.path || o._raw?.manifest || '',
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                    rotation: rotEditorToWorld(o.rot),
+                    scale: scaleToWorld(o.scale)[0] ?? scaleToWorld(o.scale),
+                });
+            }
+            if (o.type === 'cloud' && o._src === 'vdbs') {
+                vdbs.push({
+                    path: o.props?.file || o._raw?.path || '',
+                    position: { x: o.pos[0], y: o.pos[1], z: o.pos[2] },
+                    rotation: rotEditorToWorld(o.rot),
+                    scale: scaleToWorld(o.scale),
+                    density: o.props?.density ?? o._raw?.density,
                 });
             }
         });
@@ -405,6 +449,9 @@
         });
         if (!res.ok) {
             const text = await res.text().catch(() => '');
+            if (res.status === 409) {
+                throw new Error(`save_conflict: ${text.slice(0, 200)}`);
+            }
             throw new Error(`save failed ${res.status} ${text.slice(0, 200)}`);
         }
         ed._worldsRoot = worlds;
@@ -448,7 +495,7 @@
             snapOn: true,
             snap: 0.5,
             theme: 'light',
-            panels: { props: window.innerWidth >= 1100 },
+            panels: { props: false },
             sec: { tf: true, vis: true, own: true, meta: false, world: true, lod: true, env: true, limit: false },
             split: 46,
             collapsed: {},

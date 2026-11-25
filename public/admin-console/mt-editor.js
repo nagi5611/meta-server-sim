@@ -174,7 +174,7 @@
       group.scale.setScalar(p.scale || 1);
       g.add(group);
       g.userData.cloud = group;
-    } else if (o.type === "plane") {
+    } else if (o.type === "plane" && !(p.modelUrl && window.THREE.GLTFLoader)) {
       const body = addMesh(new T3.CylinderGeometry(0.16, 0.16, 1.5, 12), mat("#e9eef5"), 0.45);
       body.rotation.x = Math.PI / 2;
       const wing = addMesh(new T3.BoxGeometry(2.1, 0.05, 0.42), mat("#d3dce7"), 0.45);
@@ -470,7 +470,8 @@
     M.raycaster = new T3.Raycaster();
     M.clock = new T3.Clock();
 
-    setTheme(world.theme || "light");
+    if (world._live) setLiveEditorScene(world);
+    else setTheme(world.theme || "light");
     applySettings(world.settings || {});
     (world.objects || []).forEach((o) => addToScene(o));
     if (world._live) fitSettingEditorCamera();
@@ -543,6 +544,44 @@
     M.renderer.render(M.scene, M.camera);
   }
 
+  /** setting.js 相当のライブ編集プレビュー環境 */
+  function setLiveEditorScene(world) {
+    if (!M.scene) return;
+    const s = (world && world.settings) || M.worldSettings || {};
+    const skyHex = s.sky || "#87ceeb";
+    M.scene.background = new T3.Color(skyHex);
+    M.scene.fog = null;
+    if (M.env) {
+      M.scene.remove(M.env);
+      M.env = null;
+    }
+    const env = new T3.Group();
+    const ground = new T3.Mesh(
+      new T3.PlaneGeometry(1000, 1000),
+      new T3.MeshStandardMaterial({ color: 0x4a7c59, roughness: 0.8, metalness: 0.2 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    env.add(ground);
+    const grid = new T3.GridHelper(100, 100, 0x000000, 0x2a4a2a);
+    grid.position.y = 0.01;
+    env.add(grid);
+    const amb = new T3.AmbientLight(0xffffff, 0.65);
+    env.add(amb);
+    const dir = new T3.DirectionalLight(0xffffff, 1.25);
+    dir.position.set(30, 80, 20);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    env.add(dir);
+  /* fill light */
+    const fill = new T3.DirectionalLight(0xffffff, 0.35);
+    fill.position.set(-20, 40, -30);
+    env.add(fill);
+    M.scene.add(env);
+    M.env = env;
+    M.grid = grid;
+  }
+
   /* ---------- 環境 ---------- */
   function setTheme(theme) {
     if (!M.scene) return;
@@ -597,7 +636,10 @@
   let fitTimer = 0;
   function scheduleFitScene() {
     clearTimeout(fitTimer);
-    fitTimer = setTimeout(() => fitScene(), 150);
+    fitTimer = setTimeout(() => {
+      if (M.state?._live) fitSettingEditorCamera();
+      else fitScene();
+    }, 150);
   }
 
   /* ---------- 選択 ---------- */
@@ -964,7 +1006,7 @@
   }
 
   window.ME = {
-    TYPES, mount, unmount, setMode, setSnap, setView, focus, fitScene, fitSettingEditorCamera, rebuildScene, scheduleFitScene,
+    TYPES, mount, unmount, setMode, setSnap, setView, focus, fitScene, fitSettingEditorCamera, setLiveEditorScene, rebuildScene, scheduleFitScene,
     select, addObject, removeObject, updateObject, rebuild, setVisible, hover,
     setTheme, applySettings, on: EV.on, get selected() { return M.selected.slice(); },
     get state() { return M.state; }, get scene() { return M.scene; },
