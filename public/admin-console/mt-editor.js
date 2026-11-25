@@ -306,6 +306,11 @@
     );
     M.camera.lookAt(center);
     M.orbit.update();
+    if (M.scene.fog) {
+      const fogFar = Math.max(140, dist * 2.4, span * 8);
+      M.scene.fog.far = fogFar;
+      M.scene.fog.near = Math.min(M.scene.fog.near, Math.max(6, fogFar * 0.12));
+    }
   }
 
   function rebuildScene(objects) {
