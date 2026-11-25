@@ -18,6 +18,7 @@ export default defineConfig({
     use: {
         baseURL,
         ignoreHTTPSErrors: true,
+        serviceWorkers: 'block',
         extraHTTPHeaders: {
             'X-Forwarded-Proto': 'https',
             'X-Forwarded-Host': forwardHost,
