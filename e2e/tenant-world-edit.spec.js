@@ -37,6 +37,11 @@ async function gotoMtWorldEdit(page) {
     for (let attempt = 0; attempt < 3; attempt += 1) {
         if (attempt > 0) await page.waitForTimeout(12_000);
         await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
+        await page.waitForFunction(
+            () => window.THREE && window.THREE.WebGLRenderer && window.THREE.GLTFLoader,
+            null,
+            { timeout: 60_000 }
+        );
         try {
             await appReady();
             break;
