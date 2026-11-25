@@ -79,6 +79,13 @@ export function rewriteTenantWorldEditApiUrl(urlStr) {
 
     const pathOnly = raw.split('?')[0] || raw;
     if (PLATFORM_ADMIN_EXACT.has(pathOnly)) return raw;
+
+    const onConsoleWorldEdit = /^\/admin\/tenant\/[^/]+\/world-edit/.test(pathName);
+    const prodMounted =
+        typeof document !== 'undefined' ? document.getElementById('main')?.dataset?.prodWorldMounted : '1';
+    if (onConsoleWorldEdit && !prodMounted) {
+        return raw;
+    }
     if (
         pathOnly.startsWith('/admin/tenants/') &&
         !pathOnly.slice('/admin/tenants/'.length).includes('/')
