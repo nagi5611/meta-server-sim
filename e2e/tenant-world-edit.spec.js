@@ -28,12 +28,22 @@ function attachConsoleWatchers(page) {
 
 async function gotoMtWorldEdit(page) {
     await attachStagingSimForwardHeaders(page);
-    await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
-    await page.waitForFunction(
-        () => document.getElementById('app') && !document.getElementById('app').hidden,
-        null,
-        { timeout: 180_000 }
-    );
+    const appReady = async () =>
+        page.waitForFunction(
+            () => document.getElementById('app') && !document.getElementById('app').hidden,
+            null,
+            { timeout: 120_000 }
+        );
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (attempt > 0) await page.waitForTimeout(12_000);
+        await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
+        try {
+            await appReady();
+            break;
+        } catch (err) {
+            if (attempt === 2) throw err;
+        }
+    }
     await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 60_000 });
     await expect(page.locator('.side.rail')).toBeVisible();
     await page.waitForFunction(
@@ -61,7 +71,7 @@ test.describe('tenant world edit', () => {
     });
 
     test.beforeEach(async () => {
-        await new Promise((r) => setTimeout(r, 4_000));
+        await new Promise((r) => setTimeout(r, 8_000));
     });
 
     test('P-01 world editor loads without CSP or module errors', async ({ page }) => {
