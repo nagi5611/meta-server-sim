@@ -64,6 +64,9 @@
             window.MT.state.authed = true;
             if (typeof window.MT.render === 'function') window.MT.render();
         }
+        if (window.MT.state.view === 'platform-settings' && typeof window.MT.render === 'function') {
+            requestAnimationFrame(() => window.MT.render());
+        }
         if (typeof window.MT.toast === 'function' && window.MTD.flags?.trafficDisconnected) {
             /* 通信ログ未接続は views 側で表示 */
         }

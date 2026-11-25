@@ -79,11 +79,22 @@ const SCENES = [
                     window.MT.render();
                 });
                 await page.waitForSelector('.wed-root', { timeout: 90_000 });
-                await page.waitForTimeout(1200);
+                await page.evaluate(() => {
+                    const ed = window.MT?.state?.ed;
+                    if (ed) ed.panels.props = false;
+                    window.MT?.render?.();
+                });
+                await page.mouse.move(720, 450);
+                await page.waitForTimeout(600);
             } else {
                 await page.goto(`${STAGING}/admin/tenant/P-01/world-edit`, { waitUntil: 'load' });
                 await waitConsole(page);
                 await page.waitForSelector('.wed-root', { timeout: 120_000 });
+                await page.waitForFunction(
+                    () => window.MT?.state?.ed?._live && !window.MT.state.ed.loading,
+                    null,
+                    { timeout: 180_000 }
+                );
                 await page.waitForFunction(
                     () => {
                         const c = document.querySelector('.wed-root [data-canvas] canvas');
@@ -92,6 +103,19 @@ const SCENES = [
                     null,
                     { timeout: 120_000 }
                 );
+                await page.evaluate(() => {
+                    const ed = window.MT?.state?.ed;
+                    if (ed) ed.panels.props = false;
+                    window.MT?.render?.();
+                });
+                await page.waitForTimeout(600);
+                const rail = await page.locator('.side.rail').boundingBox();
+                if (rail && rail.width > 56) {
+                    await page.evaluate(() => {
+                        document.body.classList.add('in-editor');
+                    });
+                }
+                await page.mouse.move(720, 450);
             }
         },
     },
