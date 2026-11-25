@@ -448,7 +448,7 @@
             snapOn: true,
             snap: 0.5,
             theme: 'light',
-            panels: { props: true },
+            panels: { props: window.innerWidth >= 1100 },
             sec: { tf: true, vis: true, own: true, meta: false, world: true, lod: true, env: true, limit: false },
             split: 46,
             collapsed: {},
@@ -506,7 +506,8 @@
             window.MTA?.bindDropzones?.();
             window.MTA?.bindSplitter?.();
             window.MTA?.bindOutlinerWheel?.();
-            if (window.ME?.fitScene) window.ME.fitScene();
+            if (window.ME?.fitSettingEditorCamera) window.ME.fitSettingEditorCamera();
+            else if (window.ME?.fitScene) window.ME.fitScene();
         });
     }
 
@@ -541,7 +542,8 @@
             protoMount(st);
             dismissCanvasLoading();
             requestAnimationFrame(() => {
-                if (window.ME?.fitScene) window.ME.fitScene();
+                if (window.ME?.fitSettingEditorCamera) window.ME.fitSettingEditorCamera();
+                else if (window.ME?.fitScene) window.ME.fitScene();
             });
         };
 

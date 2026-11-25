@@ -35,5 +35,9 @@ export default defineConfig({
             name: 'staging-admin',
             testMatch: /tenant-world-edit\.spec\.js|admin-panel-layout\.spec\.js/,
         },
+        {
+            name: 'staging-admin-draft-mutation',
+            testMatch: /tenant-world-edit-draft-mutation\.spec\.js/,
+        },
     ],
 });

@@ -203,10 +203,19 @@
     }
     const cam = window.ME.isMounted ? window.ME.getCamera() : null;
     const ok = window.ME.mount(host, {
-      theme: ed.theme, objects: ed.objects, settings: ed.settings,
-      snapOn: ed.snapOn, snap: ed.snap, selected: ed.selected, mode: ed.mode
+      theme: ed.theme,
+      objects: ed.objects,
+      settings: ed.settings,
+      snapOn: ed.snapOn,
+      snap: ed.snap,
+      selected: ed.selected,
+      mode: ed.mode,
+      _live: !!ed._live,
     });
-    if (ok && cam) window.ME.setCamera(cam);
+    if (ok) {
+      if (ed._live && window.ME.fitSettingEditorCamera) window.ME.fitSettingEditorCamera();
+      else if (cam) window.ME.setCamera(cam);
+    }
     window.MTA._mounted = sig;
     const loading = host.querySelector("[data-loading]");
     if (loading) setTimeout(() => loading.classList.remove("on"), 380);

@@ -89,8 +89,8 @@ test.describe('tenant world edit', () => {
 
         await gotoMtWorldEdit(page);
 
-        await page.mouse.move(820, 420);
-        await page.waitForTimeout(250);
+        await page.mouse.move(640, 480);
+        await page.waitForTimeout(150);
         const railBox = await page.locator('.side.rail').boundingBox();
         expect(railBox?.width ?? 999, 'collapsed rail width').toBeLessThan(56);
 
@@ -206,48 +206,4 @@ test.describe('tenant world edit', () => {
         expect(spawnInState).toBeCloseTo(spawnX, 4);
     });
 
-    test('P-01 mt-editor draft save succeeds (worlds POST)', async ({ page, request }) => {
-        attachConsoleWatchers(page);
-
-        const worldsRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
-        const worldsBefore = await worldsRes.json();
-        const lobby = worldsBefore.lobby;
-        const prevName = lobby.name || 'Lobby';
-
-        await gotoMtWorldEdit(page);
-
-        const tag = `pw-draft-${Date.now()}`;
-        await page.evaluate((descTag) => {
-            const ed = window.MT.state.ed;
-            ed.worldName = `Lobby ${descTag}`;
-            ed.dirty = true;
-            window.MT.render();
-        }, tag);
-
-        const worldsPost = page.waitForResponse(
-            (r) =>
-                r.url().includes('/admin/tenants/P-01/worlds') &&
-                r.request().method() === 'POST' &&
-                r.status() < 500,
-            { timeout: 120_000 }
-        );
-        await page.locator('.wed-root [data-ed-act="draft"]').click();
-        const postRes = await worldsPost;
-        expect(postRes.ok(), `worlds POST status ${postRes.status()}`).toBeTruthy();
-
-        const worldsAfterRes = await adminApiGet(request, `/admin/tenants/P-01/worlds?_=${Date.now()}`);
-        const worldsAfter = await worldsAfterRes.json();
-        expect(worldsAfter.lobby?.name).toContain(tag);
-
-        const csrfRes = await request.get('/admin/csrf-token', { headers: adminBasicAuthHeaders() });
-        const { token: csrfToken } = await csrfRes.json();
-        await request.post('/admin/tenants/P-01/worlds', {
-            headers: {
-                ...adminBasicAuthHeaders(),
-                'Content-Type': 'application/json',
-                'X-Admin-CSRF': csrfToken,
-            },
-            data: { ...worldsAfter, lobby: { ...worldsAfter.lobby, name: prevName } },
-        });
-    });
 });
