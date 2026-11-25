@@ -1,0 +1,64 @@
+/* ScienceHUB / 3Dプリンター使い方ガイド — foundations
+   Source of truth: source/css/style.css (values lifted verbatim) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+:root{
+  /* ── brand ── */
+  --color-primary:#f38020;
+  --color-primary-dark:#d96a0c;
+  --color-primary-soft:rgba(243,128,32,.1);
+  --color-primary-line:rgba(243,128,32,.35);
+
+  /* ── neutrals (cool gray) ── */
+  --color-bg:#f5f6f8;
+  --color-surface:#fff;
+  --color-surface-muted:#f8f9fb;
+  --color-border:#e2e5ea;
+  --color-border-strong:#c9ced6;
+  --color-track:#eceef2;
+  --color-heading:#101624;   /* fg0 */
+  --color-text:#1d2433;      /* fg1 */
+  --color-text-muted:#5e6778;/* fg2 */
+  --color-text-faint:#8a92a1;/* fg3 */
+
+  /* ── semantic ── */
+  --color-warn-bg:#fff7ed; --color-warn-line:#fbc998; --color-warn-ink:#9a4a07; --color-warn-text:#5c3106;
+  --color-tip-bg:#eff5ff;  --color-tip-line:#bcd3fb;  --color-tip-ink:#1f4fae;  --color-tip-text:#1b3566; --color-tip:#3b74e0;
+  --color-success:#1f9d55;
+
+  /* ── radii / shadow ── */
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-sec:10px; --radius-lg:12px; --radius-pill:999px;
+  --shadow-sm:0 1px 2px rgba(16,22,36,.05),0 1px 3px rgba(16,22,36,.04);
+  --shadow-seg:0 1px 2px rgba(16,22,36,.12);
+  --shadow-md:0 6px 20px rgba(16,22,36,.08);
+
+  /* ── spacing (observed scale, px) ── */
+  --sp-1:4px; --sp-2:8px; --sp-3:10px; --sp-4:12px; --sp-5:14px; --sp-6:16px; --sp-7:20px; --sp-8:24px; --sp-9:28px; --sp-10:32px; --sp-11:36px; --sp-12:72px;
+  --container:1200px; --toc-w:232px; --head-h:61px;
+
+  /* ── motion ── */
+  --ease-out:cubic-bezier(.2,.8,.2,1);
+  --dur-fast:.15s; --dur-toast:.25s; --dur-arrive:.55s;
+
+  /* ── type ── */
+  --font:'Inter','Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
+  --font-num:'Inter',sans-serif;
+
+  --fs-display:clamp(28px,4vw,40px); /* page heading */
+  --fs-h2:22px;  --fs-h3:17px; --fs-title:17px;
+  --fs-body:15px; --fs-body-sm:14.5px; --fs-note:13.5px; --fs-ui:13px; --fs-caption:12px; --fs-micro:11px;
+  --lh-body:1.75; --lh-tight:1.25; --lh-h:1.35; --lh-h3:1.5;
+}
+
+/* semantic element styles */
+.ds-body,body.ds{font-family:var(--font);font-size:var(--fs-body);line-height:var(--lh-body);color:var(--color-text);background:var(--color-bg);-webkit-font-smoothing:antialiased}
+.ds-h1{font-family:var(--font);font-size:var(--fs-display);line-height:var(--lh-tight);font-weight:700;letter-spacing:-.01em;color:var(--color-heading);margin:0}
+.ds-h2{font-family:var(--font);font-size:var(--fs-h2);line-height:var(--lh-h);font-weight:700;color:var(--color-heading);margin:0}
+.ds-h3{font-family:var(--font);font-size:var(--fs-h3);line-height:var(--lh-h3);font-weight:700;color:var(--color-heading);margin:0}
+.ds-p{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--color-text);margin:0;text-wrap:pretty}
+.ds-lead{font-size:var(--fs-body);line-height:var(--lh-body);color:var(--color-text-muted);margin:0;max-width:44em}
+.ds-caption{font-size:var(--fs-caption);color:var(--color-text-muted)}
+.ds-label{font-size:var(--fs-micro);font-weight:700;letter-spacing:.08em;color:var(--color-text-faint)}
+.ds-num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.ds-kbd{font-family:var(--font);font-size:11px;font-weight:600;border:1px solid var(--color-border-strong);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--color-surface)}
+.ds-todo{color:var(--color-warn-ink);background:var(--color-warn-bg);border-radius:4px;padding:0 5px;font-weight:500;font-size:13px}
