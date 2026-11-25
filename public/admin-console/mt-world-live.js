@@ -18,8 +18,12 @@
                 installTenantR2FetchShim();
                 installTenantR2UploadShim();
                 installTenantWorldEditXhrShim();
-                const { installTenantWorldEditVdbShim } = await import('/js/tenant-world-edit-vdb-shim.js');
-                await installTenantWorldEditVdbShim(tenantId);
+                try {
+                    const { installTenantWorldEditVdbShim } = await import('/js/tenant-world-edit-vdb-shim.js');
+                    await installTenantWorldEditVdbShim(tenantId);
+                } catch (vdbErr) {
+                    console.warn('[mt-world-live] VDB shim skipped (mt-editor mode)', vdbErr);
+                }
                 const svc = { tenantId, ready: true };
                 window.__MT_SETTING_LIVE__ = svc;
                 return svc;
@@ -601,12 +605,17 @@
                 .then(() => {
                     window.MTA.paintStatus?.();
                 })
-                .catch((err) => {
-                    console.error('[mt-world-live] save failed', err);
-                    if (st.ed) st.ed.dirty = true;
-                    window.MTA.paintStatus?.();
-                    window.MT?.toast?.('保存に失敗しました');
-                });
+                    .catch((err) => {
+                        console.error('[mt-world-live] save failed', err);
+                        if (st.ed) st.ed.dirty = true;
+                        window.MTA.paintStatus?.();
+                        const msg = String(err?.message || '');
+                        if (msg.startsWith('save_conflict:')) {
+                            window.MT?.toast?.('他の管理者が先に保存しました。ページを再読み込みしてください。');
+                        } else {
+                            window.MT?.toast?.('保存に失敗しました');
+                        }
+                    });
         };
 
         document.addEventListener(
@@ -632,12 +641,17 @@
                         });
                         window.MT?.toast?.(publish ? '公開しました' : '下書きを保存しました');
                     })
-                    .catch((err) => {
-                        console.error('[mt-world-live] save click failed', err);
-                        if (st.ed) st.ed.dirty = true;
-                        window.MTA.paintStatus?.();
+                .catch((err) => {
+                    console.error('[mt-world-live] save click failed', err);
+                    if (st.ed) st.ed.dirty = true;
+                    window.MTA.paintStatus?.();
+                    const msg = String(err?.message || '');
+                    if (msg.startsWith('save_conflict:')) {
+                        window.MT?.toast?.('他の管理者が先に保存しました。ページを再読み込みしてください。');
+                    } else {
                         window.MT?.toast?.('保存に失敗しました');
-                    });
+                    }
+                });
             },
             true
         );
