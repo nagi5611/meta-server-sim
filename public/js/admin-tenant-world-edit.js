@@ -2,9 +2,11 @@
 import '../css/mt-console/colors_and_type.css';
 import '../css/mt-console/mt.css';
 import '../css/mt-console/mt-editor.css';
+import '../css/mt-console/world-edit-console-bridge.css';
 import '../css/mt-console/admin-console-compat.css';
 import { bootstrapAdminApi } from './admin-api-fetch-init.js';
 import { initMtConsoleShell } from './mt-console-shell.js';
+import { mountWorldEditConsoleLayout } from './mt-console-world-edit.js';
 import { initTenantSettingEditor } from './tenant-setting-editor.js';
 import { initTenantWorldEditShell } from './tenant-world-edit-shell.js';
 import { installTenantWorldEditXhrShim } from './tenant-world-edit-xhr.js';
@@ -42,8 +44,9 @@ if (!tenantId) {
         page: 'world-edit',
         tenantId,
         tenantLabel: tenantId,
-        username: document.getElementById('header-username')?.textContent || 'admin',
+        username: 'admin',
     });
+    mountWorldEditConsoleLayout({ tenantId, tenantLabel: tenantId });
 
     bootstrapAdminApi()
         .then(() => {
