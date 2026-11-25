@@ -50,6 +50,7 @@ async function attachSimForwardHeaders(page) {
 const ctxOpts = {
     httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     ignoreHTTPSErrors: true,
+    serviceWorkers: 'block',
     extraHTTPHeaders: {
         'X-Forwarded-Proto': 'https',
         'X-Forwarded-Host': FORWARD_HOST,

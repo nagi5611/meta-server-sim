@@ -14,6 +14,7 @@ const browser = await chromium.launch({ headless: true });
 const ctx = await browser.newContext({
     httpCredentials: { username: user, password: pass },
     ignoreHTTPSErrors: true,
+    serviceWorkers: 'block',
     extraHTTPHeaders: {
         'X-Forwarded-Proto': 'https',
         'X-Forwarded-Host': FORWARD_HOST,
@@ -34,13 +35,22 @@ await page.route('**/*', async (route) => {
 await page.goto(`${BASE}/admin/tenant/P-01/world-edit`, { waitUntil: 'load', timeout: 120_000 });
 await page.waitForTimeout(15_000);
 
+const rewriteCheck = await page.evaluate(async () => {
+    const mod = await import(`/js/tenant-world-edit-api-paths.js?bust=${Date.now()}`);
+    return {
+        tenants: mod.rewriteTenantWorldEditApiUrl('/admin/tenants'),
+        stats: mod.rewriteTenantWorldEditApiUrl('/admin/stats'),
+        hasPlatform: String(mod.rewriteTenantWorldEditApiUrl).includes('PLATFORM_ADMIN_EXACT'),
+    };
+});
+
 const probe = await page.evaluate(async () => {
     const urls = ['/admin/tenants', '/admin/stats', '/js/mt-design-world-edit-host.js'];
     const out = {};
     for (const u of urls) {
         try {
             const r = await fetch(u, { credentials: 'include' });
-            out[u] = r.status;
+            out[u] = { status: r.status, url: r.url };
         } catch (e) {
             out[u] = String(e);
         }
@@ -65,5 +75,5 @@ const snap = await page.evaluate(() => ({
     mainHtmlLen: document.getElementById('main')?.innerHTML?.length,
 }));
 
-console.log(JSON.stringify({ probe, snap, consoleTail: lines.slice(-40) }, null, 2));
+console.log(JSON.stringify({ rewriteCheck, probe, snap, consoleTail: lines.slice(-40) }, null, 2));
 await browser.close();
