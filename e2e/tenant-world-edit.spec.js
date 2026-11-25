@@ -110,7 +110,7 @@ test.describe('tenant world edit', () => {
             { timeout: 180_000 }
         );
 
-        const fill = await page.waitForFunction(
+        const fillHandle = await page.waitForFunction(
             () => {
                 if (window.ME?.fitScene) window.ME.fitScene();
                 const me = window.ME;
@@ -142,7 +142,7 @@ test.describe('tenant world edit', () => {
             null,
             { timeout: 180_000 }
         );
-        const fill = await fill.jsonValue();
+        const fill = await fillHandle.jsonValue();
         expect(fill.ratio, `canvas non-bg pixel ratio ${JSON.stringify(fill)}`).toBeGreaterThan(0.08);
 
         const diag = await page.evaluate(() => ({
