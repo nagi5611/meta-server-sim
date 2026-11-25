@@ -20,6 +20,37 @@ if (!ADMIN_PASS) {
 
 fs.mkdirSync(OUT, { recursive: true });
 
+/** @param {string} baseUrl */
+function simOrigin(baseUrl) {
+    try {
+        return new URL(baseUrl).origin;
+    } catch {
+        return baseUrl;
+    }
+}
+
+const SIM_ORIGIN = simOrigin(BASE);
+
+/**
+ * CDN モジュールへ X-Forwarded-Host を載せると CORS で失敗するため、シム API 向けだけ付与する。
+ * @param {import('playwright').Page} page
+ */
+async function attachSimForwardHeaders(page) {
+    await page.route('**/*', async (route) => {
+        const req = route.request();
+        if (!req.url().startsWith(SIM_ORIGIN)) {
+            await route.continue();
+            return;
+        }
+        const headers = {
+            ...req.headers(),
+            'x-forwarded-proto': 'https',
+            'x-forwarded-host': FORWARD_HOST,
+        };
+        await route.continue({ headers });
+    });
+}
+
 const ctxOpts = {
     httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     ignoreHTTPSErrors: true,
@@ -76,15 +107,18 @@ await shot(mobile, `staging-admin-tenant-addons-mobile-${TENANT}.png`, `${BASE}/
     await page.locator('.side .nav[data-tenant-panel="plugins"]').click();
     await page.locator('.ad-tools, .mt-disconnected').first().waitFor({ timeout: 30_000 });
 });
-await shot(
-    desktop,
-    `staging-admin-world-edit-${TENANT}.png`,
-    `${BASE}/admin/tenant/${TENANT}/world-edit`,
-    async (page) => {
-        await page.locator('.wed-root, .setting-layout').first().waitFor({ timeout: 60_000 });
-        await page.locator('.admin-sidebar').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
-    }
-);
+{
+    const page = await desktop.newPage();
+    await attachSimForwardHeaders(page);
+    await page.goto(`${BASE}/admin/tenant/${TENANT}/world-edit`, { waitUntil: 'networkidle', timeout: 120_000 });
+    await page.locator('body.mt-console').waitFor({ state: 'attached', timeout: 90_000 });
+    await page.locator('.wed-root').waitFor({ timeout: 60_000 });
+    await page.locator('.admin-sidebar').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+    const out = path.join(OUT, `staging-admin-world-edit-${TENANT}.png`);
+    await page.screenshot({ path: out, fullPage: true });
+    console.log('saved', out);
+    await page.close();
+}
 await shot(
     desktop,
     `staging-admin-tenant-topbar-${TENANT}.png`,

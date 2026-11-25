@@ -14,6 +14,34 @@ const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.SIM_ADMIN_PASSWORD 
 if (!ADMIN_PASS) process.exit(2);
 fs.mkdirSync(OUT, { recursive: true });
 
+/** @param {string} baseUrl */
+function simOrigin(baseUrl) {
+    try {
+        return new URL(baseUrl).origin;
+    } catch {
+        return baseUrl;
+    }
+}
+
+const SIM_ORIGIN = simOrigin(BASE);
+
+/** @param {import('playwright').Page} page */
+async function attachSimForwardHeaders(page) {
+    await page.route('**/*', async (route) => {
+        const req = route.request();
+        if (!req.url().startsWith(SIM_ORIGIN)) {
+            await route.continue();
+            return;
+        }
+        const headers = {
+            ...req.headers(),
+            'x-forwarded-proto': 'https',
+            'x-forwarded-host': FORWARD_HOST,
+        };
+        await route.continue({ headers });
+    });
+}
+
 const ctxBase = {
     httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     ignoreHTTPSErrors: true,
@@ -47,9 +75,16 @@ await shot(mobile, 'prod-admin-tenant-addons-mobile.png', `${BASE}/admin/tenant/
 await shot(desktop, 'prod-admin-settings-desktop.png', `${BASE}/admin.html#settings/env`, async (p) => {
     await p.locator('#env-config-save-btn').waitFor({ timeout: 30_000 });
 });
-await shot(desktop, 'prod-admin-world-edit-desktop.png', `${BASE}/admin/tenant/${TENANT}/world-edit`, async (p) => {
-    await p.locator('.wed-root, .setting-layout').first().waitFor({ timeout: 60_000 });
-});
+{
+    const page = await desktop.newPage();
+    await attachSimForwardHeaders(page);
+    await page.goto(`${BASE}/admin/tenant/${TENANT}/world-edit`, { waitUntil: 'networkidle', timeout: 120_000 });
+    await page.locator('body.mt-console').waitFor({ timeout: 90_000 });
+    await page.locator('.wed-root').waitFor({ timeout: 60_000 });
+    await page.screenshot({ path: path.join(OUT, 'prod-admin-world-edit-desktop.png'), fullPage: true });
+    console.log('saved prod-admin-world-edit-desktop.png');
+    await page.close();
+}
 await shot(desktop, 'prod-admin-tenant-topbar-desktop.png', `${BASE}/admin/tenant/${TENANT}`, async (p) => {
     await p.locator('.topbar-actions').waitFor({ timeout: 30_000 });
 });
