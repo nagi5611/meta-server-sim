@@ -110,6 +110,33 @@ test.describe('tenant world edit', () => {
             { timeout: 180_000 }
         );
 
+        const fill = await page.evaluate(() => {
+            const canvas = document.querySelector('.wed-root [data-canvas] canvas');
+            if (!canvas) return { ratio: 0 };
+            const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+            if (!gl) return { ratio: 0 };
+            const w = canvas.width;
+            const h = canvas.height;
+            const step = Math.max(4, Math.floor(Math.min(w, h) / 64));
+            const buf = new Uint8Array(4);
+            let varied = 0;
+            let total = 0;
+            const samples = [];
+            for (let y = 0; y < h; y += step) {
+                for (let x = 0; x < w; x += step) {
+                    gl.readPixels(x, h - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+                    const key = `${buf[0]},${buf[1]},${buf[2]}`;
+                    samples.push(key);
+                    total += 1;
+                }
+            }
+            const bg = samples[0];
+            varied = samples.filter((s) => s !== bg).length;
+            if (window.ME?.fitScene) window.ME.fitScene();
+            return { ratio: total ? varied / total : 0, total, varied };
+        });
+        expect(fill.ratio, `canvas non-bg pixel ratio ${JSON.stringify(fill)}`).toBeGreaterThan(0.08);
+
         const diag = await page.evaluate(() => ({
             tenant: window.MT?.state?.tenant,
             worldId: window.MT?.state?.worldId,

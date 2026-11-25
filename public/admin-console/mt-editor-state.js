@@ -196,9 +196,9 @@
     if (!host) { window.MTA._mounted = null; return; }
     const ed = st.ed;
     const sig = st.tenant + "/" + ed.worldId;
-    if (window.ME.isMounted && host.querySelector("canvas")) {
+    if (window.ME.isMounted && host.querySelector("canvas") && window.MTA._mounted === sig) {
+      window.ME.rebuildScene(ed.objects);
       window.ME.select(ed.selected.slice(), false, true);
-      window.MTA._mounted = sig;
       return;
     }
     const cam = window.ME.isMounted ? window.ME.getCamera() : null;

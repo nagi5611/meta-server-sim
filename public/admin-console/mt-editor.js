@@ -234,7 +234,7 @@
         g.add(root);
         g.userData.gltf = root;
         EV.emit("gltf-loaded", o.id);
-        fitScene();
+        scheduleFitScene();
       },
       undefined,
       (err) => {
@@ -258,13 +258,40 @@
       return;
     }
     const center = box.getCenter(new T3.Vector3());
-    const size = box.getSize(new T3.Vector3()).length();
-    const dist = Math.max(4, size * 1.35);
-    const dir = M.camera.position.clone().sub(M.orbit.target).normalize();
-    if (dir.lengthSq() < 0.01) dir.set(0.4, 0.5, 0.7).normalize();
+    const size = box.getSize(new T3.Vector3());
+    const span = Math.max(size.x, size.y, size.z, 2);
+    const dist = Math.min(180, Math.max(8, span * 1.85));
     M.orbit.target.copy(center);
-    M.camera.position.copy(center.clone().add(dir.multiplyScalar(dist)));
+    const elev = Math.PI / 5;
+    const az = Math.PI / 4;
+    M.camera.position.set(
+      center.x + Math.cos(az) * dist,
+      center.y + Math.sin(elev) * dist,
+      center.z + Math.sin(az) * dist
+    );
+    M.camera.lookAt(center);
     M.orbit.update();
+  }
+
+  function rebuildScene(objects) {
+    if (!M.scene) return;
+    Array.from(M.objs.keys()).forEach((id) => {
+      const g = M.objs.get(id);
+      if (g) {
+        M.scene.remove(g);
+        disposeTree(g);
+      }
+      M.objs.delete(id);
+      const h = M.helpers.get(id);
+      if (h) {
+        M.scene.remove(h);
+        M.helpers.delete(id);
+      }
+    });
+    M.frames.length = 0;
+    (objects || []).forEach((o) => addToScene(o));
+    M.state.objects = objects || [];
+    scheduleFitScene();
   }
 
   /* ================= オプション（テレポーター / 太鼓） ================= */
@@ -375,7 +402,7 @@
     M.orbit.dampingFactor = 0.08;
     M.orbit.maxPolarAngle = Math.PI * 0.495;
     M.orbit.minDistance = 2.2;
-    M.orbit.maxDistance = 46;
+    M.orbit.maxDistance = 220;
     M.orbit.target.set(0, 0.6, 0);
     fitHome();
 
@@ -395,6 +422,7 @@
     setTheme(world.theme || "light");
     applySettings(world.settings || {});
     (world.objects || []).forEach((o) => addToScene(o));
+    scheduleFitScene();
     setMode("translate");
     setSnap(world.snapOn !== false, world.snap || 0.5);
     if (world.selected && world.selected.length) select(world.selected);
@@ -505,8 +533,19 @@
   }
 
   function applySettings(s) {
-    // 設定は環境音・霧などに将来紐づける（現状は保持のみ）
     M.worldSettings = s;
+    if (!M.scene) return;
+    if (s.sky) {
+      const col = new T3.Color(s.sky);
+      M.scene.background = col;
+      if (M.scene.fog) M.scene.fog.color.copy(col);
+    }
+  }
+
+  let fitTimer = 0;
+  function scheduleFitScene() {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => fitScene(), 150);
   }
 
   /* ---------- 選択 ---------- */
@@ -873,7 +912,7 @@
   }
 
   window.ME = {
-    TYPES, mount, unmount, setMode, setSnap, setView, focus, fitScene,
+    TYPES, mount, unmount, setMode, setSnap, setView, focus, fitScene, rebuildScene, scheduleFitScene,
     select, addObject, removeObject, updateObject, rebuild, setVisible, hover,
     setTheme, applySettings, on: EV.on, get selected() { return M.selected.slice(); },
     get state() { return M.state; }, get scene() { return M.scene; },

@@ -463,6 +463,7 @@
         ed.files = listFilesFromWorlds(worldsRoot);
         ed.loading = null;
         ed.dirty = false;
+        void window.MTSettingLive?.ensureSettingModules?.(st.tenant);
         window.MT?.render?.();
         requestAnimationFrame(() => {
             if (!window.ME?.isMounted) window.MTA?.mountScene?.(st);
@@ -477,11 +478,40 @@
         });
     }
 
+    function dismissCanvasLoading() {
+        document.querySelectorAll('[data-loading]').forEach((el) => {
+            el.classList.remove('on');
+            el.setAttribute('hidden', '');
+        });
+        const bar = document.querySelector('[data-loadbar]');
+        if (bar) bar.remove();
+    }
+
     function install() {
         if (!window.MTA || !window.MTD) return;
         const protoInit = window.MTA.initEd;
         window.MTA.initEd = initEdLive;
         window.MTA._protoInitEd = protoInit;
+
+        const protoMount = window.MTA.mountScene;
+        window.MTA.mountScene = function mountSceneLive(st) {
+            const ed = st?.ed;
+            if (ed?._live && (!ed._worldsRoot || ed.loading)) {
+                return;
+            }
+            if (ed?._live && window.ME?.isMounted) {
+                const sig = `${st.tenant}/${ed.worldId}`;
+                if (window.MTA._mounted !== sig) {
+                    window.ME.unmount();
+                    window.MTA._mounted = null;
+                }
+            }
+            protoMount(st);
+            dismissCanvasLoading();
+            requestAnimationFrame(() => {
+                if (window.ME?.fitScene) window.ME.fitScene();
+            });
+        };
 
         const protoSave = window.MTA.saveDraft;
         window.MTA.saveDraft = function saveDraftLive(st, publish) {
