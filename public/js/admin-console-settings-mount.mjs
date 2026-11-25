@@ -9,8 +9,6 @@ let envView = null;
 /** @type {unknown} */
 let networkView = null;
 
-await bootstrapAdminApi();
-
 function esc(s) {
     return String(s ?? '')
         .replace(/&/g, '&amp;')
@@ -25,6 +23,7 @@ function esc(s) {
 export async function renderPlatformSettingsTab(body, tab) {
     body.innerHTML = '<p class="hint">読込中…</p>';
     try {
+        await bootstrapAdminApi();
         if (tab === 'env') {
             const res = await adminFetch('/admin/env-config');
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
