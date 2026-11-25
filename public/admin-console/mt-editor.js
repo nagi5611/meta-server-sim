@@ -268,6 +268,10 @@
 
   function fitScene() {
     if (!M.camera || !M.orbit || !M.scene) return;
+    const spawnRow = (M.state?.objects || []).find((o) => o.type === "spawn");
+    const anchor = spawnRow
+      ? new T3.Vector3(spawnRow.pos?.[0] || 0, spawnRow.pos?.[1] || 0, spawnRow.pos?.[2] || 0)
+      : new T3.Vector3(0, 1, 0);
     const box = new T3.Box3();
     let any = false;
     M.objs.forEach((obj) => {
@@ -278,6 +282,8 @@
       const size = b.getSize(new T3.Vector3());
       const span = Math.max(size.x, size.y, size.z);
       if (!Number.isFinite(span) || span > FIT_MAX_OBJECT_SPAN) return;
+      const center = b.getCenter(new T3.Vector3());
+      if (center.distanceTo(anchor) > 95) return;
       box.union(b);
       any = true;
     });
@@ -295,7 +301,7 @@
     const center = box.getCenter(new T3.Vector3());
     const size = box.getSize(new T3.Vector3());
     const span = Math.max(size.x, size.y, size.z, 2);
-    const dist = Math.min(M.orbit.maxDistance || 220, Math.max(8, span * 1.85));
+    const dist = Math.min(M.orbit.maxDistance || 220, Math.max(10, span * 1.35));
     M.orbit.target.copy(center);
     const elev = Math.PI / 5;
     const az = Math.PI / 4;
