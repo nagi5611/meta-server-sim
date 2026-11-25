@@ -38,4 +38,9 @@ describe('rewriteTenantWorldEditApiUrl', () => {
         setLocation('/admin/tenant/P-01');
         assert.equal(rewriteTenantWorldEditApiUrl('/admin/worlds'), '/admin/worlds');
     });
+
+    it('does not rewrite platform tenant list on world-edit', () => {
+        assert.equal(rewriteTenantWorldEditApiUrl('/admin/tenants'), '/admin/tenants');
+        assert.equal(rewriteTenantWorldEditApiUrl('/admin/stats'), '/admin/stats');
+    });
 });

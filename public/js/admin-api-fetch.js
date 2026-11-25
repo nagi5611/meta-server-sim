@@ -1,6 +1,29 @@
 // public/js/admin-api-fetch.js — 管理 API 向け fetch（metaverse-simple 同等）
 import { rewriteTenantWorldEditApiUrl } from './tenant-world-edit-api-paths.js';
 
+const PLATFORM_FETCH_NO_REWRITE = new Set([
+    '/admin/tenants',
+    '/admin/stats',
+    '/admin/users',
+    '/admin/env-config',
+    '/admin/network-config',
+    '/admin/r2-storage-status',
+    '/admin/planned-restart',
+    '/admin/csrf-token',
+    '/admin/reload-settings',
+    '/admin/restart',
+]);
+
+/**
+ * CONSOLE の loadLive 用プラットフォーム URL を tenant パスへ誤変換しない
+ * @param {string} urlStr
+ */
+function maybeRewriteAdminFetchUrl(urlStr) {
+    const pathOnly = adminFetchPath(urlStr).split('?')[0];
+    if (PLATFORM_FETCH_NO_REWRITE.has(pathOnly)) return urlStr;
+    return rewriteTenantWorldEditApiUrl(urlStr);
+}
+
 export const ADMIN_CSRF_HEADER = 'X-Admin-CSRF';
 
 /** @type {string|null} */
@@ -135,7 +158,7 @@ async function performAdminFetch(urlStr, init, headers) {
 }
 
 export async function adminFetch(url, init = {}) {
-    const urlStr = rewriteTenantWorldEditApiUrl(toUrlString(url));
+    const urlStr = maybeRewriteAdminFetchUrl(toUrlString(url));
     const method = String(init.method || 'GET').toUpperCase();
     const headers = new Headers(init.headers || {});
 
@@ -179,7 +202,7 @@ export function installAdminFetchPatch() {
     nativeFetch = window.fetch.bind(window);
     window.fetch = (input, init) => {
         const originalUrl = toUrlString(input);
-        const urlStr = rewriteTenantWorldEditApiUrl(originalUrl);
+        const urlStr = maybeRewriteAdminFetchUrl(originalUrl);
         if (needsAdminFetch(urlStr)) {
             return adminFetch(urlStr, init);
         }

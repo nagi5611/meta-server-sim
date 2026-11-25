@@ -1,6 +1,20 @@
 // public/js/tenant-world-edit-api-paths.js — ワールド編集ページの API URL を Tenant 管理向けに書き換え
 
 /** @type {Set<string>} /admin/tenants/ 直後に来ると tenant ID ではなくリソース名 */
+/** プラットフォーム管理 API（tenant プレフィックスを付けない） */
+const PLATFORM_ADMIN_EXACT = new Set([
+    '/admin/tenants',
+    '/admin/stats',
+    '/admin/users',
+    '/admin/env-config',
+    '/admin/network-config',
+    '/admin/r2-storage-status',
+    '/admin/planned-restart',
+    '/admin/csrf-token',
+    '/admin/reload-settings',
+    '/admin/restart',
+]);
+
 const TENANT_ADMIN_RESOURCE_SEGMENTS = new Set([
     'worlds',
     'models',
@@ -62,6 +76,22 @@ export function rewriteTenantWorldEditApiUrl(urlStr) {
     if (!adminMatch?.[1]) return raw;
     // ワールド編集以外（Tenant 概要など）では書き換えしない
     if (!pathName.includes('/world-edit')) return raw;
+
+    const pathOnly = raw.split('?')[0] || raw;
+    if (PLATFORM_ADMIN_EXACT.has(pathOnly)) return raw;
+
+    const onConsoleWorldEdit = /^\/admin\/tenant\/[^/]+\/world-edit/.test(pathName);
+    const prodMounted =
+        typeof document !== 'undefined' ? document.getElementById('main')?.dataset?.prodWorldMounted : '1';
+    if (onConsoleWorldEdit && !prodMounted) {
+        return raw;
+    }
+    if (
+        pathOnly.startsWith('/admin/tenants/') &&
+        !pathOnly.slice('/admin/tenants/'.length).includes('/')
+    ) {
+        return raw;
+    }
 
     const tenantId = decodeURIComponent(adminMatch[1]);
     const adminBase = `/admin/tenants/${encodeURIComponent(tenantId)}`;

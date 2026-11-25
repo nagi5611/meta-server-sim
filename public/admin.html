@@ -1,428 +1,64 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>シミュレーション管理パネル</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理パネル｜みんなでメタ CONSOLE</title>
+    <link rel="stylesheet" href="/console/colors_and_type.css">
+    <link rel="stylesheet" href="/console/mt.css">
+    <link rel="stylesheet" href="/console/mt-editor.css">
+    <link rel="stylesheet" href="/console/mt-addons.css">
+    <script type="importmap" src="/console/admin-console-importmap.json"></script>
+    <script src="/console/mt-admin-early.js"></script>
+    <script src="/console/vendor/three.min.js"></script>
+    <script src="/console/vendor/GLTFLoader.js"></script>
+    <script src="/console/vendor/OrbitControls.js"></script>
+    <script src="/console/vendor/TransformControls.js"></script>
 </head>
 <body>
-    <aside class="admin-sidebar" aria-label="管理メニュー">
-        <nav class="admin-nav" id="admin-side-nav">
-            <button type="button" class="admin-nav-item active" data-admin-panel="overview">
-                <i class="bi bi-speedometer2"></i> 概要
-            </button>
-            <button type="button" class="admin-nav-item" data-admin-panel="settings">
-                <i class="bi bi-gear"></i> 設定
-            </button>
-        </nav>
-    </aside>
 
-    <main class="admin-main admin-landing">
-        <header>
-            <div class="header-left">
-                <span class="header-username" id="header-username">admin</span>
-                <h1>シミュレーション管理パネル</h1>
-            </div>
-            <div class="header-actions">
-                <span id="admin-ops-status" class="admin-ops-status" aria-live="polite"></span>
-                <details class="admin-ops-menu">
-                    <summary class="btn btn-secondary admin-ops-menu-trigger" title="サーバー操作">
-                        <i class="bi bi-three-dots-vertical"></i> 操作
-                    </summary>
-                    <div class="admin-ops-menu-panel">
-                        <button type="button" class="admin-ops-menu-item" id="admin-reload-settings-btn">
-                            <i class="bi bi-arrow-clockwise"></i> 設定再読み込み
-                        </button>
-                        <button type="button" class="admin-ops-menu-item admin-ops-menu-item-danger" id="admin-restart-btn">
-                            <i class="bi bi-power"></i> 完全再起動
-                        </button>
-                    </div>
-                </details>
-                <button type="button" class="btn btn-secondary btn-icon" id="admin-theme-toggle" title="ダークモード切替">
-                    <i class="bi bi-moon-fill" id="admin-theme-icon"></i>
-                </button>
-                <a class="btn btn-secondary" href="/">hub</a>
-                <span class="last-update">更新: <span id="last-update">-</span></span>
-            </div>
-        </header>
-
-        <div class="admin-panels">
-            <div class="admin-panel active" data-admin-panel-id="overview">
-            <section class="stats-section platform-summary">
-                <h2>プラットフォーム概要</h2>
-                <div class="stats-grid stats-grid-compact">
-                    <div class="stat-card">
-                        <div class="stat-label">接続プレイヤー数</div>
-                        <div class="stat-value" id="total-players">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">アクティブルーム数</div>
-                        <div class="stat-value" id="total-rooms">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Tenant 数</div>
-                        <div class="stat-value" id="tenant-count">0</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">CPU使用率</div>
-                        <div class="stat-value" id="cpu-usage">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">RAM使用率</div>
-                        <div class="stat-value" id="ram-usage">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">HTTP 送信（直近60秒）</div>
-                        <div class="stat-value" id="traffic-window">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">HTTP 送信レート</div>
-                        <div class="stat-value" id="traffic-rate">-</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">HTTP 送信（累計）</div>
-                        <div class="stat-value stat-value-sm" id="traffic-total">-</div>
-                    </div>
-                </div>
-                <p class="hint" id="traffic-by-category-hint">煙データ（メイン／バルク）と R2 アセットの送信量です。サーバー再起動で累計はリセットされます。</p>
-            </section>
-
-            <section class="stats-section tenant-list-section">
-                <div class="section-header-row">
-                    <h2>Tenant 一覧</h2>
-                    <button type="button" class="btn btn-primary" id="tenant-add-btn">
-                        <i class="bi bi-plus-lg"></i> Tenant 追加
-                    </button>
-                </div>
-                <p class="hint">行をクリックすると、その Tenant の管理パネルに入ります。</p>
-                <table class="tenants-table tenants-table-clickable">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>表示名</th>
-                            <th>プレイヤー</th>
-                            <th>ルーム</th>
-                            <th>ワールド数</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tenants-table-body"></tbody>
-                </table>
-            </section>
-            </div>
-
-            <div class="admin-panel" data-admin-panel-id="settings">
-            <nav class="admin-settings-subnav" id="admin-settings-subnav" aria-label="設定カテゴリ">
-                <button type="button" class="admin-settings-subnav-item active" data-settings-tab="env">
-                    <i class="bi bi-sliders"></i> 環境変数
-                </button>
-                <button type="button" class="admin-settings-subnav-item" data-settings-tab="network">
-                    <i class="bi bi-diagram-3"></i> ネットワーク
-                </button>
-                <button type="button" class="admin-settings-subnav-item" data-settings-tab="fleet">
-                    <i class="bi bi-hdd-network"></i> 系列 Fleet
-                </button>
-                <button type="button" class="admin-settings-subnav-item" data-settings-tab="code">
-                    <i class="bi bi-code-slash"></i> JSON
-                </button>
-            </nav>
-
-            <div class="admin-settings-tab active" data-settings-tab-id="env">
-            <section class="stats-section env-config-section">
-                <div class="section-header-row">
-                    <h2>環境変数</h2>
-                    <button type="button" class="btn btn-primary" id="env-config-save-btn">
-                        <i class="bi bi-save"></i> 保存
-                    </button>
-                </div>
-                <p class="hint hint-compact">
-                    <code>.env</code> 優先 · 未ロック分は <code>env-config.json</code> に保存
-                </p>
-                <div id="env-config-banner" class="env-config-banner" hidden></div>
-                <div class="r2-connection-panel" id="r2-connection-panel">
-                    <div class="r2-connection-panel-main">
-                        <span id="r2-connection-badge" class="r2-connection-badge r2-connection-badge--unknown">確認中…</span>
-                        <span id="r2-connection-detail" class="r2-connection-detail"></span>
-                    </div>
-                    <button type="button" class="btn btn-secondary btn-sm" id="r2-connection-test-btn" disabled>
-                        <i class="bi bi-cloud-check"></i> R2 接続テスト
-                    </button>
-                </div>
-                <p id="r2-connection-error" class="form-error" hidden></p>
-                <p id="env-config-status" class="hint hint-compact"></p>
-                <div id="env-config-groups" class="env-config-groups"></div>
-                <p id="env-config-error" class="form-error" hidden></p>
-            </section>
-            </div>
-
-            <div class="admin-settings-tab" data-settings-tab-id="network">
-            <section class="stats-section network-config-section">
-                <div class="section-header-row">
-                    <h2>ネットワーク / 系列リンク</h2>
-                    <button type="button" class="btn btn-primary" id="network-config-save-btn">
-                        <i class="bi bi-save"></i> 保存
-                    </button>
-                </div>
-                <p class="hint hint-compact">
-                    <code>network-config.json</code> に保存。リバースプロキシ等は<strong>環境変数</strong>で設定。
-                </p>
-                <div id="network-config-warnings" class="network-config-warnings" hidden></div>
-                <p id="network-config-status" class="hint"></p>
-
-                <h3 class="network-config-subtitle">系列サーバー（host → port）</h3>
-                <table class="tenants-table network-config-table">
-                    <thead>
-                        <tr>
-                            <th>表示名</th>
-                            <th>Host / IP</th>
-                            <th>Port</th>
-                            <th>HTTPS</th>
-                            <th>パス</th>
-                            <th>リンク</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="network-servers-body"></tbody>
-                </table>
-                <button type="button" class="btn btn-secondary btn-sm" id="network-server-add-btn">
-                    <i class="bi bi-plus-lg"></i> サーバー追加
-                </button>
-                <div id="network-servers-port-warnings" class="network-port-warnings" hidden></div>
-
-                <h3 class="network-config-subtitle">ナビリンク（任意・上記と別 URL のとき）</h3>
-                <table class="tenants-table network-config-table">
-                    <thead>
-                        <tr>
-                            <th>表示名</th>
-                            <th>URL</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="network-portal-links-body"></tbody>
-                </table>
-                <button type="button" class="btn btn-secondary btn-sm" id="network-portal-add-btn">
-                    <i class="bi bi-plus-lg"></i> リンク追加
-                </button>
-
-                <h3 class="network-config-subtitle">Tenant 公開 URL（任意）</h3>
-                <table class="tenants-table network-config-table">
-                    <thead>
-                        <tr>
-                            <th>Tenant ID</th>
-                            <th>公開 URL</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="network-tenant-urls-body"></tbody>
-                </table>
-                <div class="network-config-actions-row">
-                    <button type="button" class="btn btn-secondary btn-sm" id="network-tenant-url-add-btn">
-                        <i class="bi bi-plus-lg"></i> URL 追加
-                    </button>
-                    <button type="button" class="btn btn-secondary btn-sm" id="network-tenant-url-autofill-btn">
-                        未設定 Tenant を自動入力
-                    </button>
-                </div>
-
-                <h3 class="network-config-subtitle">メタバースロビー（Cloudflare Pages）</h3>
-                <p class="hint hint-compact">
-                    Tenant 作成・削除時に <code>lobby-catalog.json</code> を更新します。
-                    Worker へ即時反映するには同期を実行（<code>LOBBY_WORKER_SYNC_*</code> 要設定）。
-                </p>
-                <div class="network-config-actions-row">
-                    <button type="button" class="btn btn-secondary btn-sm" id="lobby-catalog-sync-btn">
-                        ロビー Worker に同期
-                    </button>
-                    <span id="lobby-catalog-status" class="hint"></span>
-                </div>
-
-                <p id="network-config-error" class="form-error" hidden></p>
-            </section>
-            </div>
-
-            <div class="admin-settings-tab" data-settings-tab-id="fleet">
-            <section class="stats-section fleet-ops-section">
-                <div class="section-header-row">
-                    <h2>系列サーバー Fleet（統合 ops）</h2>
-                    <button type="button" class="btn btn-secondary btn-sm" id="fleet-refresh-btn">
-                        <i class="bi bi-arrow-clockwise"></i> 状態更新
-                    </button>
-                </div>
-                <p class="hint hint-compact">
-                    meta / metair / metasim / metapre / metadogo の systemd と各コア <code>.env</code>
-                    （IP・ポート・mediasoup）を一括管理。MCP: <code>npm run mcp:fleet</code>
-                </p>
-                <div id="fleet-ops-disabled-banner" class="env-config-banner" hidden></div>
-                <p id="fleet-ops-status" class="hint hint-compact"></p>
-                <table class="tenants-table fleet-cores-table">
-                    <thead>
-                        <tr>
-                            <th>コア</th>
-                            <th>systemd</th>
-                            <th>公開</th>
-                            <th>状態</th>
-                            <th>env</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="fleet-cores-body"></tbody>
-                </table>
-                <div id="fleet-env-editor" class="fleet-env-editor" hidden>
-                    <h3 id="fleet-env-editor-title">環境変数</h3>
-                    <div id="fleet-env-fields" class="fleet-env-fields"></div>
-                    <div class="fleet-env-editor-actions">
-                        <button type="button" class="btn btn-primary btn-sm" id="fleet-env-save-btn">保存</button>
-                        <button type="button" class="btn btn-secondary btn-sm" id="fleet-env-cancel-btn">閉じる</button>
-                    </div>
-                </div>
-            </section>
-            </div>
-
-            <div class="admin-settings-tab" data-settings-tab-id="code">
-            <section class="stats-section code-config-section">
-                <div class="section-header-row">
-                    <h2>設定 JSON</h2>
-                    <div class="code-config-toolbar">
-                        <select id="code-config-target" class="code-config-select" aria-label="編集対象">
-                            <option value="env">env-config.json</option>
-                            <option value="network">network-config.json</option>
-                        </select>
-                        <button type="button" class="btn btn-secondary btn-sm" id="code-config-reload-btn">
-                            <i class="bi bi-arrow-clockwise"></i> 読み込み
-                        </button>
-                        <button type="button" class="btn btn-primary btn-sm" id="code-config-save-btn">
-                            <i class="bi bi-save"></i> 保存
-                        </button>
-                    </div>
-                </div>
-                <p class="hint hint-compact">
-                    生の JSON を直接編集します。<code>env-config.json</code> はロック済みキーは含めません。
-                </p>
-                <textarea id="code-config-editor" class="code-config-editor" spellcheck="false" aria-label="設定 JSON"></textarea>
-                <p id="code-config-status" class="hint hint-compact"></p>
-                <p id="code-config-error" class="form-error" hidden></p>
-            </section>
-            </div>
-            </div>
-        </div>
-    </main>
-
-    <div id="tenant-add-modal" class="admin-modal" hidden aria-hidden="true">
-        <div class="admin-modal-backdrop" data-modal-close></div>
-        <div class="admin-modal-dialog" role="dialog" aria-labelledby="tenant-add-title" aria-modal="true">
-            <h2 id="tenant-add-title">Tenant 追加</h2>
-            <p class="hint">英数字で始まり、英数字とハイフンのみ使用できます。</p>
-            <form id="tenant-add-form">
-                <label class="admin-form-field">
-                    <span>Tenant ID</span>
-                    <input type="text" id="tenant-add-id" name="id" required pattern="[A-Za-z0-9][A-Za-z0-9-]*" autocomplete="off" placeholder="P-03">
-                </label>
-                <label class="admin-form-field">
-                    <span>表示名（任意）</span>
-                    <input type="text" id="tenant-add-display-name" name="displayName" maxlength="120" autocomplete="off" placeholder="デモ Tenant">
-                </label>
-
-                <div id="tenant-add-network-section" class="tenant-add-network-section" hidden>
-                    <h3 class="tenant-add-network-title">ネットワーク設定（下の一覧へ追加・編集可）</h3>
-                    <p class="hint">
-                        確定後は<strong>設定 → ネットワーク</strong>の表に反映されます。
-                        <code>network-config.json</code> へ書き込むにはネットワークの<strong>保存</strong>を押してください。
-                    </p>
-
-                    <label class="admin-form-field">
-                        <span>Tenant 公開 URL</span>
-                        <input type="url" id="tenant-add-access-url" autocomplete="off" placeholder="https://localhost:3003/P-03/">
-                    </label>
-
-                    <fieldset class="tenant-add-fieldset">
-                        <legend>ナビリンク</legend>
-                        <label class="admin-form-field">
-                            <span>表示名</span>
-                            <input type="text" id="tenant-add-portal-label" autocomplete="off">
-                        </label>
-                        <label class="admin-form-field">
-                            <span>URL</span>
-                            <input type="url" id="tenant-add-portal-url" autocomplete="off">
-                        </label>
-                    </fieldset>
-
-                    <fieldset class="tenant-add-fieldset">
-                        <legend>系列サーバー（切り替え）</legend>
-                        <label class="admin-form-field">
-                            <span>表示名</span>
-                            <input type="text" id="tenant-add-server-label" autocomplete="off">
-                        </label>
-                        <div class="tenant-add-server-grid">
-                            <label class="admin-form-field">
-                                <span>Host</span>
-                                <input type="text" id="tenant-add-server-host" autocomplete="off" placeholder="localhost">
-                            </label>
-                            <label class="admin-form-field">
-                                <span>Port</span>
-                                <input type="number" id="tenant-add-server-port" min="1" max="65535" autocomplete="off">
-                            </label>
-                            <label class="admin-checkbox tenant-add-server-secure">
-                                <input type="checkbox" id="tenant-add-server-secure">
-                                HTTPS
-                            </label>
-                        </div>
-                        <label class="admin-form-field">
-                            <span>パス</span>
-                            <input type="text" id="tenant-add-server-path" autocomplete="off" placeholder="/P-03/">
-                        </label>
-                        <p id="tenant-add-port-conflict" class="form-error tenant-add-port-hint" hidden></p>
-                    </fieldset>
-                </div>
-
-                <p id="tenant-add-error" class="form-error" hidden></p>
-                <div class="admin-modal-actions">
-                    <button type="button" class="btn btn-secondary" data-modal-close>キャンセル</button>
-                    <button type="submit" class="btn btn-primary" id="tenant-add-submit">確定して追加</button>
-                </div>
-            </form>
-        </div>
+<section class="gate" id="gate" data-screen-label="認証">
+  <div class="gate-in">
+    <div class="gate-brand">
+      <img src="/console/assets/icon-192.png" alt="">
+      みんなでメタ
+      <span class="sep"></span>
+      <span>CONSOLE</span>
     </div>
-
-    <div id="admin-restart-modal" class="admin-modal" hidden aria-hidden="true">
-        <div class="admin-modal-backdrop" data-modal-close></div>
-        <div class="admin-modal-dialog" role="dialog" aria-labelledby="admin-restart-title" aria-modal="true">
-            <h2 id="admin-restart-title">サーバー再起動</h2>
-            <p class="hint">強制再起動は即時に切断されます。計画再起動は指定時間まで全プレイヤーにアラートを表示します。</p>
-            <fieldset class="admin-restart-mode-fieldset">
-                <label class="admin-form-field admin-form-field-inline">
-                    <input type="radio" name="restart-mode" value="force" checked>
-                    <span>強制再起動（即時）</span>
-                </label>
-                <label class="admin-form-field admin-form-field-inline">
-                    <input type="radio" name="restart-mode" value="planned">
-                    <span>計画再起動</span>
-                </label>
-            </fieldset>
-            <div id="admin-restart-planned-fields" hidden>
-                <div class="admin-restart-delay-row">
-                    <label class="admin-form-field">
-                        <span>分</span>
-                        <input type="number" id="admin-restart-delay-minutes" min="0" max="1440" value="5" inputmode="numeric">
-                    </label>
-                    <label class="admin-form-field">
-                        <span>秒</span>
-                        <input type="number" id="admin-restart-delay-seconds" min="0" max="59" value="0" inputmode="numeric">
-                    </label>
-                </div>
-                <label class="admin-form-field">
-                    <span>プレイヤー向けアラートメッセージ</span>
-                    <textarea id="admin-restart-alert-message" rows="4" maxlength="500" placeholder="メンテナンスのため、まもなくサーバーを再起動します。"></textarea>
-                </label>
-            </div>
-            <div class="admin-modal-actions">
-                <button type="button" class="btn btn-secondary" data-modal-close>キャンセル</button>
-                <button type="button" class="btn btn-danger" id="admin-restart-submit-btn">再起動を実行</button>
-            </div>
-        </div>
+    <h1>接続中…</h1>
+    <p class="lead">管理 API とテナント情報を読み込んでいます。</p>
+    <p class="gate-err" id="gateErr" role="alert"></p>
+    <div class="gate-foot">
+      <span>認証は HTTP Basic です</span>
     </div>
+  </div>
+</section>
 
-    <script src="/js/admin-url-sanitize.js"></script>
-    <script type="module" src="/js/admin-sim.js"></script>
+<div class="app" id="app" hidden>
+  <aside class="side" id="side"></aside>
+  <main class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="page" id="main"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/console/mt-data-live.js"></script>
+<script src="/console/mt-ui.js"></script>
+<script src="/console/mt-views.js"></script>
+<script src="/console/mt-addons.js"></script>
+<script src="/console/mt-editor.js"></script>
+<script src="/console/mt-world.js"></script>
+<script src="/console/mt-editor-state.js"></script>
+<script src="/console/mt-app.js"></script>
+<script src="/console/mt-world-live.js"></script>
+<script src="/console/mt-setting-bridge.js"></script>
+<script src="/console/mt-production-editor-bridge.js"></script>
+<script src="/console/mt-addons-live.js"></script>
+<script src="/console/mt-platform-extensions.js"></script>
+<script type="module" src="/js/admin-console-settings-mount.mjs"></script>
+<script src="/console/mt-app-boot.js"></script>
+
 </body>
 </html>

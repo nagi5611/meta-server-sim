@@ -9,40 +9,46 @@ const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.SIM_ADMIN_PASSWORD 
 const ARTIFACT_DIR = path.join(process.cwd(), 'test-results', 'admin-layout');
 
 async function assertSettingsSubnav(page) {
-    const subnav = page.locator('#admin-settings-subnav');
+    const subnav = page.locator('[data-ps-tabs]');
     await expect(subnav).toBeVisible();
-    const box = await subnav.boundingBox();
-    expect(box).toBeTruthy();
-    if (box) {
-        expect(box.width).toBeGreaterThan(200);
-        expect(box.height).toBeGreaterThan(32);
-        expect(box.height).toBeLessThan(120);
-    }
     const flex = await subnav.evaluate((el) => getComputedStyle(el).display);
-    expect(flex).toBe('flex');
+    expect(flex).toMatch(/flex|inline-flex/);
 }
 
-async function assertSectionHeaderRow(page, sectionSelector) {
-    const row = page.locator(`${sectionSelector} .section-header-row`).first();
-    await expect(row).toBeVisible();
-    const layout = await row.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { display: s.display, flexDirection: s.flexDirection, justifyContent: s.justifyContent };
-    });
-    expect(layout.display).toBe('flex');
-    expect(layout.flexDirection).toBe('row');
-    expect(layout.justifyContent).toMatch(/space-between|flex-start/);
+async function waitConsoleReady(page) {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            await page.goto('/admin.html', { waitUntil: 'domcontentloaded', timeout: 120_000 });
+            await page.waitForFunction(
+                () => document.getElementById('app') && !document.getElementById('app').hidden,
+                null,
+                { timeout: 60_000 }
+            );
+            return;
+        } catch (e) {
+            lastErr = e;
+            await page.waitForTimeout(1500 * (attempt + 1));
+        }
+    }
+    throw lastErr;
 }
 
 async function openAdminSettings(page, settingsTab = 'env') {
-    await page.goto(`/admin.html#settings/${settingsTab}`, { waitUntil: 'networkidle' });
-    await expect(page.locator('body.mt-console .app.mt-console-app')).toBeVisible({ timeout: 30_000 });
+    await waitConsoleReady(page);
+    await page.evaluate((tab) => {
+        window.location.hash = `settings/${tab}`;
+        const st = window.MT?.state;
+        if (!st) return;
+        st.tenant = null;
+        st.view = 'platform-settings';
+        window.MT.render();
+    }, settingsTab);
+    await expect(page.locator('#app')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.side')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('#env-config-save-btn, #network-config-save-btn')).toBeVisible({
-        timeout: 30_000,
-    });
-    const settingsPanel = page.locator('.admin-panel[data-admin-panel-id="settings"]');
-    await expect(settingsPanel).toHaveClass(/active/, { timeout: 15_000 });
+    await expect(page.locator('.sheet .head h1')).toContainText(/設定/, { timeout: 30_000 });
+    await expect(page.locator('[data-ps-tabs]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#platformSettingsBody')).toBeVisible({ timeout: 60_000 });
 }
 
 test.describe('admin panel layout', () => {
@@ -52,43 +58,24 @@ test.describe('admin panel layout', () => {
         httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     });
 
-    test('CONSOLE shell settings subnav and env/network sections layout', async ({ page, baseURL }) => {
+    test('CONSOLE design settings tabs and platform shell layout', async ({ page, baseURL }) => {
         fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
         const host = new URL(baseURL || 'http://localhost:3003').hostname;
 
         await openAdminSettings(page, 'env');
-        const legacyHeader = page.locator('header:not(.topbar):has(h1)');
-        await expect(legacyHeader).toHaveCount(0);
         await assertSettingsSubnav(page);
+        await expect(page.locator('#platformSettingsBody .field, #platformSettingsBody .hint')).toBeVisible();
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, `${host}-settings-env.png`),
             fullPage: true,
         });
 
-        await assertSectionHeaderRow(page, '.env-config-section');
-        const envSave = page.locator('#env-config-save-btn');
-        await expect(envSave).toBeVisible();
-        const envSaveBox = await envSave.boundingBox();
-        const envHeader = await page.locator('.env-config-section .section-header-row h2').boundingBox();
-        expect(envSaveBox && envHeader).toBeTruthy();
-        if (envSaveBox && envHeader) {
-            expect(envSaveBox.y).toBeLessThan(envHeader.y + envHeader.height + 8);
-        }
-
-        await page.locator('[data-settings-tab="network"]').click();
-        await expect(page.locator('.admin-settings-tab[data-settings-tab-id="network"].active')).toBeVisible();
-        await assertSettingsSubnav(page);
-        await assertSectionHeaderRow(page, '.network-config-section');
+        await page.locator('[data-ps-tab="network"]').click();
+        await expect(page.locator('[data-ps-tab="network"]')).toHaveClass(/on/);
+        await expect(page.locator('#platformSettingsBody')).toBeVisible();
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, `${host}-settings-network.png`),
             fullPage: true,
         });
-
-        const networkSave = page.locator('#network-config-save-btn');
-        const addServer = page.locator('#network-server-add-btn');
-        await expect(networkSave).toBeVisible();
-        await expect(addServer).toBeVisible();
-        const addBox = await addServer.boundingBox();
-        expect(addBox?.width).toBeGreaterThan(40);
     });
 });
