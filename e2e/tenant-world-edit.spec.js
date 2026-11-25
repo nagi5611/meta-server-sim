@@ -1,5 +1,6 @@
 // e2e/tenant-world-edit.spec.js
 import { test, expect } from '@playwright/test';
+import { adminApiGet, adminBasicAuthHeaders } from './helpers/admin-basic-auth.mjs';
 
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'dev-admin-password-16';
@@ -27,7 +28,7 @@ test.describe('tenant world edit', () => {
     test('P-01 world editor loads without CSP or module errors', async ({ page }) => {
         const consoleLines = attachConsoleWatchers(page);
 
-        const worldsApi = await page.request.get('/admin/tenants/P-01/worlds');
+        const worldsApi = await adminApiGet(page.request, '/admin/tenants/P-01/worlds');
         expect(worldsApi.ok(), `worlds API status ${worldsApi.status()}`).toBeTruthy();
         const worldsJson = await worldsApi.json();
         expect(Object.keys(worldsJson).length).toBeGreaterThan(0);
@@ -70,11 +71,13 @@ test.describe('tenant world edit', () => {
     });
 
     test('P-01 lobby model is reachable and worlds save round-trips', async ({ page, request }) => {
-        const csrfRes = await request.get('/admin/csrf-token');
+        const csrfRes = await request.get('/admin/csrf-token', {
+            headers: adminBasicAuthHeaders(),
+        });
         expect(csrfRes.ok()).toBeTruthy();
         const { token } = await csrfRes.json();
 
-        const worldsBeforeRes = await request.get('/admin/tenants/P-01/worlds');
+        const worldsBeforeRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
         expect(worldsBeforeRes.ok()).toBeTruthy();
         const worldsBefore = await worldsBeforeRes.json();
         const lobby = worldsBefore.lobby;
@@ -95,6 +98,7 @@ test.describe('tenant world edit', () => {
 
         const saveRes = await request.post('/admin/tenants/P-01/worlds', {
             headers: {
+                ...adminBasicAuthHeaders(),
                 'Content-Type': 'application/json',
                 'X-Admin-CSRF': token,
             },
@@ -102,7 +106,7 @@ test.describe('tenant world edit', () => {
         });
         expect(saveRes.ok(), `worlds save status ${saveRes.status()}`).toBeTruthy();
 
-        const worldsAfterRes = await request.get('/admin/tenants/P-01/worlds');
+        const worldsAfterRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
         expect(worldsAfterRes.ok()).toBeTruthy();
         const worldsAfter = await worldsAfterRes.json();
         expect(worldsAfter.lobby?.spawnPoint?.x).toBe(marker);

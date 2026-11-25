@@ -20,6 +20,7 @@ export default defineConfig({
         ignoreHTTPSErrors: true,
         extraHTTPHeaders: {
             'X-Forwarded-Proto': 'https',
+            'X-Forwarded-Host': forwardHost,
         },
         trace: 'on-first-retry',
         httpCredentials: {
@@ -27,5 +28,11 @@ export default defineConfig({
             password: adminPassword,
         },
     },
-    projects: [{ name: 'staging-remote', testMatch: /tenant-taiko-chart\.spec\.js/ }],
+    projects: [
+        { name: 'staging-remote', testMatch: /tenant-taiko-chart\.spec\.js/ },
+        {
+            name: 'staging-admin',
+            testMatch: /tenant-world-edit\.spec\.js|admin-panel-layout\.spec\.js/,
+        },
+    ],
 });
