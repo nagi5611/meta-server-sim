@@ -219,26 +219,18 @@ test.describe('tenant world edit', () => {
             window.MT.render();
         }, tag);
 
-        await page.locator('.wed-root [data-ed-act="draft"]').click();
-        await page.waitForFunction(
-            async (descTag) => {
-                try {
-                    const res = await (window.__nativeAdminFetch || fetch)(
-                        `/admin/tenants/P-01/worlds`,
-                        { credentials: 'include' }
-                    );
-                    if (!res.ok) return false;
-                    const w = (await res.json()).lobby;
-                    return w?.name?.includes(descTag);
-                } catch {
-                    return false;
-                }
-            },
-            tag,
+        const worldsPost = page.waitForResponse(
+            (r) =>
+                r.url().includes('/admin/tenants/P-01/worlds') &&
+                r.request().method() === 'POST' &&
+                r.status() < 500,
             { timeout: 120_000 }
         );
+        await page.locator('.wed-root [data-ed-act="draft"]').click();
+        const postRes = await worldsPost;
+        expect(postRes.ok(), `worlds POST status ${postRes.status()}`).toBeTruthy();
 
-        const worldsAfterRes = await adminApiGet(request, '/admin/tenants/P-01/worlds');
+        const worldsAfterRes = await adminApiGet(request, `/admin/tenants/P-01/worlds?_=${Date.now()}`);
         const worldsAfter = await worldsAfterRes.json();
         expect(worldsAfter.lobby?.name).toContain(tag);
 
