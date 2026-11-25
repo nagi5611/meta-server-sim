@@ -495,7 +495,7 @@
             snapOn: true,
             snap: 0.5,
             theme: 'light',
-            panels: { props: false },
+            panels: { props: true },
             sec: { tf: true, vis: true, own: true, meta: false, world: true, lod: true, env: true, limit: false },
             split: 46,
             collapsed: {},
