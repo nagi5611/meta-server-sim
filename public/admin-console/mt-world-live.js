@@ -2,6 +2,38 @@
 (function () {
     'use strict';
 
+    let settingBootPromise = null;
+
+  /** setting.js 向け admin API / R2 / VDB shims を一度だけ初期化する */
+    async function ensureSettingModules(tenantId) {
+        if (window.__MT_SETTING_LIVE__) return window.__MT_SETTING_LIVE__;
+        if (!settingBootPromise) {
+            settingBootPromise = (async () => {
+                const { bootstrapAdminApi } = await import('/js/admin-api-fetch-init.js');
+                await bootstrapAdminApi();
+                const { installTenantR2FetchShim, installTenantR2UploadShim } = await import(
+                    '/js/tenant-r2-upload-shim.js'
+                );
+                const { installTenantWorldEditXhrShim } = await import('/js/tenant-world-edit-xhr.js');
+                installTenantR2FetchShim();
+                installTenantR2UploadShim();
+                installTenantWorldEditXhrShim();
+                const { installTenantWorldEditVdbShim } = await import('/js/tenant-world-edit-vdb-shim.js');
+                await installTenantWorldEditVdbShim(tenantId);
+                const svc = { tenantId, ready: true };
+                window.__MT_SETTING_LIVE__ = svc;
+                return svc;
+            })().catch((e) => {
+                console.error('[mt-world-live] setting shims boot failed', e);
+                settingBootPromise = null;
+                return null;
+            });
+        }
+        return settingBootPromise;
+    }
+
+    window.MTSettingLive = { ensureSettingModules };
+
     const MOCK_PHRASES = ['街灯 01', '中央ステージ', '案内アバター', '夜のネオン商店街', 'AKARI City'];
 
     function vec3ToArr(v, d) {
@@ -463,7 +495,7 @@
         ed.files = listFilesFromWorlds(worldsRoot);
         ed.loading = null;
         ed.dirty = false;
-        void window.MTSettingLive?.ensureSettingModules?.(st.tenant);
+        void ensureSettingModules(st.tenant);
         window.MT?.render?.();
         requestAnimationFrame(() => {
             if (!window.ME?.isMounted) window.MTA?.mountScene?.(st);
