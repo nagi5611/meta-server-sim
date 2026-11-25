@@ -1,6 +1,10 @@
 // e2e/tenant-world-edit.spec.js
 import { test, expect } from '@playwright/test';
-import { adminApiGet, adminBasicAuthHeaders } from './helpers/admin-basic-auth.mjs';
+import {
+    adminApiGet,
+    adminBasicAuthHeaders,
+    attachStagingSimForwardHeaders,
+} from './helpers/admin-basic-auth.mjs';
 
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASSWORD || 'dev-admin-password-16';
