@@ -5,11 +5,11 @@
  * @param {string} panelId
  */
 export function activateTenantPanel(panelId) {
-    const navItems = document.querySelectorAll('.side .nav[data-tenant-panel]');
-    const panels = document.querySelectorAll('[data-tenant-panel-id]');
-    navItems.forEach((btn) => {
-        btn.classList.toggle('on', btn.getAttribute('data-tenant-panel') === panelId);
+    document.querySelectorAll('.side .nav').forEach((n) => n.classList.remove('on'));
+    document.querySelectorAll('.side .nav[data-tenant-panel]').forEach((btn) => {
+        if (btn.getAttribute('data-tenant-panel') === panelId) btn.classList.add('on');
     });
+    const panels = document.querySelectorAll('[data-tenant-panel-id]');
     panels.forEach((p) => {
         p.classList.toggle('active', p.getAttribute('data-tenant-panel-id') === panelId);
     });

@@ -214,7 +214,11 @@ export async function initTenantPluginsPanel(tenantId) {
         <button type="button" class="btn btn-warning btn-sm" id="tenant-plugins-reload-btn">Reload</button>
       </div>
       ${shown.length ? groups : `<div class="sheet"><div class="empty">条件に一致するアドオンはありません</div></div>`}
-      <h2 class="visually-hidden" id="tenant-plugins-status" role="status">${plugins.length} 件</h2>
+      <div class="wfoot">
+        <span id="tenant-plugins-status" role="status">登録 ${plugins.length} 件</span>
+        <span class="sp"></span>
+        <span>変更後は <b>Reload</b> で反映</span>
+      </div>
     `;
 
         wireMountEvents();

@@ -51,7 +51,9 @@ function refreshCrumbs() {
         else parts.push('ダッシュボード');
     } else if (runtimeConfig.page === 'tenant') {
         parts.push(runtimeConfig.tenantLabel || runtimeConfig.tenantId || 'テナント');
-        const active = document.querySelector('[data-tenant-panel].on')?.getAttribute('data-tenant-panel');
+        const active = document
+            .querySelector('.side .nav[data-tenant-panel].on')
+            ?.getAttribute('data-tenant-panel');
         const labels = {
             overview: 'ステータス',
             logs: '通信ログ',
