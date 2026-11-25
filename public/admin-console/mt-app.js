@@ -839,6 +839,30 @@
     }
     if (a === "explorer") { window.MTA.openExplorer(state); return; }
 
+    if (a === "preview-obj") {
+      const o = E.objects.find((x) => x.id === E.selected[0]);
+      if (!o) return;
+      const kindByType = { smoke: "zip", cloud: "vdb", pdf: "pdf", board: "pdf" };
+      const kind = kindByType[o.type] || "pdf";
+      const fname = String(o.props?.file || o.name || "preview");
+      let f = E.files.find((x) => x.name === fname || fname.endsWith("/" + x.name) || fname.endsWith(x.name));
+      if (!f) {
+        f = {
+          id: "pv-obj-" + o.id,
+          name: fname.split("/").pop() || fname,
+          kind,
+          size: 1,
+          date: "—",
+          path: kind === "pdf" ? ["docs"] : ["fx"],
+        };
+        E.files.unshift(f);
+      }
+      E.preview = { id: f.id, page: o.props?.page || 1, pages: o.props?.pages || 4 };
+      render();
+      requestAnimationFrame(() => window.MTA.mountPreviewViewer(state));
+      return;
+    }
+
     /* --- 右クリックメニュー --- */
     if (a.startsWith("ctx-")) {
       const f = E.files.find((x) => x.id === (E.ctx && E.ctx.id));

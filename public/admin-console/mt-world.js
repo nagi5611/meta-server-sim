@@ -260,6 +260,18 @@
     </div>`;
   }
 
+  /** ライブ時 FDS/VDB 等の旧エディタ導線（暫定） */
+  function liveLegacyEditorLink(ed, label) {
+    if (!ed?._live) return "";
+    const st = window.MT?.state;
+    const tid = st?.tenant;
+    if (!tid) return "";
+    return `<div class="vrow-line" style="flex-direction:column;align-items:stretch;gap:6px;margin-top:8px">
+        <a class="vbtn" href="/admin-legacy/tenant/${encodeURIComponent(tid)}/world-edit" target="_blank" rel="noopener noreferrer">${icon("open")}旧エディタで ${esc(label)} を開く</a>
+        <p class="vhint" style="margin:0">暫定: フルプレビューと高度な編集は旧エディタをご利用ください。</p>
+      </div>`;
+  }
+
   function typeBody(ed, o) {
     const p = o.props || {};
     const sel = (key, opts, cur) => `<select class="vinp" data-ed-prop="${key}">
@@ -288,7 +300,9 @@
       <div class="vseg" data-ed-prop="filter">
         ${[["all", "全便"], ["domestic", "国内線"], ["international", "国際線"]]
           .map(([v, l]) => `<button data-v="${v}" class="${p.filter === v ? "on" : ""}">${l}</button>`).join("")}
-      </div>`;
+      </div>
+      <button type="button" class="vbtn" data-ed-act="preview-obj" style="margin-top:8px">${icon("open")}発着プレビュー</button>
+      ${liveLegacyEditorLink(ed, "発着案内")}`;
 
     if (o.type === "pdf") return `
       <label class="vlbl">ファイル</label><input class="vinp" data-ed-prop="file" value="${esc(p.file || "")}">
@@ -297,17 +311,24 @@
         <button data-ed-page="-1">${icon("left")}</button>
         <span>${p.page || 1} / ${p.pages || 4}</span>
         <button data-ed-page="1">${icon("right")}</button>
-      </div>`;
+      </div>
+      <button type="button" class="vbtn" data-ed-act="preview-obj" style="margin-top:8px">${icon("open")}PDF プレビュー</button>
+      ${liveLegacyEditorLink(ed, "PDF")}`;
 
     if (o.type === "smoke") return `
       <label class="vlbl">データ</label><input class="vinp" data-ed-prop="file" value="${esc(p.file || "")}">
       <label class="vlbl">濃さ</label>${rng("density", p.density == null ? 0.6 : p.density)}
-      <label class="vchk"><input type="checkbox" data-ed-prop="playing" ${p.playing ? "checked" : ""}><span>エディタで再生</span></label>`;
+      <label class="vchk"><input type="checkbox" data-ed-prop="playing" ${p.playing ? "checked" : ""}><span>エディタで再生</span></label>
+      <button type="button" class="vbtn" data-ed-act="preview-obj" style="margin-top:8px">${icon("wave")}簡易プレビュー</button>
+      ${liveLegacyEditorLink(ed, "FDS 煙")}`;
 
     if (o.type === "cloud") return `
+      <label class="vlbl">ファイル</label><input class="vinp" data-ed-prop="file" value="${esc(p.file || p.path || "")}">
       <label class="vlbl">濃さ</label>${rng("density", p.density == null ? 0.45 : p.density)}
       <label class="vlbl">色</label><input type="color" data-ed-prop="tint" value="${p.tint || "#ffffff"}">
-      <label class="vlbl">大きさ</label><input class="vinp num" type="number" step="0.1" data-ed-prop="scale" value="${p.scale || 1}">`;
+      <label class="vlbl">大きさ</label><input class="vinp num" type="number" step="0.1" data-ed-prop="scale" value="${p.scale || 1}">
+      <button type="button" class="vbtn" data-ed-act="preview-obj" style="margin-top:8px">${icon("wave")}簡易プレビュー</button>
+      ${liveLegacyEditorLink(ed, "VDB 雲")}`;
 
     if (o.type === "plane") return `
       <label class="vlbl">速度</label><input class="vinp num" type="number" step="1" data-ed-prop="speed" value="${p.speed || 12}">
@@ -531,7 +552,7 @@
       <div class="up-info">
         <div class="up-line">
           <span class="up-name">${esc(u.name)}</span>
-          <span class="up-pct">${u.done ? "完了" : Math.round(u.progress) + "%"}</span>
+          <span class="up-pct">${u.failed ? "失敗" : u.done ? "完了" : Math.round(u.progress) + "%"}</span>
         </div>
         <div class="up-bar"><i style="width:${u.progress.toFixed(1)}%"></i></div>
         <div class="up-meta">

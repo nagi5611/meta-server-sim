@@ -203,7 +203,59 @@ async function shot(page, outPath) {
     await page.screenshot({ path: outPath, fullPage: false });
 }
 
-function compareImages(aPath, bPath, diffPath) {
+/** ワールド編集: 3D とデータ依存テキスト領域のマスク矩形 */
+async function collectWorldEditMaskRects(page) {
+    return page.evaluate(() => {
+        const rects = [];
+        const addEl = (el) => {
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            if (r.width < 2 || r.height < 2) return;
+            rects.push({
+                x: Math.max(0, Math.floor(r.x)),
+                y: Math.max(0, Math.floor(r.y)),
+                w: Math.ceil(r.width),
+                h: Math.ceil(r.height),
+            });
+        };
+        [
+            '.wed-root .ved-canvas',
+            '.wed-root .vd-worldtabs',
+            '.wed-root .vd-crumb',
+            '.wed-root .vout-scroll',
+            '.wed-root .vhud',
+            '.wed-root [data-save-state]',
+        ].forEach((sel) => document.querySelectorAll(sel).forEach(addEl));
+        return rects;
+    });
+}
+
+const MASK_FILL = { r: 0xb8, g: 0xbd, b: 0xc6, a: 255 };
+
+function fillRectsOnPng(png, rects) {
+    for (const { x, y, w, h } of rects) {
+        const x0 = Math.max(0, x);
+        const y0 = Math.max(0, y);
+        const x1 = Math.min(png.width, x0 + w);
+        const y1 = Math.min(png.height, y0 + h);
+        for (let py = y0; py < y1; py++) {
+            for (let px = x0; px < x1; px++) {
+                const i = (png.width * py + px) << 2;
+                png.data[i] = MASK_FILL.r;
+                png.data[i + 1] = MASK_FILL.g;
+                png.data[i + 2] = MASK_FILL.b;
+                png.data[i + 3] = MASK_FILL.a;
+            }
+        }
+    }
+}
+
+function mergeMaskRects(a, b) {
+    const all = [...(a || []), ...(b || [])];
+    return all;
+}
+
+function compareImages(aPath, bPath, diffPath, maskRects) {
     const a = PNG.sync.read(fs.readFileSync(aPath));
     const b = PNG.sync.read(fs.readFileSync(bPath));
     const w = Math.min(a.width, b.width);
@@ -213,9 +265,13 @@ function compareImages(aPath, bPath, diffPath) {
     const cb = new PNG({ width: w, height: h });
     PNG.bitblt(a, ca, 0, 0, w, h, 0, 0);
     PNG.bitblt(b, cb, 0, 0, w, h, 0, 0);
+    if (maskRects?.length) {
+        fillRectsOnPng(ca, maskRects);
+        fillRectsOnPng(cb, maskRects);
+    }
     const diffPx = pixelmatch(ca.data, cb.data, out.data, w, h, { threshold: 0.12 });
     fs.writeFileSync(diffPath, PNG.sync.write(out));
-    return { diffPx, total: w * h, ratio: diffPx / (w * h) };
+    return { diffPx, total: w * h, ratio: diffPx / (w * h), masked: !!maskRects?.length };
 }
 
 async function attachStagingHeaders(page) {
@@ -257,6 +313,7 @@ await new Promise((resolve) => protoServer.listen(PROTO_PORT, '127.0.0.1', resol
 
 const browser = await chromium.launch({ headless: true });
 const results = [];
+const worldEditMasks = { prototype: [], staging: [] };
 
 {
     const ctx = await browser.newContext({ viewport: VIEWPORT });
@@ -265,6 +322,9 @@ const results = [];
     for (const scene of SCENES) {
         if (scene.id === 'platform-settings') continue;
         await scene.prepare(page);
+        if (scene.id === 'world-edit') {
+            worldEditMasks.prototype = await collectWorldEditMaskRects(page);
+        }
         const out = path.join(ART, `prototype-${scene.id}-1440x900.png`);
         await shot(page, out);
     }
@@ -288,10 +348,18 @@ const results = [];
     await loginStaging(page);
     for (const scene of SCENES) {
         await scene.prepare(page);
+        if (scene.id === 'world-edit') {
+            worldEditMasks.staging = await collectWorldEditMaskRects(page);
+        }
         const out = path.join(ART, `staging-${scene.id}-1440x900.png`);
         await shot(page, out);
     }
     await ctx.close();
+}
+
+const worldEditMaskUnion = mergeMaskRects(worldEditMasks.prototype, worldEditMasks.staging);
+if (worldEditMaskUnion.length) {
+    fs.writeFileSync(path.join(ART, 'world-edit-mask-rects.json'), JSON.stringify(worldEditMaskUnion, null, 2));
 }
 
 for (const scene of SCENES) {
@@ -300,7 +368,8 @@ for (const scene of SCENES) {
     const diff = path.join(ART, `compare-${scene.id}-diff.png`);
     if (scene.id === 'platform-settings') continue;
     if (!fs.existsSync(proto) || !fs.existsSync(stag)) continue;
-    const stats = compareImages(proto, stag, diff);
+    const masks = scene.id === 'world-edit' ? worldEditMaskUnion : null;
+    const stats = compareImages(proto, stag, diff, masks);
     results.push({ scene: scene.id, label: scene.label, ...stats, diffPath: diff });
 }
 

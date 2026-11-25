@@ -658,6 +658,7 @@
 
         window.MTWL = {
             fetchAllWorlds,
+            listFilesFromWorlds,
             worldDocToObjects,
             worldDocToSettings,
             editorToWorldDoc,

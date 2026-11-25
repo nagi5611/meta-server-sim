@@ -16,14 +16,23 @@ async function assertSettingsSubnav(page) {
 }
 
 async function openAdminSettings(page, settingsTab = 'env') {
-    await page.goto(`/admin.html#settings/${settingsTab}`, { waitUntil: 'domcontentloaded' });
+    await page.goto('/admin.html', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.getElementById('app') && !document.getElementById('app').hidden, null, {
         timeout: 120_000,
     });
-    await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
+    await page.evaluate((tab) => {
+        window.location.hash = `settings/${tab}`;
+        const st = window.MT?.state;
+        if (!st) return;
+        st.tenant = null;
+        st.view = 'platform-settings';
+        window.MT.render();
+    }, settingsTab);
+    await expect(page.locator('#app')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.side')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.sheet .head h1')).toContainText(/設定/, { timeout: 30_000 });
-    await expect(page.locator('[data-ps-tabs]')).toBeVisible();
+    await expect(page.locator('[data-ps-tabs]')).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('#platformSettingsBody')).toBeVisible({ timeout: 60_000 });
 }
 
 test.describe('admin panel layout', () => {
@@ -39,7 +48,7 @@ test.describe('admin panel layout', () => {
 
         await openAdminSettings(page, 'env');
         await assertSettingsSubnav(page);
-        await expect(page.locator('#platformSettingsBody .tbl, #platformSettingsBody .hint')).toBeVisible();
+        await expect(page.locator('#platformSettingsBody .field, #platformSettingsBody .hint')).toBeVisible();
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, `${host}-settings-env.png`),
             fullPage: true,

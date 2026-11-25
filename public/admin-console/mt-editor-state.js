@@ -293,7 +293,11 @@
      アップロード
      ========================================================= */
   let uploadTimer = 0;
-  function startUpload(st, fileNames) {
+  function startUpload(st, fileNames, rawFiles) {
+    if (st?.ed?._live && rawFiles?.length && window.MTSettingBridge?.uploadFilesWithProgress) {
+      void window.MTSettingBridge.uploadFilesWithProgress(st, Array.from(rawFiles));
+      return;
+    }
     const ed = st.ed;
     const now = Date.now();
     const added = fileNames.map((name, i) => {
@@ -492,7 +496,7 @@
     inp.dataset.bound = "1";
     inp.addEventListener("change", () => {
       const files = Array.from(inp.files || []);
-      if (files.length) startUpload(window.MT.state, files.map((f) => f.name));
+      if (files.length) startUpload(window.MT.state, files.map((f) => f.name), files);
       inp.value = "";
     });
   }
@@ -503,7 +507,7 @@
   function bindDropzones() {
     const handle = (files) => {
       if (!files || !files.length) return;
-      startUpload(window.MT.state, files.map((f) => f.name));
+      startUpload(window.MT.state, files.map((f) => f.name), files);
     };
 
     // キャンバス
