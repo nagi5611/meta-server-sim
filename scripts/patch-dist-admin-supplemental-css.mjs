@@ -6,7 +6,7 @@ const SUPPLEMENTAL = '<link rel="stylesheet" href="/css/admin.css">';
 const MARKER = '/metaverse-simple-static/css/admin.css';
 
 const distDir = path.join(process.cwd(), 'dist');
-const targets = ['admin.html', 'admin-tenant.html'];
+const targets = ['admin.html', 'admin-legacy.html', 'admin-legacy-tenant.html'];
 
 for (const name of targets) {
     const filePath = path.join(distDir, name);

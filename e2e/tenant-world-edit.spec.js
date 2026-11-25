@@ -34,23 +34,23 @@ test.describe('tenant world edit', () => {
 
         await page.goto('/admin/tenant/P-01/world-edit');
 
-        await expect(page.locator('.admin-sidebar')).toBeVisible();
-        await expect(page.locator('.admin-main header')).toBeVisible();
-        await expect(page.locator('.we-right-area')).toBeVisible();
-        await expect(page.locator('#canvas')).toBeVisible({ timeout: 90_000 });
-        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
+        await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
+        await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('.side.rail')).toBeVisible();
+        await expect(page.locator('.vd-root canvas, .page canvas')).toBeVisible({ timeout: 90_000 });
+        await expect(page.locator('[data-ed-sel-world], [data-ed-act="world-add"]')).toBeVisible({
+            timeout: 60_000,
+        });
 
         const diag = await page.evaluate(() => ({
-            itemCount: document.querySelectorAll('#world-list .item').length,
-            saveStatus: document.getElementById('save-status')?.textContent?.trim() || '',
-            hasAdminFetch: typeof window.adminFetch === 'function',
-            shimInstalled: Boolean(window.__tenantAdminWorldEditShimInstalled),
+            tenant: window.MT?.state?.tenant,
+            worldId: window.MT?.state?.worldId,
+            worldCount: window.MTD?.TENANTS?.find((t) => t.id === 'P-01')?.worlds?.length ?? 0,
+            editorMounted: Boolean(window.ME?.isMounted),
         }));
 
-        expect(
-            diag.itemCount,
-            `world-list empty (save="${diag.saveStatus}" adminFetch=${diag.hasAdminFetch} shim=${diag.shimInstalled})`
-        ).toBeGreaterThan(0);
+        expect(diag.tenant, 'tenant context').toBe('P-01');
+        expect(diag.worldCount, 'worlds from API').toBeGreaterThan(0);
 
         const cspViolations = consoleLines.filter(
             (t) =>
@@ -112,7 +112,7 @@ test.describe('tenant world edit', () => {
         const modelHead = await request.head('/P-01/models/lobby.glb');
         expect(modelHead.status(), 'lobby.glb should be served (R2 or local fallback)').toBe(200);
 
-        await page.goto('/admin/tenant/P-01/world-edit');
+        await page.goto('/admin-legacy/tenant/P-01/world-edit');
         await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
         await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
 
@@ -130,10 +130,10 @@ test.describe('tenant world edit', () => {
         await expect(page.locator('#spawn-x')).toHaveValue(String(marker));
     });
 
-    test('P-01 world-edit save button succeeds (worlds/patch)', async ({ page }) => {
+    test('P-01 legacy world-edit save button succeeds (worlds/patch)', async ({ page }) => {
         const consoleLines = attachConsoleWatchers(page);
 
-        await page.goto('/admin/tenant/P-01/world-edit');
+        await page.goto('/admin-legacy/tenant/P-01/world-edit');
         await expect(page.locator('#canvas')).toBeVisible({ timeout: 120_000 });
         await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 120_000 });
 
