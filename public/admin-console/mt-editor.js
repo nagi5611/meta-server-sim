@@ -210,10 +210,22 @@
   }
 
   const gltfPending = new Set();
+  function gltfPendingKey(objectId, url) {
+    return objectId + "|" + url;
+  }
+
+  /** アンマウント／rebuild 後に古い GLTF 読み込みが新シーンをブロックしないよう解除する */
+  function clearGltfPendingForObject(objectId) {
+    const prefix = String(objectId) + "|";
+    Array.from(gltfPending).forEach((key) => {
+      if (key.startsWith(prefix)) gltfPending.delete(key);
+    });
+  }
+
   function queueGltfLoad(g, o) {
     const url = o.props && o.props.modelUrl;
     if (!url || !window.THREE.GLTFLoader) return;
-    const pendingKey = o.id + "|" + url;
+    const pendingKey = gltfPendingKey(o.id, url);
     if (gltfPending.has(pendingKey)) return;
     gltfPending.add(pendingKey);
     const loader = new T3.GLTFLoader();
@@ -221,6 +233,7 @@
       url,
       (gl) => {
         gltfPending.delete(pendingKey);
+        if (M.objs.get(o.id) !== g) return;
         const root = gl.scene || gl.scenes?.[0];
         if (!root) return;
         const ph = g.children.find((c) => c.name === "__placeholder");
@@ -322,6 +335,7 @@
   function rebuildScene(objects) {
     if (!M.scene) return;
     Array.from(M.objs.keys()).forEach((id) => {
+      clearGltfPendingForObject(id);
       const g = M.objs.get(id);
       if (g) {
         M.scene.remove(g);
@@ -506,6 +520,7 @@
       if (d.parentNode) d.parentNode.removeChild(d);
     }
     if (M.tc) M.tc.dispose && M.tc.dispose();
+    gltfPending.clear();
     M.scene = null; M.camera = null; M.renderer = null; M.orbit = null; M.tc = null;
     M.objs = new Map(); M.helpers = new Map(); M.selected = []; M.hovered = null;
     M.frames = [];
