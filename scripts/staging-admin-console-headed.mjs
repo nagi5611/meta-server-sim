@@ -6,7 +6,8 @@ import { chromium, devices } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const BASE = process.env.E2E_BASE_URL || 'https://staging.mmh-virtual.jp:3104';
+const BASE = process.env.E2E_BASE_URL || 'http://127.0.0.1:3104';
+const FORWARD_HOST = process.env.PLAYWRIGHT_FORWARD_HOST || 'staging.mmh-virtual.jp';
 const OUT = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
 const TENANT = process.env.E2E_TENANT_ID || 'P-01';
 const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
@@ -22,6 +23,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const ctxOpts = {
     httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
     ignoreHTTPSErrors: true,
+    extraHTTPHeaders: {
+        Host: FORWARD_HOST,
+        'X-Forwarded-Proto': 'https',
+    },
 };
 
 /**
