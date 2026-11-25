@@ -8,6 +8,16 @@
     <link rel="stylesheet" href="/console/mt.css">
     <link rel="stylesheet" href="/console/mt-editor.css">
     <link rel="stylesheet" href="/console/mt-addons.css">
+    <script type="importmap">{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "three/examples/jsm/utils/BufferGeometryUtils": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js",
+        "@metaverse-simple/setting.js": "/metaverse-simple-static/js/setting.js",
+        "@metaverse-simple/asset-resolve-original": "/metaverse-simple-static/js/asset-resolve.js"
+    }
+}</script>
     <script>
         window.__MT_BOOT__ = {};
     </script>
@@ -51,7 +61,10 @@
 <script src="/console/mt-editor-state.js"></script>
 <script src="/console/mt-app.js"></script>
 <script src="/console/mt-production-editor-bridge.js"></script>
+<script src="/console/mt-addons-live.js"></script>
 <script src="/console/mt-platform-extensions.js"></script>
+<script type="module" src="/js/mt-design-world-edit-host.js"></script>
+<script type="module" src="/js/admin-console-settings-mount.mjs"></script>
 <script src="/console/mt-app-boot.js"></script>
 
 </body>

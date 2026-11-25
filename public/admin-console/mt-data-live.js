@@ -249,6 +249,11 @@
     }
 
     async function loadLive() {
+        try {
+            platformStats = await fetchJson('/admin/stats');
+        } catch {
+            platformStats = null;
+        }
         await loadTenants();
         await Promise.all([loadPlugins(), loadTraffic()]);
         await loadPluginStates();
@@ -262,11 +267,25 @@
     function labels7() {
         return ['月', '火', '水', '木', '金', '土', '日'];
     }
-    function hourly(seed = 1) {
-        return Array.from({ length: 24 }, (_, i) => 20 + ((i * seed) % 40));
+    let platformStats = null;
+
+    function hourly(t) {
+        const base = typeof t === 'object' && t ? livePlayers(t) : Number(t) || 1;
+        const now = livePlayers(t) || base;
+        return Array.from({ length: 24 }, (_, i) => {
+            const wobble = Math.round(now * (0.55 + 0.4 * Math.sin((i / 24) * Math.PI * 2)));
+            return Math.max(0, wobble);
+        });
     }
-    function daily(seed = 1) {
-        return Array.from({ length: 7 }, (_, i) => 100 + ((i * seed * 3) % 80));
+    function daily(t) {
+        const now = livePlayers(t) || 10;
+        return Array.from({ length: 7 }, (_, i) => Math.max(0, Math.round(now * (0.85 + (i % 3) * 0.07))));
+    }
+
+    function livePlayers(t) {
+        if (!t) return 0;
+        const liveN = window.MT?.liveN?.[t.id];
+        return liveN == null ? Number(t.players) || 0 : liveN;
     }
     const nodes = [];
     const health = [];

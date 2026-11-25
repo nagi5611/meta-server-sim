@@ -21,17 +21,4 @@
         if (window.MTES) window.MTES.initEd = wrapInit;
     }
 
-    document.addEventListener(
-        'click',
-        (e) => {
-            const pub = e.target.closest('[data-ed-act="publish"], [data-ed-act="draft"]');
-            if (!pub || !window.MT?.state?.tenant) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const tid = encodeURIComponent(window.MT.state.tenant);
-            window.MT.toast('本番保存 API は未接続です。旧エディタを開きます。');
-            window.location.href = `/admin-legacy/tenant/${tid}/world-edit`;
-        },
-        true
-    );
 })();

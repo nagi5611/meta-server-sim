@@ -46,50 +46,11 @@
         const body = document.getElementById('platformSettingsBody');
         if (!body) return;
         const tab = (window.location.hash || '#settings/env').split('/')[1] || 'env';
-        try {
-            if (tab === 'env') {
-                const j = await adminFetch('/admin/env-config');
-                const rows = (j.entries || j.vars || []).slice(0, 80);
-                body.innerHTML =
-                    rows.length > 0
-                        ? `<table class="tbl"><thead><tr><th>キー</th><th>値</th></tr></thead><tbody>${rows
-                              .map(
-                                  (r) =>
-                                      `<tr><td><code>${esc(r.key || r.name || '—')}</code></td><td>${esc(
-                                          r.masked != null ? r.masked : r.value ?? '—'
-                                      )}</td></tr>`
-                              )
-                              .join('')}</tbody></table>`
-                        : '<p class="hint">未接続（環境変数一覧が空です）</p>';
-            } else if (tab === 'network') {
-                const j = await adminFetch('/admin/network-config');
-                const tenants = j.tenants || j.entries || [];
-                body.innerHTML =
-                    tenants.length > 0
-                        ? `<table class="tbl"><thead><tr><th>Tenant</th><th>公開 URL</th></tr></thead><tbody>${tenants
-                              .map(
-                                  (r) =>
-                                      `<tr><td>${esc(r.id || r.tenantId || '—')}</td><td>${esc(
-                                          r.publicUrl || r.url || '—'
-                                      )}</td></tr>`
-                              )
-                              .join('')}</tbody></table>`
-                        : '<p class="hint">未接続</p>';
-            } else if (tab === 'fleet') {
-                let fleetHtml = '<p class="hint">未接続</p>';
-                try {
-                    const j = await adminFetch('/admin/fleet');
-                    fleetHtml = `<pre class="code">${esc(JSON.stringify(j, null, 2))}</pre>`;
-                } catch {
-                    fleetHtml = '<p class="hint">未接続（/admin/fleet/status）</p>';
-                }
-                body.innerHTML = fleetHtml;
-            } else {
-                body.innerHTML = '<p class="hint">未接続</p>';
-            }
-        } catch {
-            body.innerHTML = '<p class="hint">未接続</p>';
+        if (window.MTPlatformSettings?.renderPlatformSettingsTab) {
+            await window.MTPlatformSettings.renderPlatformSettingsTab(body, tab);
+            return;
         }
+        body.innerHTML = '<p class="hint">未接続（設定モジュールの読込待ち）</p>';
     }
 
     function injectPlatformNav() {

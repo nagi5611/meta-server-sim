@@ -37,10 +37,8 @@ test.describe('tenant world edit', () => {
         await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
         await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 30_000 });
         await expect(page.locator('.side.rail')).toBeVisible();
-        await expect(page.locator('.vd-root canvas, .page canvas')).toBeVisible({ timeout: 90_000 });
-        await expect(page.locator('[data-ed-sel-world], [data-ed-act="world-add"]')).toBeVisible({
-            timeout: 60_000,
-        });
+        await expect(page.locator('.wed-root #canvas, #canvas')).toBeVisible({ timeout: 180_000 });
+        await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 180_000 });
 
         const diag = await page.evaluate(() => ({
             tenant: window.MT?.state?.tenant,

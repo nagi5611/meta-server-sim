@@ -198,7 +198,13 @@
     const root = document.getElementById("main");
     root.style.height = isEd ? "100dvh" : "";
     if (isEd) {
-      if (!state.tenant) { state.tenant = "mmh"; state.worldId = null; }
+      if (!state.tenant) {
+        state.tenant = D.TENANTS[0]?.id || null;
+      }
+      if (window.MTDesignWorldEdit?.mount) {
+        void window.MTDesignWorldEdit.mount(state);
+        return;
+      }
       if (!state.ed) window.MTA.initEd(state);
       root.innerHTML = V.world();
       window.MTA.mountScene(state);
@@ -214,7 +220,7 @@
       return;
     }
 
-    window.ME.isMounted && window.ME.unmount();
+    window.MTDesignWorldEdit?.teardown?.(); window.ME.isMounted && window.ME.unmount();
     const page = $("#main");
     let html = "";
     if (state.view === "dash") html = V.dash();

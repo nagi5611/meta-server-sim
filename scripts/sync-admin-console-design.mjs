@@ -49,6 +49,33 @@ for (const name of COPY) {
   }`
         );
         text = text.replaceAll('assets/icon-192.png', '/console/assets/icon-192.png');
+        text = text.replace(
+            /if \(isEd\) \{[\s\S]*?return;\s*\}\n\n    window\.ME\.isMounted && window\.ME\.unmount\(\);/,
+            `if (isEd) {
+      if (!state.tenant) {
+        state.tenant = D.TENANTS[0]?.id || null;
+      }
+      if (window.MTDesignWorldEdit?.mount) {
+        void window.MTDesignWorldEdit.mount(state);
+        return;
+      }
+      if (!state.ed) window.MTA.initEd(state);
+      root.innerHTML = V.world();
+      window.MTA.mountScene(state);
+      window.MTA.bindDropzones();
+      window.MTA.bindSplitter();
+      requestAnimationFrame(() => {
+        if (!window.ME.isMounted) window.MTA.mountScene(state);
+        window.MTA.bindDropzones();
+        window.MTA.bindFileInput();
+        window.MTA.bindSplitter();
+        bindWorldDrag();
+      });
+      return;
+    }
+
+    window.MTDesignWorldEdit?.teardown?.(); window.ME.isMounted && window.ME.unmount();`
+        );
     }
     if (name.endsWith('.css')) {
         text = text.replaceAll('assets/icon-192.png', '/console/assets/icon-192.png');
