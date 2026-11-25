@@ -14,7 +14,7 @@
         const fd = new FormData();
         fd.append('model', file);
         const q = confirmOverwrite ? '?confirm=1' : '';
-        const fetchFn = window.__nativeAdminFetch || window.fetch;
+        const fetchFn = window.adminFetch || window.fetch;
         const res = await fetchFn(`/admin/tenants/${encodeURIComponent(tenantId)}/upload${q}`, {
             method: 'POST',
             credentials: 'include',
@@ -38,14 +38,34 @@
      * @param {boolean} confirmOverwrite
      * @param {(pct: number) => void} onProgress 0–100、-1 は不明
      */
+    /**
+     * 管理 POST 用 CSRF ヘッダーを XHR に付与する
+     * @param {XMLHttpRequest} xhr
+     */
+    async function attachAdminCsrfToXhr(xhr) {
+        const mod = await import('/js/admin-api-fetch.js');
+        await mod.initAdminCsrf();
+        const token = mod.getAdminCsrfTokenSync();
+        if (token) {
+            xhr.setRequestHeader(mod.ADMIN_CSRF_HEADER, token);
+        }
+    }
+
     function uploadModelXhr(tenantId, file, confirmOverwrite, onProgress) {
         return new Promise((resolve, reject) => {
+            void (async () => {
             const xhr = new XMLHttpRequest();
             const fd = new FormData();
             fd.append('model', file);
             const url = `/admin/tenants/${encodeURIComponent(tenantId)}/upload${confirmOverwrite ? '?confirm=1' : ''}`;
             xhr.open('POST', url);
             xhr.withCredentials = true;
+            try {
+                await attachAdminCsrfToXhr(xhr);
+            } catch (err) {
+                reject(err);
+                return;
+            }
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable && e.total > 0) {
                     onProgress(Math.min(100, (e.loaded / e.total) * 100));
@@ -77,6 +97,7 @@
             });
             xhr.addEventListener('error', () => reject(new Error('upload network error')));
             xhr.send(fd);
+            })().catch(reject);
         });
     }
 
