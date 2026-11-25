@@ -1,7 +1,5 @@
 /* ScienceHUB / 3Dプリンター使い方ガイド — foundations
    Source of truth: source/css/style.css (values lifted verbatim) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap');
-
 :root{
   /* ── brand ── */
   --color-primary:#f38020;
@@ -41,8 +39,8 @@
   --dur-fast:.15s; --dur-toast:.25s; --dur-arrive:.55s;
 
   /* ── type ── */
-  --font:'Inter','Noto Sans JP','Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif;
-  --font-num:'Inter',sans-serif;
+  --font:system-ui,-apple-system,'Segoe UI','Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;
+  --font-num:system-ui,-apple-system,'Segoe UI',sans-serif;
 
   --fs-display:clamp(28px,4vw,40px); /* page heading */
   --fs-h2:22px;  --fs-h3:17px; --fs-title:17px;

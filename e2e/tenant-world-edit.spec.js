@@ -37,12 +37,24 @@ test.describe('tenant world edit', () => {
         const worldsJson = await worldsApi.json();
         expect(Object.keys(worldsJson).length).toBeGreaterThan(0);
 
-        await page.goto('/admin/tenant/P-01/world-edit');
+        await attachStagingSimForwardHeaders(page);
+        await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'load' });
 
         await expect(page.locator('#app')).toBeVisible({ timeout: 60_000 });
         await expect(page.locator('body.in-editor')).toBeVisible({ timeout: 30_000 });
         await expect(page.locator('.side.rail')).toBeVisible();
-        await expect(page.locator('.wed-root #canvas, #canvas')).toBeVisible({ timeout: 180_000 });
+        await page.waitForFunction(
+            () => {
+                const main = document.getElementById('main');
+                if (!main?.dataset?.prodWorldMounted) return false;
+                const canvas = document.querySelector('.wed-design-host #canvas, #canvas');
+                if (!canvas) return false;
+                const r = canvas.getBoundingClientRect();
+                return r.width > 8 && r.height > 8;
+            },
+            null,
+            { timeout: 180_000 }
+        );
         await expect(page.locator('#world-list .item').first()).toBeVisible({ timeout: 180_000 });
 
         const diag = await page.evaluate(() => ({
