@@ -15,11 +15,27 @@ async function assertSettingsSubnav(page) {
     expect(flex).toMatch(/flex|inline-flex/);
 }
 
+async function waitConsoleReady(page) {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            await page.goto('/admin.html', { waitUntil: 'domcontentloaded', timeout: 120_000 });
+            await page.waitForFunction(
+                () => document.getElementById('app') && !document.getElementById('app').hidden,
+                null,
+                { timeout: 60_000 }
+            );
+            return;
+        } catch (e) {
+            lastErr = e;
+            await page.waitForTimeout(1500 * (attempt + 1));
+        }
+    }
+    throw lastErr;
+}
+
 async function openAdminSettings(page, settingsTab = 'env') {
-    await page.goto('/admin.html', { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.getElementById('app') && !document.getElementById('app').hidden, null, {
-        timeout: 120_000,
-    });
+    await waitConsoleReady(page);
     await page.evaluate((tab) => {
         window.location.hash = `settings/${tab}`;
         const st = window.MT?.state;

@@ -136,11 +136,22 @@ const SCENES = [
 ];
 
 async function waitConsole(page) {
-    await page.waitForFunction(
-        () => document.getElementById('app') && !document.getElementById('app').hidden,
-        null,
-        { timeout: 120_000 }
-    );
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            await page.waitForFunction(
+                () => document.getElementById('app') && !document.getElementById('app').hidden,
+                null,
+                { timeout: 60_000 }
+            );
+            return;
+        } catch (e) {
+            lastErr = e;
+            await page.goto(`${STAGING}/admin.html`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+            await page.waitForTimeout(1500 * (attempt + 1));
+        }
+    }
+    throw lastErr;
 }
 
 async function loginPrototype(page) {
