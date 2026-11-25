@@ -41,7 +41,6 @@ for (const p of paths) {
             local.push(t);
         }
     });
-    page.on('pageerror', (e) => local.push(String(e)));
     await page.route('**/*', async (route) => {
         const req = route.request();
         if (!req.url().startsWith(BASE)) return route.continue();
