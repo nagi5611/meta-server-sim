@@ -16,6 +16,9 @@
     }
 
     async function start() {
+        if (!window.__nativeAdminFetch) {
+            window.__nativeAdminFetch = window.fetch.bind(window);
+        }
         const gate = document.getElementById('gate');
         const app = document.getElementById('app');
         const err = document.getElementById('gateErr');

@@ -73,7 +73,8 @@
     }
 
     async function fetchJson(url, opts = {}) {
-        const res = await fetch(url, { credentials: 'include', ...opts });
+        const liveFetch = window.__nativeAdminFetch || window.fetch;
+        const res = await liveFetch(url, { credentials: 'include', ...opts });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
     }
