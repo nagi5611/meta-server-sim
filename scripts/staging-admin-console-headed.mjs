@@ -60,8 +60,9 @@ async function waitApp(page) {
     await page.waitForFunction(
         () => {
             const app = document.getElementById('app');
-            return app && !app.hidden && window.MT?.state?.authed;
+            return Boolean(app && !app.hidden && window.MT?.state?.authed);
         },
+        null,
         { timeout: 120_000 }
     );
     await page.locator('.side').waitFor({ state: 'visible', timeout: 60_000 });
@@ -117,8 +118,11 @@ await shot(desktop, 'staging-admin-settings-env.png', `${BASE}/admin.html`, asyn
     const page = await desktop.newPage();
     await attachSimForwardHeaders(page);
     await page.goto(`${BASE}/admin/tenant/${TENANT}/world-edit`, { waitUntil: 'load', timeout: 180_000 });
-    await waitApp(page);
-    await page.locator('body.in-editor').waitFor({ timeout: 60_000 });
+    await page.waitForFunction(
+        () => document.body.classList.contains('in-editor') && Boolean(document.querySelector('#canvas, .wed-root')),
+        null,
+        { timeout: 180_000 }
+    );
     await page.locator('.wed-root, .wed-design-host').waitFor({ timeout: 120_000 });
     await page.locator('#canvas').waitFor({ timeout: 180_000 });
     await page.locator('#world-list .item').first().waitFor({ timeout: 180_000 });
