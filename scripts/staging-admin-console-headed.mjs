@@ -100,17 +100,23 @@ await shot(desktop, `staging-admin-tenant-logs-${TENANT}.png`, `${BASE}/admin/te
 });
 await shot(desktop, `staging-admin-tenant-addons-${TENANT}.png`, `${BASE}/admin/tenant/${TENANT}`, async (p) => {
     await goTenantView(p, 'addons');
-    await p.locator('.ad-row, .addons, .hint').first().waitFor({ timeout: 60_000 });
+    await Promise.race([
+        p.locator('.ad-row, .addons, .hint, #main .sheet').first().waitFor({ timeout: 90_000 }),
+        p.locator('.side .nav[data-go="addons"].on').waitFor({ timeout: 90_000 }),
+    ]);
 }).catch((e) => console.error('addons shot failed', e.message));
-await shot(desktop, 'staging-admin-settings-env.png', `${BASE}/admin.html#settings/env`, async (p) => {
-    await p.locator('[data-ps-tabs]').waitFor({ timeout: 60_000 });
+
+await shot(desktop, 'staging-admin-settings-env.png', `${BASE}/admin.html`, async (p) => {
+    const plat = p.locator('[data-go="platform-settings"]');
+    await plat.click({ timeout: 60_000 });
+    await p.locator('[data-ps-tabs], #platformSettingsBody').first().waitFor({ timeout: 90_000 });
     await p.locator('[data-ps-save-env], #platformSettingsBody .field').first().waitFor({ timeout: 60_000 });
-});
+}).catch((e) => console.error('settings shot failed', e.message));
 
 {
     const page = await desktop.newPage();
     await attachSimForwardHeaders(page);
-    await page.goto(`${BASE}/admin/tenant/${TENANT}/world-edit`, { waitUntil: 'networkidle', timeout: 180_000 });
+    await page.goto(`${BASE}/admin/tenant/${TENANT}/world-edit`, { waitUntil: 'load', timeout: 180_000 });
     await waitApp(page);
     await page.locator('body.in-editor').waitFor({ timeout: 60_000 });
     await page.locator('.wed-root, .wed-design-host').waitFor({ timeout: 120_000 });
