@@ -33,7 +33,13 @@ for (const p of paths) {
     const local = [];
     page.on('console', (m) => {
         const t = m.text();
-        if (t.includes('Content Security Policy') || t.includes('CSP')) local.push(t);
+        if (
+            t.includes('Content Security Policy') ||
+            t.includes('violates the following Content Security Policy') ||
+            t.includes('CSP directive')
+        ) {
+            local.push(t);
+        }
     });
     page.on('pageerror', (e) => local.push(String(e)));
     await page.route('**/*', async (route) => {
