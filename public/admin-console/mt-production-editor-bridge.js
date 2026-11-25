@@ -2,13 +2,6 @@
 (function () {
     'use strict';
 
-    window.__mtWorldEditReady =
-        window.__mtWorldEditReady ||
-        import('/js/mt-design-world-edit-host.js').catch((e) => {
-            console.error('[mt-production-editor-bridge] world-edit module load failed', e);
-            return null;
-        });
-
     /**
      * 移植対応表は docs/admin-console-migration-map.md を参照。
      * 現段階: ワールド一覧は MTD（API）由来。保存・モデル読込は mt-editor（プロトタイプ）＋今後 setting.js API へ接続。

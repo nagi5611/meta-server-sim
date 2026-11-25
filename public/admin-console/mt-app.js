@@ -201,25 +201,22 @@
       if (!state.tenant) {
         state.tenant = D.TENANTS[0]?.id || null;
       }
-      void (window.__mtWorldEditReady || Promise.resolve()).then(() => {
-        if (window.MTDesignWorldEdit?.mount) return window.MTDesignWorldEdit.mount(state);
-        if (!state.ed) window.MTA.initEd(state);
-        root.innerHTML = V.world();
-        window.MTA.mountScene(state);
+      if (!state.ed) window.MTA.initEd(state);
+      root.innerHTML = V.world();
+      window.MTA.mountScene(state);
+      window.MTA.bindDropzones();
+      window.MTA.bindSplitter();
+      requestAnimationFrame(() => {
+        if (!window.ME.isMounted) window.MTA.mountScene(state);
         window.MTA.bindDropzones();
+        window.MTA.bindFileInput();
         window.MTA.bindSplitter();
-        requestAnimationFrame(() => {
-          if (!window.ME.isMounted) window.MTA.mountScene(state);
-          window.MTA.bindDropzones();
-          window.MTA.bindFileInput();
-          window.MTA.bindSplitter();
-          bindWorldDrag();
-        });
+        bindWorldDrag();
       });
       return;
     }
 
-    window.MTDesignWorldEdit?.teardown?.(); window.ME.isMounted && window.ME.unmount();
+    window.ME.isMounted && window.ME.unmount();
     const page = $("#main");
     let html = "";
     if (state.view === "dash") html = V.dash();

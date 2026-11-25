@@ -1,0 +1,238 @@
+#!/usr/bin/env node
+/**
+ * プロトタイプ vs ステージング CONSOLE 見た目比較（1440x900）
+ */
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PNG } from 'pngjs';
+import pixelmatch from 'pixelmatch';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ART = process.env.MCP_ARTIFACTS_DIR || '/opt/cursor/artifacts';
+const VIEWPORT = { width: 1440, height: 900 };
+const PROTO = `file://${path.join(ROOT, 'docs/design/admin-console/index.html')}`;
+const STAGING = process.env.E2E_BASE_URL || 'http://127.0.0.1:3104';
+const FORWARD_HOST = process.env.PLAYWRIGHT_FORWARD_HOST || 'staging.mmh-virtual.jp';
+const ADMIN_USER = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASSWORD || process.env.SIM_ADMIN_PASSWORD || '';
+
+/** @type {{ id: string, label: string, prepare: (page: import('playwright').Page) => Promise<void> }[]} */
+const SCENES = [
+    {
+        id: 'dashboard',
+        label: 'ダッシュボード',
+        prepare: async (page) => {
+            await clickNav(page, 'dash');
+        },
+    },
+    {
+        id: 'tenant-list',
+        label: 'テナント一覧',
+        prepare: async (page) => {
+            await clickNav(page, 'dash');
+            await page.waitForTimeout(300);
+        },
+    },
+    {
+        id: 'tenant-detail',
+        label: 'テナント詳細',
+        prepare: async (page) => {
+            await openTenant(page, 'P-01');
+            await clickNav(page, 'tenant');
+        },
+    },
+    {
+        id: 'tenant-logs',
+        label: '通信ログ',
+        prepare: async (page) => {
+            await openTenant(page, 'P-01');
+            await clickNav(page, 'logs');
+        },
+    },
+    {
+        id: 'tenant-addons',
+        label: 'アドオン',
+        prepare: async (page) => {
+            await openTenant(page, 'P-01');
+            await clickNav(page, 'addons');
+        },
+    },
+    {
+        id: 'world-edit',
+        label: 'ワールド編集',
+        prepare: async (page) => {
+            const url = page.url();
+            if (url.includes('file://')) {
+                await openTenant(page, 'P-01');
+                await clickNav(page, 'world');
+            } else {
+                await page.goto(`${STAGING}/admin/tenant/P-01/world-edit`, { waitUntil: 'load' });
+                await waitConsole(page);
+                await page.waitForSelector('.wed-root', { timeout: 120_000 });
+                await page.waitForFunction(
+                    () => {
+                        const c = document.querySelector('.wed-root [data-canvas] canvas');
+                        return c && c.getBoundingClientRect().width > 64;
+                    },
+                    null,
+                    { timeout: 120_000 }
+                );
+            }
+        },
+    },
+    {
+        id: 'platform-settings',
+        label: 'プラットフォーム設定',
+        prepare: async (page) => {
+            if (page.url().includes('file://')) {
+                await page.evaluate(() => {
+                    window.MT.state.view = 'platform-settings';
+                    window.MT.render();
+                });
+            } else {
+                await page.goto(`${STAGING}/admin.html`, { waitUntil: 'load' });
+                await waitConsole(page);
+                const link = page.locator('[data-go="platform-settings"]');
+                await link.click({ timeout: 60_000 });
+                await page.locator('[data-ps-tabs], #platformSettingsBody').first().waitFor({ timeout: 60_000 });
+            }
+        },
+    },
+];
+
+async function waitConsole(page) {
+    await page.waitForFunction(
+        () => document.getElementById('app') && !document.getElementById('app').hidden,
+        null,
+        { timeout: 120_000 }
+    );
+}
+
+async function loginPrototype(page) {
+    await page.goto(PROTO, { waitUntil: 'load', timeout: 120_000 });
+    await page.locator('#gUser').fill('admin');
+    await page.locator('#gPass').fill('admin1234');
+    await page.locator('#gateForm button[type="submit"]').click();
+    await waitConsole(page);
+}
+
+async function loginStaging(page) {
+    await page.goto(`${STAGING}/admin.html`, { waitUntil: 'load', timeout: 120_000 });
+    await waitConsole(page);
+}
+
+async function openTenant(page, tenantId) {
+    const link = page.locator(`.side .nav[data-go="tenant"], .side .nav[data-tenant="${tenantId}"]`).first();
+    const row = page.locator(`[data-act="open-tenant"][data-tenant="${tenantId}"], .t-row[data-tenant="${tenantId}"]`).first();
+    if (await row.count()) {
+        await row.click();
+    } else if (await link.count()) {
+        await link.click();
+    } else {
+        await page.evaluate((id) => {
+            window.MT.state.tenant = id;
+            window.MT.state.view = 'tenant';
+            window.MT.render();
+        }, tenantId);
+    }
+    await page.waitForTimeout(400);
+}
+
+async function clickNav(page, view) {
+    const nav = page.locator(`.side .nav[data-go="${view}"]`);
+    if (await nav.count()) await nav.first().click();
+    else {
+        await page.evaluate((v) => {
+            window.MT.state.view = v;
+            window.MT.render();
+        }, view);
+    }
+    await page.waitForTimeout(500);
+}
+
+async function shot(page, outPath) {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    await page.screenshot({ path: outPath, fullPage: false });
+}
+
+function compareImages(aPath, bPath, diffPath) {
+    const a = PNG.sync.read(fs.readFileSync(aPath));
+    const b = PNG.sync.read(fs.readFileSync(bPath));
+    const w = Math.min(a.width, b.width);
+    const h = Math.min(a.height, b.height);
+    const out = new PNG({ width: w, height: h });
+    const ca = new PNG({ width: w, height: h });
+    const cb = new PNG({ width: w, height: h });
+    PNG.bitblt(a, ca, 0, 0, w, h, 0, 0);
+    PNG.bitblt(b, cb, 0, 0, w, h, 0, 0);
+    const diffPx = pixelmatch(ca.data, cb.data, out.data, w, h, { threshold: 0.12 });
+    fs.writeFileSync(diffPath, PNG.sync.write(out));
+    return { diffPx, total: w * h, ratio: diffPx / (w * h) };
+}
+
+async function attachStagingHeaders(page) {
+    await page.route('**/*', async (route) => {
+        const req = route.request();
+        if (!req.url().startsWith(STAGING)) return route.continue();
+        await route.continue({
+            headers: { ...req.headers(), 'x-forwarded-proto': 'https', 'x-forwarded-host': FORWARD_HOST },
+        });
+    });
+}
+
+const browser = await chromium.launch({ headless: true });
+const results = [];
+
+{
+    const ctx = await browser.newContext({ viewport: VIEWPORT });
+    const page = await ctx.newPage();
+    await loginPrototype(page);
+    for (const scene of SCENES) {
+        await scene.prepare(page);
+        const out = path.join(ART, `prototype-${scene.id}-1440x900.png`);
+        await shot(page, out);
+    }
+    await ctx.close();
+}
+
+{
+    if (!ADMIN_PASS) {
+        console.error('ADMIN_PASSWORD required for staging shots');
+        process.exit(2);
+    }
+    const ctx = await browser.newContext({
+        viewport: VIEWPORT,
+        httpCredentials: { username: ADMIN_USER, password: ADMIN_PASS },
+        ignoreHTTPSErrors: true,
+        serviceWorkers: 'block',
+        extraHTTPHeaders: { 'X-Forwarded-Proto': 'https', 'X-Forwarded-Host': FORWARD_HOST },
+    });
+    const page = await ctx.newPage();
+    await attachStagingHeaders(page);
+    await loginStaging(page);
+    for (const scene of SCENES) {
+        await scene.prepare(page);
+        const out = path.join(ART, `staging-${scene.id}-1440x900.png`);
+        await shot(page, out);
+    }
+    await ctx.close();
+}
+
+for (const scene of SCENES) {
+    const proto = path.join(ART, `prototype-${scene.id}-1440x900.png`);
+    const stag = path.join(ART, `staging-${scene.id}-1440x900.png`);
+    const diff = path.join(ART, `compare-${scene.id}-diff.png`);
+    if (!fs.existsSync(proto) || !fs.existsSync(stag)) continue;
+    const stats = compareImages(proto, stag, diff);
+    results.push({ scene: scene.id, label: scene.label, ...stats, diffPath: diff });
+}
+
+await browser.close();
+console.log(JSON.stringify({ viewport: VIEWPORT, results }, null, 2));
+const bad = results.filter((r) => r.ratio > 0.08);
+process.exit(bad.length ? 1 : 0);

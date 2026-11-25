@@ -45,12 +45,13 @@ test.describe('tenant world edit', () => {
         await expect(page.locator('.side.rail')).toBeVisible();
         await page.waitForFunction(
             () => {
-                const main = document.getElementById('main');
-                if (!main?.dataset?.prodWorldMounted) return false;
-                const canvas = document.querySelector('.wed-design-host #canvas, #canvas');
+                const root = document.querySelector('.wed-root');
+                if (!root) return false;
+                const canvas =
+                    root.querySelector('[data-canvas] canvas') || root.querySelector('[data-canvas]');
                 if (!canvas) return false;
                 const r = canvas.getBoundingClientRect();
-                return r.width > 8 && r.height > 8;
+                return r.width > 64 && r.height > 64;
             },
             null,
             { timeout: 180_000 }
