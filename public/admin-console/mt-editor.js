@@ -222,6 +222,33 @@
     });
   }
 
+  /**
+   * 進行中の GLTF 読み込みがすべて終わるまで待つ
+   * @param {number} [timeoutMs]
+   * @returns {Promise<void>}
+   */
+  function waitForGltfIdle(timeoutMs) {
+    const limit = timeoutMs == null ? 120000 : timeoutMs;
+    if (gltfPending.size === 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      const deadline = Date.now() + limit;
+      const tick = () => {
+        if (gltfPending.size === 0) {
+          clearInterval(iv);
+          resolve();
+          return;
+        }
+        if (Date.now() > deadline) {
+          clearInterval(iv);
+          resolve();
+        }
+      };
+      const iv = setInterval(tick, 48);
+      EV.on("gltf-loaded", tick);
+      tick();
+    });
+  }
+
   function queueGltfLoad(g, o) {
     const url = o.props && o.props.modelUrl;
     if (!url || !window.THREE.GLTFLoader) return;
@@ -1029,6 +1056,8 @@
     get camera() { return M.camera; },
     get isMounted() { return !!M.renderer; },
     getCamera, setCamera,
-    syncFromScene
+    syncFromScene,
+    waitForGltfIdle,
+    get gltfPendingCount() { return gltfPending.size; },
   };
 })();

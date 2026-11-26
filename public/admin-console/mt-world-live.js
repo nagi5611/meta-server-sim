@@ -523,43 +523,102 @@
         if (window.innerWidth < 900) ed.panels.props = false;
         st.ed = ed;
 
-        void hydrateFromApi(st).catch((err) => {
+        void hydrateFromApi(st).catch(async (err) => {
             console.error('[mt-world-live] hydrate failed', err);
             if (window.MT?.toast) window.MT.toast('ワールドデータの読み込みに失敗しました');
+            if (window.MTWorldLoading?.isOpen()) {
+                await window.MTWorldLoading.fail('ワールドデータの読み込みに失敗しました');
+            }
             ed.loading = null;
+            dismissCanvasLoading();
             window.MT?.render?.();
         });
 
         return ed;
     }
 
+    /**
+     * 8 ステップのローディング UI と同期しながらワールドを読み込む
+     * @param {object} st
+     */
     async function hydrateFromApi(st) {
         const ed = st.ed;
-        const worldsRoot = await fetchAllWorlds(st.tenant);
-        const wid = ed.worldId;
-        const wdoc = worldsRoot[wid];
-        if (!wdoc) throw new Error(`world ${wid} missing`);
-        ed._worldsRoot = worldsRoot;
-        ed.worldName = wdoc.name || ed.worldName;
-        ed.objects = worldDocToObjects(st.tenant, wid, wdoc);
-        ed.settings = worldDocToSettings(wdoc);
-        ed.files = listFilesFromWorlds(worldsRoot);
-        ed.loading = null;
-        ed.dirty = false;
-        void ensureSettingModules(st.tenant);
+        const WL = window.MTWorldLoading;
+        ed.loading = { label: 'ワールドを読み込み中', pct: 0 };
         window.MT?.render?.();
-        requestAnimationFrame(() => {
-            if (!window.ME?.isMounted) window.MTA?.mountScene?.(st);
-            else {
+        WL?.open?.();
+
+        let worldsRoot;
+
+        const mountLiveScene = () => {
+            return new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    if (!window.ME?.isMounted) window.MTA?.mountScene?.(st);
+                    else {
+                        window.ME.unmount();
+                        window.MTA?.mountScene?.(st);
+                    }
+                    window.MTA?.bindDropzones?.();
+                    window.MTA?.bindSplitter?.();
+                    window.MTA?.bindOutlinerWheel?.();
+                    resolve();
+                });
+            });
+        };
+
+        await WL.runStep(0, async () => {
+            worldsRoot = await fetchAllWorlds(st.tenant);
+            const wid = ed.worldId;
+            const wdoc = worldsRoot[wid];
+            if (!wdoc) throw new Error(`world ${wid} missing`);
+            ed._worldsRoot = worldsRoot;
+            ed.worldName = wdoc.name || ed.worldName;
+            ed.objects = worldDocToObjects(st.tenant, wid, wdoc);
+            ed.settings = worldDocToSettings(wdoc);
+            ed.files = listFilesFromWorlds(worldsRoot);
+            ed.dirty = false;
+            ed.loading.pct = 13;
+            window.MT?.render?.();
+        }, 240);
+
+        await WL.runStep(1, async () => {
+            void ensureSettingModules(st.tenant);
+            if (window.ME?.isMounted && window.MTA?._mounted !== `${st.tenant}/${ed.worldId}`) {
                 window.ME.unmount();
-                window.MTA?.mountScene?.(st);
+                window.MTA._mounted = null;
             }
-            window.MTA?.bindDropzones?.();
-            window.MTA?.bindSplitter?.();
-            window.MTA?.bindOutlinerWheel?.();
+        }, 200);
+
+        await WL.runStep(2, async () => {
+            window.MT?.render?.();
+        }, 180);
+
+        await WL.runStep(3, async () => {
+            await new Promise((r) => requestAnimationFrame(r));
+        }, 160);
+
+        await WL.runStep(4, async () => {
+            await mountLiveScene();
+        }, 220);
+
+        await WL.runStep(5, async () => {
+            if (window.ME?.waitForGltfIdle) await window.ME.waitForGltfIdle(120000);
+        }, 200);
+
+        await WL.runStep(6, async () => {
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }, 180);
+
+        await WL.runStep(7, async () => {
             if (window.ME?.fitSettingEditorCamera) window.ME.fitSettingEditorCamera();
             else if (window.ME?.fitScene) window.ME.fitScene();
-        });
+            await new Promise((r) => requestAnimationFrame(r));
+        }, 200);
+
+        await WL.finish(ed.worldName);
+        ed.loading = null;
+        dismissCanvasLoading();
+        window.MT?.render?.();
     }
 
     function dismissCanvasLoading() {
@@ -578,9 +637,26 @@
         window.MTA._protoInitEd = protoInit;
 
         const protoMount = window.MTA.mountScene;
+        const protoSwitchWorld = window.MTA.switchWorld;
+        window.MTA.switchWorld = function switchWorldLive(st, wid) {
+            const ed = st?.ed;
+            if (!ed || ed.worldId === wid) return;
+            if (!ed._live) {
+                protoSwitchWorld(st, wid);
+                return;
+            }
+            const t = window.MTD.TENANTS.find((x) => x.id === st.tenant);
+            window.MTA.saveDraft(st, false);
+            st.worldId = wid;
+            st.ed = null;
+            window.MT._mounted = null;
+            if (window.ME?.isMounted) window.ME.unmount();
+            initEdLive(st);
+        };
+
         window.MTA.mountScene = function mountSceneLive(st) {
             const ed = st?.ed;
-            if (ed?._live && (!ed._worldsRoot || ed.loading)) {
+            if (ed?._live && !ed._worldsRoot) {
                 return;
             }
             if (ed?._live && window.ME?.isMounted) {

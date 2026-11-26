@@ -577,7 +577,7 @@
     const ed = st.ed;
 
     return `<div class="wed-root" data-scene-theme="${ed.theme}">
-      ${ed.loading ? `<div class="vloadbar" data-loadbar>
+      ${ed.loading && !ed._live ? `<div class="vloadbar" data-loadbar>
         <div class="vloadbar-in">
           <span class="vspin-sm"></span>
           <span class="vloadbar-t">${window.MUI.esc(ed.loading.label || "読み込み中")}</span>
@@ -588,7 +588,7 @@
       ${topHtml(ed, t)}
       <div class="ved-stage ${ed.panels.props ? "docked" : ""}">
         <div class="ved-canvas" data-canvas>
-          <div class="ved-loading" data-loading><span class="vspin"></span>ワールドを読み込み中…</div>
+          <div class="ved-loading" data-loading ${ed._live && ed.loading ? 'hidden' : ''}><span class="vspin"></span>ワールドを読み込み中…</div>
         </div>
 
         <div class="vtools">
