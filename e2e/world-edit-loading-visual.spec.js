@@ -18,44 +18,77 @@ test.describe('world edit loading overlay visuals', () => {
         fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
         await attachStagingSimForwardHeaders(page);
 
-        const appReady = () =>
-            page.waitForFunction(
-                () => document.getElementById('app') && !document.getElementById('app').hidden,
-                null,
-                { timeout: 120_000 }
-            );
+        const completeReady = page.waitForFunction(
+            () => {
+                const root = document.querySelector('.mt-world-loading:not([hidden])');
+                if (!root || root.classList.contains('is-dismissing')) return false;
+                if (root.dataset.mtLdPhase !== 'complete') return false;
+                const stage = document.querySelector('.mt-world-loading .ld-stage.is-collapsed');
+                const okEl = document.querySelector('.mt-world-loading .d-ok');
+                const title = document.querySelector('.mt-world-loading .d-t');
+                return !!(
+                    stage &&
+                    okEl &&
+                    title &&
+                    okEl.textContent.includes('読み込み完了') &&
+                    title.textContent.includes('を開きました')
+                );
+            },
+            null,
+            { timeout: 180_000, polling: 'raf' }
+        );
 
         await page.goto('/admin/tenant/P-01/world-edit', { waitUntil: 'commit' });
-        await appReady();
-
-        const overlay = page.locator('.mt-world-loading');
-        await expect(overlay).toBeAttached({ timeout: 120_000 });
+        await expect(page.locator('.mt-world-loading')).toBeAttached({ timeout: 120_000 });
 
         let capturedProgress = false;
-        for (let i = 0; i < 80; i += 1) {
-            const hidden = await overlay.getAttribute('hidden');
-            const pill = await page.locator('.mt-world-loading .d-pill').textContent().catch(() => '');
-            const hasBar = (await page.locator('.mt-world-loading.ld-bar-step-3, .mt-world-loading.ld-bar-step-4, .mt-world-loading.ld-bar-step-5').count()) > 0;
-            if (!hidden && pill && pill.includes('STEP') && hasBar) {
-                await page.screenshot({
-                    path: path.join(ARTIFACT_DIR, '01-loading-in-progress.png'),
-                    fullPage: false,
+        for (let i = 0; i < 400; i += 1) {
+            if (!capturedProgress) {
+                const progressOk = await page.evaluate(() => {
+                    const root = document.querySelector('.mt-world-loading:not([hidden])');
+                    const pill = document.querySelector('.mt-world-loading .d-pill');
+                    const title = document.querySelector('.mt-world-loading .d-t');
+                    if (!root || !pill || !title) return false;
+                    const step = Number(root.dataset.mtLdStep || 0);
+                    if (step < 4) return false;
+                    return (
+                        pill.textContent.includes('STEP') &&
+                        title.textContent.length > 3 &&
+                        parseFloat(getComputedStyle(pill).opacity) > 0.85 &&
+                        parseFloat(getComputedStyle(title).opacity) > 0.85
+                    );
                 });
-                capturedProgress = true;
-                break;
+                if (progressOk) {
+                    await page.waitForTimeout(400);
+                    await expect(page.locator('.mt-world-loading .d-pill')).toBeVisible();
+                    await expect(page.locator('.mt-world-loading .d-t')).toBeVisible();
+                    await page.screenshot({
+                        path: path.join(ARTIFACT_DIR, '01-loading-in-progress.png'),
+                        fullPage: false,
+                        animations: 'disabled',
+                    });
+                    capturedProgress = true;
+                }
             }
-            await page.waitForTimeout(80);
+            if (capturedProgress) break;
+            await page.waitForTimeout(40);
         }
         expect(capturedProgress, 'loading in-progress overlay').toBeTruthy();
 
-        await expect(page.locator('.mt-world-loading .d-ok')).toBeVisible({ timeout: 180_000 });
-        await expect(page.locator('.mt-world-loading .d-t')).toContainText(/を開きました/, { timeout: 30_000 });
+        await completeReady;
+        await expect(page.locator('.mt-world-loading .ld-stage.is-collapsed')).toBeVisible();
+        await expect(page.locator('.mt-world-loading .d-ok')).toContainText('読み込み完了');
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '02-loading-complete.png'),
             fullPage: false,
         });
 
-        await expect(overlay).toBeHidden({ timeout: 60_000 });
+        await page.waitForFunction(
+            () => document.querySelector('.mt-world-loading[hidden]') !== null,
+            null,
+            { timeout: 180_000 }
+        );
+
         await page.waitForFunction(
             () => {
                 const root = document.querySelector('.wed-root');
@@ -65,7 +98,10 @@ test.describe('world edit loading overlay visuals', () => {
             null,
             { timeout: 180_000 }
         );
-        await page.waitForTimeout(400);
+        await page.mouse.move(720, 480);
+        await page.waitForTimeout(350);
+        const railWidth = await page.locator('.side.rail').evaluate((el) => el.getBoundingClientRect().width);
+        expect(railWidth, 'collapsed editor rail width').toBeLessThan(56);
         await page.screenshot({
             path: path.join(ARTIFACT_DIR, '03-editor-ready.png'),
             fullPage: false,

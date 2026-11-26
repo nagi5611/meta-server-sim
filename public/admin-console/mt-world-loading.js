@@ -14,6 +14,7 @@
   ];
   const N = STEPS.length;
   const COLLAPSE_GAP_MS = 85;
+  const COMPLETE_HOLD_MS = 1200;
 
   let root = null;
   let stage = null;
@@ -118,6 +119,10 @@
     desc.classList.remove("is-swap");
     void desc.offsetWidth;
     desc.classList.add("is-swap");
+    if (root) {
+      root.dataset.mtLdStep = String(i + 1);
+      root.dataset.mtLdPhase = "progress";
+    }
   }
 
   function resetSlots() {
@@ -126,8 +131,13 @@
     slotEls.forEach((s) => s.classList.remove("in", "is-active", "is-gone"));
     setBarStep(-1);
     if (desc) {
-      desc.classList.remove("is-swap");
+      desc.classList.remove("is-swap", "is-complete");
       desc.innerHTML = "";
+    }
+    if (root) {
+      delete root.dataset.mtLdStep;
+      delete root.dataset.mtLdPhase;
+      delete root.dataset.mtLdCaptureReady;
     }
   }
 
@@ -139,6 +149,7 @@
     root.classList.remove("is-dismissing");
     root.removeAttribute("hidden");
     root.setAttribute("aria-busy", "true");
+    document.body.classList.add("mt-ld-active");
     fitStage();
   }
 
@@ -167,20 +178,30 @@
     slotEls.forEach((s) => s.classList.remove("is-active"));
     if (!reducedMotion) await wait(160);
     const ok = await collapseCards(my);
-    if (!ok) return;
+    if (!ok) {
+      if (root && !root.hasAttribute("hidden")) await dismiss();
+      return;
+    }
 
     const name = esc(worldName || "ワールド");
     desc.innerHTML =
       `<div class="d-ok"><b aria-hidden="true">✓</b>読み込み完了</div>` +
       `<h1 class="d-t">${name} を開きました</h1>`;
     desc.classList.remove("is-swap");
+    desc.classList.add("is-complete");
     void desc.offsetWidth;
-    desc.classList.add("is-swap");
-
-    const hold = reducedMotion ? 320 : 720;
-    await wait(hold);
-    if (my !== token) return;
-    await dismiss();
+    if (root) {
+      root.dataset.mtLdPhase = "complete";
+      root.dataset.mtLdCaptureReady = "1";
+      root.dispatchEvent(
+        new CustomEvent("mt-world-loading:complete", { detail: { worldName: worldName || "" } })
+      );
+    }
+    const holdMs = reducedMotion ? 500 : COMPLETE_HOLD_MS;
+    window.setTimeout(() => {
+      if (my !== token && root?.dataset?.mtLdPhase !== "complete") return;
+      void dismiss();
+    }, holdMs);
   }
 
   /** エラー時に短く表示して閉じる */
@@ -200,13 +221,16 @@
 
   /** フェードアウトして非表示 */
   async function dismiss() {
-    if (!root) return;
+    if (!root || root.hasAttribute("hidden")) return;
     token += 1;
+    delete root.dataset.mtLdCaptureReady;
     root.classList.add("is-dismissing");
     root.setAttribute("aria-busy", "false");
-    const dur = reducedMotion ? 80 : 450;
-    await wait(dur);
+    if (!reducedMotion) {
+      await wait(380);
+    }
     root.setAttribute("hidden", "");
+    document.body.classList.remove("mt-ld-active");
     root.classList.remove("is-dismissing");
     resetSlots();
   }
@@ -218,7 +242,7 @@
    * @param {number} [minMs]
    */
   async function runStep(index, work, minMs) {
-    const min = minMs == null ? 200 : minMs;
+    const min = minMs == null ? 280 : minMs;
     setActive(index);
     const t0 = performance.now();
     await work();
