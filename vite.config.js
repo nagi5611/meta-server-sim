@@ -135,6 +135,7 @@ export default defineConfig({
         proxy: {
             '/api': tenantProxy,
             '/admin': tenantProxy,
+            '/console': tenantProxy,
             '/admin.html': tenantProxy,
             '/admin-tenant.html': tenantProxy,
             '/metaverse-simple-static': tenantProxy,
